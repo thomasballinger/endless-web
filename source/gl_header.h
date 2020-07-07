@@ -14,6 +14,6 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #ifdef __APPLE__
 #include <OpenGL/GL3.h>
 #else
-#include <GL/glew.h>
+#include <GLES3/gl3.h>
 #endif
 
