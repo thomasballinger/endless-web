@@ -96,6 +96,9 @@ GLuint Shader::Compile(const char *str, GLenum type)
 	static string version;
 	if(version.empty())
 	{
+#ifdef ES_GLES
+		version = "#version 300 es";
+#else
 		version = "#version ";
 		string glsl = reinterpret_cast<const char *>(glGetString(GL_SHADING_LANGUAGE_VERSION));
 		for(char c : glsl)
@@ -106,6 +109,7 @@ GLuint Shader::Compile(const char *str, GLenum type)
 				version += c;
 		}
 		version += '\n';
+#endif
 	}
 	size_t length = strlen(str);
 	vector<GLchar> text(version.length() + length + 1);
