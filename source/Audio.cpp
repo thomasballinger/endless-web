@@ -31,7 +31,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <mutex>
 #include <set>
 #include <stdexcept>
+#ifndef ES_NO_THREADS
 #include <thread>
+#endif // ES_NO_THREADS
 #include <vector>
 
 using namespace std;
@@ -84,7 +86,9 @@ namespace {
 	// sure that all sounds from a given frame start at the same time.
 	map<const Sound *, QueueEntry> queue;
 	map<const Sound *, QueueEntry> deferred;
+#ifndef ES_NO_THREADS
 	thread::id mainThreadID;
+#endif // ES_NO_THREADS
 
 	// Sound resources that have been loaded from files.
 	map<string, Sound> sounds;
@@ -97,7 +101,9 @@ namespace {
 
 	// Queue and thread for loading sound files in the background.
 	map<string, string> loadQueue;
+#ifndef ES_NO_THREADS
 	thread loadThread;
+#endif // ES_NO_THREADS
 
 	// The current position of the "listener," i.e. the center of the screen.
 	Point listener;
@@ -127,7 +133,9 @@ void Audio::Init(const vector<string> &sources)
 
 	// If we don't make it to this point, no audio will be played.
 	isInitialized = true;
+#ifndef ES_NO_THREADS
 	mainThreadID = this_thread::get_id();
+#endif // ES_NO_THREADS
 
 	// The listener is looking "into" the screen. This orientation vector is
 	// used to determine what sounds should be in the right or left speaker.
@@ -160,7 +168,7 @@ void Audio::Init(const vector<string> &sources)
 		}
 	}
 
-#ifndef __EMSCRIPTEN__
+#ifndef ES_NO_THREADS
 	// Begin loading the files.
 	if(!loadQueue.empty())
 		loadThread = thread(&Load);
@@ -208,7 +216,9 @@ void Audio::CheckReferences()
 // Report the progress of loading sounds.
 double Audio::GetProgress()
 {
+#ifndef ES_NO_THREADS
 	unique_lock<mutex> lock(audioMutex);
+#endif // ES_NO_THREADS
 
 	if(loadQueue.empty())
 		return 1.;
@@ -242,7 +252,9 @@ void Audio::SetVolume(double level)
 // "sound/" folder, and without ~ if it's on the end, or the extension.
 const Sound *Audio::Get(const string &name)
 {
+#ifndef ES_NO_THREADS
 	unique_lock<mutex> lock(audioMutex);
+#endif // ES_NO_THREADS
 	return &sounds[name];
 }
 
@@ -280,6 +292,7 @@ void Audio::Play(const Sound *sound, const Point &position)
 	if(!isInitialized || !sound || !sound->Buffer() || !volume)
 		return;
 
+#ifndef ES_NO_THREADS
 	// Place sounds from the main thread directly into the queue. They are from
 	// the UI, and the Engine may not be running right now to call Update().
 	if(this_thread::get_id() == mainThreadID)
@@ -289,6 +302,9 @@ void Audio::Play(const Sound *sound, const Point &position)
 		unique_lock<mutex> lock(audioMutex);
 		deferred[sound].Add(position - listener);
 	}
+#else
+	queue[sound].Add(position - listener);
+#endif // ES_NO_THREADS
 }
 
 
@@ -459,15 +475,19 @@ void Audio::Quit()
 {
 	// First, check if sounds are still being loaded in a separate thread, and
 	// if so interrupt that thread and wait for it to quit.
+#ifndef ES_NO_THREADS
 	unique_lock<mutex> lock(audioMutex);
+#endif // ES_NO_THREADS
 	if(!loadQueue.empty())
 		loadQueue.clear();
+#ifndef ES_NO_THREADS
 	if(loadThread.joinable())
 	{
 		lock.unlock();
 		loadThread.join();
 		lock.lock();
 	}
+#endif // ES_NO_THREADS
 
 	// Now, stop and delete any OpenAL sources that are playing.
 	for(const Source &source : sources)
@@ -603,7 +623,9 @@ namespace {
 		while(true)
 		{
 			{
+#ifndef ES_NO_THREADS
 				unique_lock<mutex> lock(audioMutex);
+#endif // ES_NO_THREADS
 				// If this is not the first time through, remove the previous item
 				// in the queue. This is a signal that it has been loaded, so we
 				// must not remove it until after loading the file.

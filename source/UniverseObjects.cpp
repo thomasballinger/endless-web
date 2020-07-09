@@ -72,6 +72,7 @@ namespace {
 
 
 
+#ifndef ES_NO_THREADS
 future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode)
 {
 	progress = 0.;
@@ -108,12 +109,44 @@ future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode
 			progress = 1.;
 		});
 }
+#else
+void UniverseObjects::Load(const vector<string> &sources, bool debugMode)
+{
+	progress = 0.;
+
+	vector<string> files;
+	for(const string &source : sources)
+	{
+		// Iterate through the paths starting with the last directory given. That
+		// is, things in folders near the start of the path have the ability to
+		// override things in folders later in the path.
+		auto list = Files::RecursiveList(source + "data/");
+		files.reserve(files.size() + list.size());
+		files.insert(files.end(),
+				make_move_iterator(list.begin()),
+				make_move_iterator(list.end()));
+	}
+
+	const double step = 1. / (static_cast<int>(files.size()) + 1);
+	for(const auto &path : files)
+	{
+		LoadFile(path, debugMode);
+		progress = progress + step;
+	}
+	FinishLoading();
+	progress = 1.;
+}
+#endif // ES_NO_THREADS
 
 
 
 double UniverseObjects::GetProgress() const
 {
+#ifndef ES_NO_THREADS
 	return progress.load(memory_order_acquire);
+#else
+	return progress;
+#endif // ES_NO_THREADS
 }
 
 
@@ -373,7 +406,9 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 			// we also update our cache of it.
 			if(node.Token(1) == "menu background")
 			{
+#ifndef ES_NO_THREADS
 				lock_guard<mutex> lock(menuBackgroundMutex);
+#endif // ES_NO_THREADS
 				menuBackgroundCache.Load(node);
 			}
 		}
@@ -513,6 +548,8 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 
 void UniverseObjects::DrawMenuBackground(Panel *panel) const
 {
+#ifndef ES_NO_THREADS
 	lock_guard<mutex> lock(menuBackgroundMutex);
+#endif // ES_NO_THREADS
 	menuBackgroundCache.Draw(Information(), panel);
 }

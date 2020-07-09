@@ -75,7 +75,11 @@ class Wormhole;
 // universe.
 class GameData {
 public:
+#ifndef ES_NO_THREADS
 	static std::future<void> BeginLoad(bool onlyLoadData, bool debugMode);
+#else
+	static void BeginLoad(bool onlyLoadData, bool debugMode);
+#endif // ES_NO_THREADS
 	static void FinishLoading();
 	// Check for objects that are referred to but never defined.
 	static void CheckReferences();
