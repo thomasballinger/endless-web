@@ -32,7 +32,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <list>
 #include <map>
 #include <memory>
+#ifndef ES_NO_THREADS
 #include <thread>
+#endif // ES_NO_THREADS
 #include <utility>
 #include <vector>
 
@@ -173,14 +175,16 @@ private:
 
 	AI ai;
 
+#ifndef ES_NO_THREADS
 	std::thread calcThread;
 	std::condition_variable condition;
 	std::mutex swapMutex;
+	bool terminate = false;
+	bool hasFinishedCalculating = true;
+#endif // ES_NO_THREADS
 
 	bool calcTickTock = false;
 	bool drawTickTock = false;
-	bool hasFinishedCalculating = true;
-	bool terminate = false;
 	bool wasActive = false;
 	DrawList draw[2];
 	BatchDrawList batchDraw[2];

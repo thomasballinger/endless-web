@@ -99,7 +99,11 @@ namespace {
 
 
 
+#ifndef ES_NO_THREADS
 future<void> GameData::BeginLoad(bool onlyLoadData, bool debugMode)
+#else
+void GameData::BeginLoad(bool onlyLoadData, bool debugMode)
+#endif // ES_NO_THREADS
 {
 	// Initialize the list of "source" folders based on any active plugins.
 	LoadSources();

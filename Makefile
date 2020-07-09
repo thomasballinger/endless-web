@@ -2,7 +2,7 @@ EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
 
 clean:
 	rm -f endless-sky.js
-	rm -f endless-sky.worker.js
+	#rm -f endless-sky.worker.js
 	rm -f endless-sky.data
 	rm -f endless-sky.wasm
 	rm -f dataversion.js
@@ -39,7 +39,6 @@ favicon.ico:
 COMMON_FLAGS = -O3\
 		-s USE_SDL=2\
 		-s USE_LIBPNG=1\
-		-pthread\
 		-s DISABLE_EXCEPTION_CATCHING=0
 
 CFLAGS = $(COMMON_FLAGS)\
@@ -49,6 +48,7 @@ CFLAGS = $(COMMON_FLAGS)\
 	-Werror\
 	-Wold-style-cast\
 	-DES_GLES\
+	-DES_NO_THREADS\
 	-gsource-map\
 	-I libjpeg-turbo-2.1.0\
 
@@ -65,7 +65,6 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 	-s DEMANGLE_SUPPORT=1\
 	-s GL_ASSERTIONS=1\
 	-s ASYNCIFY\
-	-s PTHREAD_POOL_SIZE=7\
 	-s MIN_WEBGL_VERSION=2\
 	-s MAX_WEBGL_VERSION=2\
 	-s WASM_MEM_MAX=2147483648\
@@ -108,7 +107,7 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data 
 	rm -rf output
 	mkdir -p output
 	cp endless-sky.html output/index.html
-	cp endless-sky.wasm endless-sky.data endless-sky.js endless-sky.worker.js output/
+	cp endless-sky.wasm endless-sky.data endless-sky.js output/
 	cp -r js/ output/js
 	cp dataversion.js output/
 	cp favicon.ico output/

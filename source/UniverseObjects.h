@@ -63,7 +63,11 @@ class UniverseObjects {
 	friend class GameData;
 public:
 	// Load game objects from the given directories of definitions.
+#ifndef ES_NO_THREADS
 	std::future<void> Load(const std::vector<std::string> &sources, bool debugMode = false);
+#else
+	void Load(const std::vector<std::string> &sources, bool debugMode = false);
+#endif // ES_NO_THREADS
 	// Determine the fraction of data files read from disk.
 	double GetProgress() const;
 	// Resolve every game object dependency.
@@ -89,7 +93,11 @@ private:
 
 private:
 	// A value in [0, 1] representing how many source files have been processed for content.
+#ifndef ES_NO_THREADS
 	std::atomic<double> progress;
+#else
+	double progress;
+#endif // ES_NO_THREADS
 
 
 private:
@@ -131,7 +139,9 @@ private:
 	std::map<std::string, std::set<std::string>> disabled;
 
 	// A local cache of the menu background interface for thread-safe access.
+#ifndef ES_NO_THREADS
 	mutable std::mutex menuBackgroundMutex;
+#endif // ES_NO_THREADS
 	Interface menuBackgroundCache;
 };
 

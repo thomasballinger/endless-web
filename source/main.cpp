@@ -140,12 +140,18 @@ int main(int argc, char *argv[])
 	try {
 		// Begin loading the game data.
 		bool isConsoleOnly = loadOnly || printTests || printData;
+#ifndef ES_NO_THREADS
 		future<void> dataLoading = GameData::BeginLoad(isConsoleOnly, debugMode);
+#else
+		GameData::BeginLoad(isConsoleOnly, debugMode);
+#endif // ES_NO_THREADS
 
 		// If we are not using the UI, or performing some automated task, we should load
 		// all data now. (Sprites and sounds can safely be deferred.)
+#ifndef ES_NO_THREADS
 		if(isConsoleOnly || !testToRunName.empty())
 			dataLoading.wait();
+#endif // ES_NO_THREADS
 
 		if(!testToRunName.empty() && !GameData::Tests().Has(testToRunName))
 		{
