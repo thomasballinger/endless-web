@@ -24,6 +24,9 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <cstring>
 #include <map>
 
+#pragma clang diagnostic ignored "-Wunused-private-field"
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+
 using namespace std;
 
 namespace {
@@ -40,6 +43,7 @@ namespace {
 
 void Music::Init(const vector<string> &sources)
 {
+#ifndef ES_NO_THREADS
 	for(const string &source : sources)
 	{
 		// Find all the sound files that this resource source provides.
@@ -59,6 +63,7 @@ void Music::Init(const vector<string> &sources)
 			paths[name] = path;
 		}
 	}
+#endif
 }
 
 
@@ -68,8 +73,10 @@ void Music::Init(const vector<string> &sources)
 Music::Music()
 	: silence(OUTPUT_CHUNK, 0)
 {
+#ifndef ES_NO_THREADS
 	// Don't start the thread until this object is fully constructed.
 	thread = std::thread(&Music::Decode, this);
+#endif
 }
 
 
@@ -77,6 +84,7 @@ Music::Music()
 // Destructor, which waits for the thread to stop.
 Music::~Music()
 {
+#ifndef ES_NO_THREADS
 	// Tell the decoding thread to stop.
 	{
 		unique_lock<mutex> lock(decodeMutex);
@@ -89,6 +97,7 @@ Music::~Music()
 	// our job to close it.
 	if(nextFile)
 		fclose(nextFile);
+#endif
 }
 
 
@@ -96,6 +105,7 @@ Music::~Music()
 // Set the source of music. If the path is empty, this music will be silent.
 void Music::SetSource(const string &name)
 {
+#ifndef ES_NO_THREADS
 	// Find a file that provides this music.
 	auto it = paths.find(name);
 	string path = (it == paths.end() ? "" : it->second);
@@ -119,6 +129,7 @@ void Music::SetSource(const string &name)
 	// Notify the decoding thread that it can start.
 	lock.unlock();
 	condition.notify_all();
+#endif
 }
 
 
@@ -126,6 +137,7 @@ void Music::SetSource(const string &name)
 // Get the next audio buffer to play.
 const vector<int16_t> &Music::NextChunk()
 {
+#ifndef ES_NO_THREADS
 	// Check whether the "next" buffer is ready.
 	unique_lock<mutex> lock(decodeMutex);
 	if(next.size() < OUTPUT_CHUNK)
@@ -144,7 +156,8 @@ const vector<int16_t> &Music::NextChunk()
 	
 	// Return the buffer.
 	return current;
-	
+#endif
+	return silence;
 }
 
 
@@ -152,6 +165,7 @@ const vector<int16_t> &Music::NextChunk()
 // Entry point for the decoding thread.
 void Music::Decode()
 {
+#ifndef ES_NO_THREADS
 	// This vector will store the input from the file.
 	vector<unsigned char> input(INPUT_CHUNK, 0);
 	// Objects for MP3 decoding:
@@ -277,4 +291,5 @@ void Music::Decode()
 		mad_stream_finish(&stream);
 		fclose(file);
 	}
+#endif
 }

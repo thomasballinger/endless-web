@@ -38,7 +38,6 @@ favicon.ico:
 COMMON_FLAGS = -O3 -flto\
 		-s USE_SDL=2\
 		-s USE_LIBPNG=1\
-		-pthread\
 		-s DISABLE_EXCEPTION_CATCHING=0
 
 CFLAGS = $(COMMON_FLAGS)\
@@ -48,6 +47,7 @@ CFLAGS = $(COMMON_FLAGS)\
 	-Werror\
 	-Wold-style-cast\
 	-DES_GLES\
+	-DES_NO_THREADS\
 	-gsource-map\
 	-fno-rtti\
 	-I libjpeg-turbo-2.1.0\
@@ -65,7 +65,6 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 	-s GL_ASSERTIONS=1\
 	--closure 1\
 	-s ASYNCIFY\
-	-s PTHREAD_POOL_SIZE=7\
 	-s MIN_WEBGL_VERSION=2\
 	-s MAX_WEBGL_VERSION=2\
 	-s WASM_MEM_MAX=2147483648\
