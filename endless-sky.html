@@ -327,13 +327,16 @@
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl) {
           return 'your browser does not support WebGL2.';
-        } else if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === false) {
-          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy';
-        } else if (typeof Atomics === 'undefined') {
-          return "your browser does not support Atomics, required for the threaded version of Endless Web. There should be a version without it, I'll work on it.";
-        } else {
-          return true;
         }
+        /* for when compiled with threads
+        if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === false) {
+          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy';
+        }
+        if (typeof Atomics === 'undefined') {
+          return "your browser does not support Atomics, required for the threaded version of Endless Web. There should be a version without it, I'll work on it.";
+        }
+        */
+        return true;
       }
 
       async function addMainScriptTag(data) {
