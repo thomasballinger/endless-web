@@ -1,13 +1,18 @@
 EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
 
 clean:
-	rm -f endless-sky.html
 	rm -f endless-sky.js
 	rm -f endless-sky.worker.js
 	rm -f endless-sky.data
 	rm -f endless-sky.wasm
+	rm -f dataversion.js
 	rm -f endless-sky.wasm.map
 	rm -f lib/emcc/libendless-sky.a
+clean-full: clean
+	rm -f Ubuntu-Regular.ttf
+	rm -f title.png
+	rm -rf build/emcc
+	rm -rf lib/emcc
 2.1.0.tar.gz:
 	wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz
 libjpeg-turbo-2.1.0: 2.1.0.tar.gz
@@ -19,8 +24,12 @@ ifndef EMSCRIPTEN_ENV
 endif
 	cd libjpeg-turbo-2.1.0; emcmake cmake -G"Unix Makefiles" -DWITH_SIMD=0 -DCMAKE_BUILD_TYPE=Release -Wno-dev
 	cd libjpeg-turbo-2.1.0; emmake make
-dev: endless-sky.html
+dev: endless-sky.js dataversion.js Ubuntu-Regular.ttf title.png
 	emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing endless-sky.html
+title.png:
+	cp images/_menu/title.png title.png
+Ubuntu-Regular.ttf:
+	curl -Ls 'https://github.com/google/fonts/blob/main/ufl/ubuntu/Ubuntu-Regular.ttf?raw=true' > Ubuntu-Regular.ttf
 
 # not using -flto because of a change introduced in emscripten in 2.0.27 that I don't understand
 COMMON_FLAGS = -O3\
@@ -51,7 +60,6 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 	-s ASSERTIONS=2\
 	-s DEMANGLE_SUPPORT=1\
 	-s GL_ASSERTIONS=1\
-	--closure 1\
 	-s ASYNCIFY\
 	-s PTHREAD_POOL_SIZE=7\
 	-s MIN_WEBGL_VERSION=2\
@@ -76,16 +84,19 @@ OBJS_EXCEPT_MAIN := $(subst .cpp,.o,$(TEMP))
 HEADERS := $(shell ls source/*.h*) $(shell ls source/text/*.h*)
 
 build/emcc/%.o: source/%.cpp
-	mkdir -p build/emcc
-	mkdir -p build/emcc/text
+	@mkdir -p build/emcc
+	@mkdir -p build/emcc/text
 	em++ $(CFLAGS) -c $< -o $@
 
 lib/emcc/libendless-sky.a: $(OBJS_EXCEPT_MAIN)
-	mkdir -p lib/emcc
+	@mkdir -p lib/emcc
 	emar rcs lib/emcc/libendless-sky.a $(OBJS_EXCEPT_MAIN)
 
-endless-sky.html: libjpeg-turbo-2.1.0/libturbojpeg.a lib/emcc/libendless-sky.a build/emcc/main.o
+endless-sky.js: libjpeg-turbo-2.1.0/libturbojpeg.a lib/emcc/libendless-sky.a build/emcc/main.o
 ifndef EMSCRIPTEN_ENV
 	$(error "em++ is not available, activate the emscripten env first")
 endif
-	em++ -o endless-sky.html $(LINK_FLAGS) build/emcc/main.o lib/emcc/libendless-sky.a
+	em++ -o endless-sky.js $(LINK_FLAGS) build/emcc/main.o lib/emcc/libendless-sky.a
+
+dataversion.js: endless-sky.js
+	./hash-data.py endless-sky.data dataversion.js
