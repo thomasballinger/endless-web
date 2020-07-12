@@ -162,13 +162,26 @@ The first time you build the project, a library for the SDL framework will be do
 
 Mac and Linux (Windows not supported):
 
+<<<<<<< HEAD
 Install Emscripten following the instructions at https://emscripten.org/docs/getting_started/downloads.html
 Use the latest version and source the emsdk_env.sh file so you can run commands like emcc, em++ and emmake.
 The last time I checked, this looked like:
+=======
+Install scons with apt, yum, brew, etc. Unlike the setup instructions for the normal build on Mac above, you will need scons on Mac.
+
+```
+  $ apt install scons  # just run one of these commands, this one is for Debian
+  $ yum install scons  # RPM-based
+  $ brew install scons  # mac
+```
+
+Next, install emscripten. The last time I checked, this looked like:
+>>>>>>> 474993cd... HTML for web build
 
 ```
   $ git clone https://github.com/emscripten-core/emsdk.git
   $ cd emsdk
+<<<<<<< HEAD
   $ ./emsdk install 2.0.34
   $ ./emsdk activate 2.0.34
   $ source ./emsdk_env.sh  # you'll need to run this one each time you open a new terminal
