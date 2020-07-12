@@ -424,6 +424,7 @@ void GameWindow::ExitWithError(const string& message, bool doPopUp)
 		box.title = "Endless Sky: Error";
 		box.message = message.c_str();
 		box.colorScheme = nullptr;
+		printf("Error: %s\n", message.c_str());
 		
 		SDL_MessageBoxButtonData button;
 		button.flags = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
