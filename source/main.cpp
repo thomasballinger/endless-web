@@ -72,7 +72,11 @@ int main(int argc, char *argv[])
 	FS.syncfs(
 		true, function(err) {
 			assert(!err);
-			console.log("IndexedDB loaded!");
+			const contents = FS.lookupPath('saves').node.contents;
+			const numFiles = Object.keys(contents).length;
+			console.log(
+				numFiles ? numFiles : "No",
+				"save files found in IndexedDB.");
 		}););
 #endif
 	// Handle command-line arguments
