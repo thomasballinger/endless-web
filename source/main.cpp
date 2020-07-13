@@ -45,6 +45,10 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <windows.h>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#    include <emscripten.h>
+#endif
+
 using namespace std;
 
 void PrintHelp();
@@ -60,6 +64,17 @@ void InitConsole();
 // Entry point for the EndlessSky executable
 int main(int argc, char *argv[])
 {
+#ifdef __EMSCRIPTEN__
+	EM_ASM(FS.mkdir('/saves'); FS.mount(IDBFS, {}, '/saves');
+
+	// sync from persisted state into memory and then
+	// run the 'test' function
+	FS.syncfs(
+		true, function(err) {
+			assert(!err);
+			console.log("IndexedDB loaded!");
+		}););
+#endif
 	// Handle command-line arguments
 #ifdef _WIN32
 	if(argc > 1)
