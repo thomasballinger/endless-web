@@ -149,9 +149,11 @@ if env["mode"] == "emcc":
 		"--preload-file", "sounds",
 		"--preload-file", "credits.txt",
 		"--preload-file", "keys.txt",
-		"--preload-file", "dummy@saves/dummy",
 		"--emrun",
 	])
+	env.Append(LIBS = [
+		"idbfs.js"
+	]);
 
 if env["opengl"] == "gles":
 	if is_windows_host:
