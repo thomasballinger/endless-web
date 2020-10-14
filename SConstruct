@@ -33,7 +33,7 @@ if is_windows_host:
 
 opts = Variables()
 opts.AddVariables(
-	EnumVariable("mode", "Compilation mode", "release", allowed_values=("release", "debug", "profile")),
+	EnumVariable("mode", "Compilation mode", "release", allowed_values=("release", "debug", "profile", "emcc")),
 	EnumVariable("opengl", "Whether to use OpenGL or OpenGL ES", "desktop", allowed_values=("desktop", "gles")),
 	PathVariable("BUILDDIR", "Directory to store compiled object files in", "build", PathVariable.PathIsDirCreate),
 	PathVariable("BIN_DIR", "Directory to store binaries in", ".", PathVariable.PathIsDirCreate),
@@ -48,15 +48,13 @@ Help(opts.GenerateHelpText(env))
 #   $ CXXFLAGS=-march=native scons
 # or modify the `flags` variable:
 flags = ["-std=c++11", "-Wall", "-Werror", "-Wold-style-cast"]
+common_flags = []
 if env["mode"] != "debug":
-	flags += ["-O3", "-flto"]
-	env.Append(LINKFLAGS = ["-O3", "-flto"])
+	common_flags  += ["-O3", "-flto"]
 if env["mode"] == "debug":
 	flags += ["-g"]
 elif env["mode"] == "profile":
-	flags += ["-pg"]
-	env.Append(LINKFLAGS = ["-pg"])
-env.Append(CCFLAGS = flags)
+	common_flags += ["-pg"]
 
 # Always use `ar` to create the symbol table, and don't use ranlib at all, since it fails to preserve
 # LTO information, even when passed the plugin path, when run in Steam's "Scout" runtime.
@@ -80,6 +78,10 @@ sys_libs = [
 ]
 env.Append(LIBS = sys_libs)
 
+# no uuid_generate_random provided by Emscripten, so alias to uuid_generate
+if env["mode"] == "emcc":
+	flags += ["-Duuid_generate_random=uuid_generate"]
+
 game_libs = [
 	"winmm",
 	"mingw32",
@@ -95,8 +97,61 @@ game_libs = [
 	"jpeg",
 	"openal",
 	"pthread",
+] if env["mode"] != "emcc" else [
+	"openal"
 ]
 env.Append(LIBS = game_libs)
+
+if env["mode"] == "emcc":
+	if env["opengl"] != "gles":
+		print("emcc requires opengl=gles")
+		Exit(1)
+	env['CXX'] = "em++"
+	env['CC'] = "emcc"
+	env['AR'] = "emar"
+	env['RANLIB'] = "emranlib"
+	flags += [
+		"-gsource-map",
+		"-fno-rtti",
+		"-I", "libjpeg-turbo-2.1.0",
+	]
+	common_flags += [
+		"-s", "USE_SDL=2",
+		"-s", "USE_LIBPNG=1",
+		"-pthread",
+
+		# debugging
+		"-s", "DISABLE_EXCEPTION_CATCHING=0",
+	]
+	env.Append(LINKFLAGS = [
+		"-L", "libjpeg-turbo-2.1.0",
+		"-l", "jpeg",
+
+		# debugging
+		"--source-map-base", "http://localhost:6931/",
+		"-s", "USE_WEBGL2=1",
+		"-s", "ASSERTIONS=2",
+		"-s", "DEMANGLE_SUPPORT=1",
+		"-s", "GL_ASSERTIONS=1",
+
+		"--closure", "1",
+		"-s", "ASYNCIFY",
+		"-s", "PTHREAD_POOL_SIZE=7", # <=6 deadlocks
+		"-s", "MIN_WEBGL_VERSION=2",
+		"-s", "MAX_WEBGL_VERSION=2",
+		"-s", "WASM_MEM_MAX=2147483648", # 2GB
+		"-s", "INITIAL_MEMORY=629145600", # 600MB
+		"-s", "ALLOW_MEMORY_GROWTH=1",
+
+		# load these directories in a virtual filesystem
+		"--preload-file", "data",
+		"--preload-file", "images",
+		"--preload-file", "sounds",
+		"--preload-file", "credits.txt",
+		"--preload-file", "keys.txt",
+		"--preload-file", "dummy@saves/dummy",
+		"--emrun",
+	])
 
 if env["opengl"] == "gles":
 	if is_windows_host:
@@ -105,7 +160,7 @@ if env["opengl"] == "gles":
 	env.Append(LIBS = [
 		"GLESv2",
 	])
-	env.Append(CCFLAGS = ["-DES_GLES"])
+	flags += ["-DES_GLES"]
 elif is_windows_host:
 	env.Append(LIBS = [
 		"glew32.dll",
@@ -117,12 +172,16 @@ else:
 		"GLEW",
 	])
 
+env.Append(CCFLAGS = flags)
+env.Append(CCFLAGS = common_flags)
+env.Append(LINKFLAGS = common_flags)
+
 # libmad is not in the Steam runtime, so link it statically:
 if 'steamrt_scout_i386' in chroot_name:
 	env.Append(LIBS = File("/usr/lib/i386-linux-gnu/libmad.a"))
 elif 'steamrt_scout_amd64' in chroot_name:
 	env.Append(LIBS = File("/usr/lib/x86_64-linux-gnu/libmad.a"))
-else:
+elif env["mode"] != "emcc":
 	env.Append(LIBS = "mad")
 
 
@@ -143,11 +202,14 @@ def RecursiveGlob(pattern, dir_name=buildDirectory):
 
 # By default, invoking scons will build the backing archive file and then the game binary.
 sourceLib = env.StaticLibrary(pathjoin(libDirectory, "endless-sky"), RecursiveGlob("*.cpp", buildDirectory))
+outname = "endless-sky"
+if env["mode"] == "emcc":
+    outname += ".html"
 exeObjs = [Glob(pathjoin(buildDirectory, f)) for f in ("main.cpp",)]
 if is_windows_host:
 	windows_icon = env.RES(pathjoin(buildDirectory, "WinApp.rc"))
 	exeObjs.append(windows_icon)
-sky = env.Program(pathjoin(binDirectory, "endless-sky"), exeObjs + sourceLib)
+sky = env.Program(pathjoin(binDirectory, outname), exeObjs + sourceLib)
 env.Default(sky)
 
 
