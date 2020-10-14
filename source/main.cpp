@@ -52,6 +52,10 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <mmsystem.h>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#    include <emscripten.h>
+#endif
+
 using namespace std;
 
 void PrintHelp();
@@ -67,6 +71,21 @@ void InitConsole();
 // Entry point for the EndlessSky executable
 int main(int argc, char *argv[])
 {
+#ifdef __EMSCRIPTEN__
+	EM_ASM(FS.mkdir('/saves');
+	FS.mount(IDBFS, {}, '/saves');
+
+	// sync from persisted state into memory
+	FS.syncfs(
+		true, function(err) {
+			assert(!err);
+			const contents = FS.lookupPath('saves').node.contents;
+			const numFiles = Object.keys(contents).length;
+			console.log(
+				numFiles ? numFiles : "No",
+				"save files found in IndexedDB.");
+		}););
+#endif
 	// Handle command-line arguments
 #ifdef _WIN32
 	if(argc > 1)
