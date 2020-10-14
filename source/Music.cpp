@@ -17,7 +17,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Files.h"
 
+#ifdef __EMSCRIPTEN__
+#include "FakeMad.h"
+#else
 #include <mad.h>
+#endif
 
 #include <algorithm>
 #include <cstring>

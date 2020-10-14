@@ -54,6 +54,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <sstream>
 #include <stdexcept>
 
+#ifdef __EMSCRIPTEN__
+#    include <emscripten.h>
+#endif
+
 using namespace std;
 
 namespace {
@@ -500,6 +504,15 @@ void PlayerInfo::Save() const
 	// Save global conditions:
 	DataWriter globalConditions(Files::Config() + "global conditions.txt");
 	GameData::GlobalConditions().Save(globalConditions);
+
+#ifdef __EMSCRIPTEN__
+	EM_ASM(
+	   // syncfs(false) means save in-memory fs to persistent storage
+	   FS.syncfs(false, function(err) {
+		   assert(!err);
+		   console.log("persisted save file to IndexedDB.");
+	}););
+#endif
 }
 
 
