@@ -116,3 +116,21 @@ For the Code::Blocks project, the archive program can be configured in Code::Blo
 The Scons builds can be controlled by setting the appropriate environment variable(s), either directly in the environment or just for the lifetime of the command:
 
   $ AR=gcc-ar RANLIB=gcc-ranlib scons 
+
+
+Building the web build
+
+Windows: ?
+
+Mac and Linux:
+
+Install scons with apt-get, yum, brew, etc. Unlike the setup instructions for the normal build on Mac above, you will need scons on Mac.
+
+Install Emscripten: follow instructions at https://emscripten.org/docs/getting_started/downloads.html
+
+Use the latest version (see instructions above) and source the emsdk_env.sh file so you can run commands like emcc, em++ and emrun.
+
+Now in the source code folder, run
+
+  $ scons -j 8 mode=emcc music=off opengl=gles threads=off
+  $ emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing endless-sky.html
