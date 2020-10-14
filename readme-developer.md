@@ -6,35 +6,35 @@ Most of the current development work is done on Ubuntu Linux. Building the code 
 
 How you build Endless Sky will then depend on your operating system:
 
-
-
 ## Linux
 
 Use your favorite package manager to install the following (version numbers may vary depending on your distribution):
 
 ##### DEB-based distros:
-   - g++
-   - scons
-   - libsdl2-dev
-   - libpng-dev
-   - libjpeg-dev
-   - libgl1-mesa-dev
-   - libglew-dev
-   - libopenal-dev
-   - libmad0-dev
-   - uuid-dev
+
+- g++
+- scons
+- libsdl2-dev
+- libpng-dev
+- libjpeg-dev
+- libgl1-mesa-dev
+- libglew-dev
+- libopenal-dev
+- libmad0-dev
+- uuid-dev
 
 ##### RPM-based distros:
-   - gcc-c++
-   - scons
-   - SDL2-devel
-   - libpng-devel
-   - libjpeg-turbo-devel
-   - mesa-libGL-devel
-   - glew-devel
-   - openal-soft-devel
-   - libmad-devel
-   - libuuid-devel
+
+- gcc-c++
+- scons
+- SDL2-devel
+- libpng-devel
+- libjpeg-turbo-devel
+- mesa-libGL-devel
+- glew-devel
+- openal-soft-devel
+- libmad-devel
+- libuuid-devel
 
 Then, from the project root folder, simply type:
 
@@ -55,8 +55,6 @@ To compile and also run unit tests, the "test" target can be used:
 The produced test binary will be invoked with a reasonable set of arguments. To run any test benchmarks, you will need to invoke the test binary directly. Refer to the build pipeline definitions for the current required arguments.
 More information on unit tests can be found in the project's "tests" directory, or by running the binary with the `--tests` flag.
 
-
-
 ## Windows
 
 Two methods of building the game on Windows are supported. The official build is done on the command-line with the Scons program, but the game may also be built using the Code::Blocks IDE. Both require a MinGW toolchain and the precompiled libraries linked below.
@@ -72,7 +70,6 @@ Endless Sky requires precompiled libraries to compile and play: [Download link](
 
 The zip can be extracted anywhere on your filesystem; to minimize additional configuration, you can move the `dev64` folder to `C:\`.
 
-
 ### Building with Scons
 
 If you want to build the game from the command line via Scons, you will need [Python 3.8 or later](https://www.python.org/downloads/). When installing, be sure to select the "Add to PATH" checkbox.
@@ -87,7 +84,6 @@ If you used the defaults for MinGW up to this point, add "New" and enter the fol
 From there, restart your command line if you had one open, and simply `cd` to your Endless Sky directory, then type `mingw32-make.exe -f .winmake`. (`make`'s standard `-j N` flag is supported, to increase the number of active parallel build tasks to N.)
 
 **IMPORTANT:** Before the game will run the first time, you will need to skip down to the instructions at **Running the game** below.
-
 
 ### Building with Code::Blocks
 
@@ -108,38 +104,34 @@ You can continue making tweaks to files that belong to the "endless-sky-lib" pro
 
 **IMPORTANT:** Before the game will run the first time, you will need to skip down to the instructions at **Running the game** below.
 
-
 ### Building with other IDEs
 
 Refer to the build pipeline files under `.github\` to tailor the build process to your chosen IDE.
-
 
 ### Running the Game
 
 For Endless Sky to run on Windows, it needs various .dll files included in the base directory. Go to `C:\dev64\bin\`, and copy the files to your base directory. These should include:
 
-  - glew32.dll
-  - **libgcc_s_seh-1.dll**
-  - libjpeg-62.dll
-  - libmad-0.dll
-  - libpng15-15.dll
-  - **libstdc++-6.dll**
-  - libturbojpeg.dll
-  - libwinpthread-1.dll
-  - OpenAL32.dll
-  - SDL2.dll
-  - soft_oal.dll
-  - zlib1.dll
+- glew32.dll
+- **libgcc_s_seh-1.dll**
+- libjpeg-62.dll
+- libmad-0.dll
+- libpng15-15.dll
+- **libstdc++-6.dll**
+- libturbojpeg.dll
+- libwinpthread-1.dll
+- OpenAL32.dll
+- SDL2.dll
+- soft_oal.dll
+- zlib1.dll
 
 **After** you have copied all those libraries, take note of the **bolded** libraries. Those will need to be included from your MinGW installation, instead of from the precompiled ones. By default, you can go to `C:\Program Files\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin`, and copy those libraries to your Endless Sky directory to overwrite the current ones.
 
 Once all the libraries in place, the game is ready to run! You have three options depending on how you built it:
 
 - If you built the game via Scons, open a terminal to the base Endless Sky directory, then run `bin\pkgd\release\endless-sky.exe`.
-- If you built the game via Code::Blocks, double click *EndlessSky* in the file panel on the left, then either click the green arrow on top, or hit Control+F10.
+- If you built the game via Code::Blocks, double click _EndlessSky_ in the file panel on the left, then either click the green arrow on top, or hit Control+F10.
 - If you want to run the game manually, use one of the methods above to build the game, then copy an executable from under the `bin\` folder to your base directory, then open the game.
-
-
 
 ## macOS:
 
@@ -156,3 +148,25 @@ It is possible that you will also need to modify the “Header Search Paths” a
 The first time you build the project, a library for the SDL framework will be downloaded.
 
 **Note: there is extremely limited development support for macOS, and no intent to support macOS's new ARM architecture.**
+
+## Building for the web:
+
+Mac and Linux (Windows not supported):
+
+Install Emscripten following the instructions at https://emscripten.org/docs/getting_started/downloads.html
+Use the latest version and source the emsdk_env.sh file so you can run commands like emcc, em++ and emmake.
+The last time I checked, this looked like:
+
+```
+  $ git clone https://github.com/emscripten-core/emsdk.git
+  $ cd emsdk
+  $ ./emsdk install 3.1.0
+  $ ./emsdk activate 3.1.0
+  $ source ./emsdk_env.sh  # you'll need to run this one each time you open a new terminal
+```
+
+Now back in the endless-sky repo directory run: (maybe you need to install make, wget, and tar first? I figure those should be everywhere already)
+
+```
+  $ make dev
+```
