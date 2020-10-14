@@ -156,3 +156,26 @@ It is possible that you will also need to modify the “Header Search Paths” a
 The first time you build the project, a library for the SDL framework will be downloaded.
 
 **Note: there is extremely limited development support for macOS, and no intent to support macOS's new ARM architecture.**
+
+
+## Building for the web:
+
+Mac and Linux (Windows not supported):
+
+Install Emscripten following the instructions at https://emscripten.org/docs/getting_started/downloads.html
+Use the latest version and source the emsdk_env.sh file so you can run commands like emcc, em++ and emmake.
+The last time I checked, this looked like:
+
+```
+  $ git clone https://github.com/emscripten-core/emsdk.git
+  $ cd emsdk
+  $ ./emsdk install 2.0.34
+  $ ./emsdk activate 2.0.34
+  $ source ./emsdk_env.sh  # you'll need to run this one each time you open a new terminal
+```
+
+Now back in the endless-sky repo directory run: (maybe you need to install make, wget, and tar first? I figure those should be everywhere already)
+
+```
+  $ make dev
+```
