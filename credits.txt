@@ -5,6 +5,14 @@ The player's manual and other
 resources are available at:
 https://endless-sky.github.io
 
+This WebAssembly port done by:
+  janisozaur
+  thomasballinger
+
+Fork available at
+  https://github.com
+    /janisozaur/endless-sky
+
 This game is open source.
 To report bugs, give feedback,
 or contribute to story writing,
