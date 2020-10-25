@@ -1,6 +1,14 @@
 Welcome to Endless Sky!
 version 0.9.16-alpha
 
+This WebAssembly port done by:
+  janisozaur
+  thomasballinger
+
+Fork available at
+  https://github.com
+    /janisozaur/endless-sky
+
 This game is open source.
 To report bugs, give feedback,
 or contribute to story writing,
