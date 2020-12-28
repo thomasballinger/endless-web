@@ -13,9 +13,7 @@
         src: url("Ubuntu-Regular.ttf");
       }
       body {
-          display: -webkit-flex;
           display: flex;
-          -webkit-flex-direction: column;
           flex-direction: column;
           width: 100%;
           height: 100%;
@@ -39,8 +37,10 @@
       button:hover {
         color: rgb(215, 215, 215);
       }
+      h1, h2, h3 {
+        color: rgb(115, 115, 115);
+      }
       #canvas {
-          -webkit-flex: 1;
           flex: 1;
           width: 100%;
           min-height: 10%;
@@ -51,6 +51,9 @@
       }
       .download-button {
         width: 100%
+      }
+      .load-button {
+        margin: 20px;
       }
       .status {
           text-align: center;
@@ -68,18 +71,16 @@
         left: 0;
         width: 100%;
         height: 100%;
-        z-index: -1;
+        z-index: 1;
         background-color: black;
-        background-image: url("./title.png");
-        background-repeat: no-repeat;
-        background-position: center;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
       }
+      .title {
+      }
       .progress-bar-section {
-        margin-top: 40%;
         font-family: 'Ubuntu', "times new roman", times, roman, serif;
         color: #4e4e4e;
         text-align: center;
@@ -116,17 +117,23 @@
       }
       .ugly-header {
         padding-left: 2px;
+        z-index: 2;
       }
     </style>
   </head>
   <body>
     <div class="loading">
+
+      <img class="title" src="title.png" />
       <div class="progress-bar-section">
         <p class="progress-text">Downloading data...</p>
         <div class="progress-bar">
           <div class="progress"></div>
         </div>
       </div>
+      <button class="load-button" disabled>Play Endless Sky</button>
+      <h2 class="plugins-header" style="display: none;">Plugins</h2>
+      <div class="plugins-list">Plugins</div>
     </div>
     <div class="debug">
       <h1>Debug panel</h1>
@@ -147,7 +154,14 @@
 
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
 
+    <!-- these are GPLv3 licensed libraries that we should download instead of hotlinking at some point -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.js" integrity="sha512-18QiVdJv36r1ryb5mr1lFpm4wZMORhvGgvz0mHQllOmx3NmSZkYwWuDcecFByaRVWqiQ0F/FZC5pCBMuy8IfkQ==" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip-utils/0.1.0/jszip-utils.js" integrity="sha512-vzp9X4pwJHRiGSEH692sqmRe5R8OQNKSCe1zg38GQoNUGJtnPrwhwKF3lbaFZMsT8ZQ3ppZ8tlLqkJGosi5/CA==" crossorigin="anonymous"></script>
+
+    <!-- These naive scripts create globals so load order matters -->
     <script src="js/cached-resource.js"></script>
+    <script src="js/save-games.js"></script>
+    <script src="js/plugins.js"></script>
     <script src="dataversion.js"></script>
     <script type='text/javascript'>
       function toggleDebugWindow() {
@@ -165,59 +179,13 @@
           toggleDebugWindow();
         }
       }, {capture: true})
+
       document.querySelector('.toggle-debug').addEventListener('click', toggleDebugWindow);
+
       const saveGamesList = document.querySelector('.save-games');
       const showSaveGamesButton = document.querySelector('.show-save-games');
-      function timeDelta(seconds){
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor(seconds / 60);
-        const s = Math.ceil(seconds % 60)
-        if (h) return h > 1 ? `${h} hours ago` : `1 hour ago`;
-        if (m) return m > 1 ? `${m} minutes ago` : `1 minute ago`;
-        return s < 20 ? `just now` : `${s} seconds ago`;
-      }
-      function showSaveGames(){
-        const now = new Date();
-        const contents = FS.lookupPath('saves').node.contents
-        const files = Object.keys(contents).map(name => {
-          const path = `/saves/${name}`;
-          const mtime = FS.stat(path).mtime;
-          return {
-            name,
-            path: `/saves/${name}`,
-            mtime,
-            t: +mtime,
-            secondsAgo: Math.ceil((now - mtime) / 1000)
-          };
-        })
-        files.sort((a, b) => (a.secondsAgo - b.secondsAgo));
+      showSaveGamesButton.addEventListener('click', () => showSaveGames(saveGamesList));
 
-        saveGamesList.innerHTML = ''
-        files.forEach(({name, path, secondsAgo}) => {
-          const button = document.createElement('button');
-          button.class = "download-button";
-          button.innerText = `${name} (saved ${timeDelta(secondsAgo)})`;
-          button.onclick = function offerFileAsDownload() {
-            const mime = "text/plain";
-            let content = FS.readFile(path);
-            console.log(`Offering download of "${path}", with ${content.length} bytes...`);
-
-            const a = document.createElement('a');
-            a.download = name;
-            a.href = URL.createObjectURL(new Blob([content], {type: mime}));
-            a.style.display = 'none';
-
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-              document.body.removeChild(a);
-              URL.revokeObjectURL(a.href);
-            }, 10000);
-          }
-          saveGamesList.appendChild(button);
-        });
-      }
-      showSaveGamesButton.addEventListener('click', showSaveGames);
       const progressBar = document.querySelector('.progressBar');
       const progress = document.querySelector('.progress');
       const progressText = document.querySelector('.progress-text');
@@ -229,17 +197,19 @@
         if (numerator === denominator) {
           progress.style.transition = 'none';
           if (usingCache) {
-            progressText.textContent = "Using cached data file, loading..."
+            progressText.textContent = "Using cached data"
           } else {
-            progressText.textContent = "Downloading complete, loading..."
+            progressText.textContent = "Downloading complete"
           }
         }
       }
+
       // Prevents known errors which fire thousands of times from making the console hard to use
       function errFilter(text) {
         // ignore errors about missing image frames
         if (/missing frame/.exec(text)) text = null;
       }
+
       [...document.querySelectorAll('.file-selector')].map(el => {
         el.addEventListener("change", async function() {
           // write every file uploaded to the filesystem
@@ -257,6 +227,9 @@
       document.querySelector('.dismiss-upload').addEventListener('click', function() {
         this.parentNode.style.display = 'none';
       });
+
+      let runtimeInitializedResolve;
+      const runtimeInitializedPromise = new Promise(r => {runtimeInitializedResolve = r})
 
       var Module = {
           print: (function(text) {
@@ -284,7 +257,8 @@
           })(),
           canvas: document.getElementById('canvas'),
           getPreloadedPackage: function() { return Module.downloadedData; },
-          arguments: ['--no-music']
+          noInitialRun: true,
+          onRuntimeInitialized: () => {console.log('runtime initialized'); runtimeInitializedResolve();}
       };
 
       // returns true if this browser, otherwise a string for an error message.
@@ -297,21 +271,57 @@
         }
       }
 
-      async function addMainScriptTag() {
-        // If no dataversion.js script found, force download with date string
-        const versionString = typeof endlessSkyDataVersion === 'undefined' ? Date() : endlessSkyDataVersion;
-        Module.downloadedData = await (new CachedResource("endless-sky.data")).get('versionstring', updateProgress);
+      async function addMainScriptTag(data) {
+        // dynamically loaded so we can load the data ourselves
+        Module.downloadedData = data;
         const tag = document.createElement('script');
         tag.src = "endless-sky.js";
         document.body.appendChild(tag);
       }
 
-      const why = supported();
-      if (why === true) {
-        addMainScriptTag();
-      } else {
-        progressText.textContent = `Not supported because ${why}`
+      async function main() {
+        const why = supported();
+        if (why !== true) {
+          progressText.textContent = `Not supported because ${why}`
+          return;
+        }
+
+        const showPluginManager = (new URL(location)).searchParams.has('plugins');
+
+        let loadButtonResolve
+        const loadButtonPromise = new Promise((r) => loadButtonResolve = r);
+        const loadButton = document.querySelector('.load-button');
+
+        if (showPluginManager) {
+          loadButton.disabled = false;
+          loadButton.addEventListener("click", loadButtonResolve);
+        } else {
+          loadButton.style.display = 'none';
+        }
+
+        // If no dataversion available, force download with date string
+        const versionString = typeof endlessSkyDataVersion === 'undefined' ? Date() : endlessSkyDataVersion;
+        // If no data size available, dunno
+        const dataSize = typeof endlessSkyDataSize === 'undefined' ? 0 : endlessSkyDataSize;
+        data = await (new CachedResource("endless-sky.data")).get(dataSize, versionString, updateProgress);
+
+        await addMainScriptTag(data);
+        await runtimeInitializedPromise;
+
+        if (showPluginManager) {
+          document.querySelector('.plugins-header').style.display = '';
+          const plugins = await (await fetch("https://raw.githubusercontent.com/EndlessSkyCommunity/endless-sky-plugins/master/generated/plugins.json")).json()
+          showPlugins(document.querySelector('.plugins-list'), plugins);
+          FS.mkdir('plugins');
+
+          await loadButtonPromise
+        }
+        loadButton.disabled = true;
+        document.querySelector('.loading').style.zIndex = -1;
+        Module.callMain(['--no-music']);
       }
+
+      main();
     </script>
   </body>
 </html>

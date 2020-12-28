@@ -65,7 +65,8 @@ void InitConsole();
 int main(int argc, char *argv[])
 {
 #ifdef __EMSCRIPTEN__
-	EM_ASM(FS.mkdir('/saves'); FS.mount(IDBFS, {}, '/saves');
+	EM_ASM(FS.mkdir('/saves');
+	FS.mount(IDBFS, {}, '/saves');
 
 	// sync from persisted state into memory
 	FS.syncfs(
