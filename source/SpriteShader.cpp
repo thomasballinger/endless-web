@@ -20,6 +20,11 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <vector>
 #include <sstream>
 
+#ifdef ES_GLES
+// ES_GLES doesn't use this, so use (the right) dummy value
+#define GL_TEXTURE_SWIZZLE_RGBA           0x8E46
+#endif
+
 using namespace std;
 
 namespace {

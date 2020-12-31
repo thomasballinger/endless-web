@@ -58,8 +58,8 @@ public:
 	
 private:
 	double DoLoad(std::unique_lock<std::mutex> &lock);
-	
-	
+
+
 private:
 	// These are the image sets that need to be loaded from disk.
 	std::queue<std::shared_ptr<ImageSet>> toRead;
