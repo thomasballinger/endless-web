@@ -166,10 +166,10 @@ private:
 	std::thread calcThread;
 	std::condition_variable condition;
 	std::mutex swapMutex;
+	bool terminate = false;
 	
 	bool calcTickTock = false;
 	bool drawTickTock = false;
-	bool terminate = false;
 	bool wasActive = false;
 	DrawList draw[2];
 	BatchDrawList batchDraw[2];
