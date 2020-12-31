@@ -271,7 +271,7 @@ namespace {
 #pragma GCC diagnostic pop
 		
 		jpeg_stdio_src(&cinfo, file);
-		jpeg_read_header(&cinfo, true);
+		jpeg_read_header(&cinfo, TRUE);
 		cinfo.out_color_space = JCS_RGB;
 		
 		jpeg_start_decompress(&cinfo);

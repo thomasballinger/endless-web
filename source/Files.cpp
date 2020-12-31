@@ -98,6 +98,11 @@ void Files::Init(const char * const *argv)
 			
 	}
 	
+#ifdef __EMSCRIPTEN__
+	config = "/";
+	resources = "/";
+#endif
+	
 	if(resources.empty())
 	{
 		// Find the path to the resource directory. This will depend on the

@@ -144,7 +144,6 @@ void SpriteQueue::operator()()
 }
 
 
-
 double SpriteQueue::DoLoad(unique_lock<mutex> &lock)
 {
 	while(!toUnload.empty())

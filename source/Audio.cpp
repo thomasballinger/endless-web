@@ -160,9 +160,17 @@ void Audio::Init(const vector<string> &sources)
 			}
 		}
 	}
+
+#ifndef __EMSCRIPTEN__
+	// emscripten-compiled code freezes here in the browser
+	// so just load synchronously
+
 	// Begin loading the files.
 	if(!loadQueue.empty())
 		loadThread = thread(&Load);
+#else
+	Load();
+#endif
 	
 	// Create the music-streaming threads.
 	currentTrack.reset(new Music());
@@ -428,6 +436,7 @@ void Audio::Quit()
 	unique_lock<mutex> lock(audioMutex);
 	if(!loadQueue.empty())
 		loadQueue.clear();
+
 	if(loadThread.joinable())
 	{
 		lock.unlock();
