@@ -163,9 +163,17 @@ void Audio::Init(const vector<string> &sources, bool enableMusic)
 			}
 		}
 	}
+
+#ifndef __EMSCRIPTEN__
+	// emscripten-compiled code freezes here in the browser
+	// so just load synchronously
+
 	// Begin loading the files.
 	if(!loadQueue.empty())
 		loadThread = thread(&Load);
+#else
+	Load();
+#endif
 	
 	// Create the music-streaming threads.
 	if (!musicEnabled) return;

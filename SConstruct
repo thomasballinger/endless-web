@@ -33,7 +33,7 @@ if is_windows_host:
 
 opts = Variables()
 opts.AddVariables(
-	EnumVariable("mode", "Compilation mode", "release", allowed_values=("release", "debug", "profile")),
+	EnumVariable("mode", "Compilation mode", "release", allowed_values=("release", "debug", "profile", "emcc")),
 	EnumVariable("opengl", "Whether to use OpenGL or OpenGL ES", "desktop", allowed_values=("desktop", "gles")),
 	PathVariable("BUILDDIR", "Directory to store compiled object files in", "build", PathVariable.PathIsDirCreate),
 	PathVariable("BIN_DIR", "Directory to store binaries in", ".", PathVariable.PathIsDirCreate),
@@ -47,7 +47,13 @@ Help(opts.GenerateHelpText(env))
 #   $ CXXFLAGS=-msse3 scons
 #   $ CXXFLAGS=-march=native scons
 # or modify the `flags` variable:
-flags = ["-std=c++11", "-Wall", "-Werror", "-Wold-style-cast"]
+flags = [] if env["mode"] == "emcc" else [
+    "-std=c++11",
+    "-Wall",
+    "-Werror",
+    "-Wold-style-cast"
+]
+common_flags = [""]
 if env["mode"] != "debug":
 	flags += ["-O3", "-flto"]
 	env.Append(LINKFLAGS = ["-O3", "-flto"])
@@ -95,8 +101,56 @@ game_libs = [
 	"jpeg",
 	"openal",
 	"pthread",
+] if env["mode"] != "emcc" else [
+	"openal"
 ]
 env.Append(LIBS = game_libs)
+
+if env["mode"] == "emcc":
+	if env["opengl"] != "gles":
+		print("emcc requires opengl=gles")
+		Exit(1)
+	flags += ["-gsource-map"]
+	env['CXX'] = "em++"
+	env['CC'] = "emcc"
+	env['AR'] = "emar"
+	env['RANLIB'] = "emranlib"
+	common_flags += [
+		"-s", "DISABLE_EXCEPTION_CATCHING=0",
+		"-s", "USE_SDL=2",
+		"-s", "USE_LIBPNG=1",
+		"-pthread",
+		"-I", "libjpeg-turbo-2.1.0",
+	]
+	env.Append(LINKFLAGS = [
+		"-L", "libjpeg-turbo-2.1.0",
+		#"-l", "turbojpeg",
+		"-l", "jpeg",
+		"-I", "libjpeg-turbo-2.1.0",
+		"--source-map-base", "http://localhost:6931/",
+		"-s", "USE_WEBGL2=1",
+		"-s", "ASSERTIONS=2",
+		"-s", "DEMANGLE_SUPPORT=1",
+		"-s", "GL_ASSERTIONS=1",
+		"-s", "ASYNCIFY",
+		"-s", "PTHREAD_POOL_SIZE=5",
+		"-s", "MIN_WEBGL_VERSION=2",
+		"-s", "FETCH=1",
+		"-s", "WASM_MEM_MAX=2147483648", # 2GB
+		"-s", "INITIAL_MEMORY=629145600", # 600MB
+		"-s", "ALLOW_MEMORY_GROWTH=1",
+		"-s", "EXPORTED_RUNTIME_METHODS=['callMain']",
+		"--preload-file", "data",
+		"--preload-file", "images",
+		"--preload-file", "sounds",
+		"--preload-file", "credits.txt",
+		"--preload-file", "keys.txt",
+		"--preload-file", "dummy@saves/dummy",
+		"--emrun",
+	])
+	env.Append(LIBS = [
+		"idbfs.js"
+	]);
 
 if env["opengl"] == "gles":
 	if is_windows_host:
@@ -105,7 +159,7 @@ if env["opengl"] == "gles":
 	env.Append(LIBS = [
 		"GLESv2",
 	])
-	env.Append(CCFLAGS = ["-DES_GLES"])
+	flags += ["-DES_GLES"]
 elif is_windows_host:
 	env.Append(LIBS = [
 		"glew32.dll",
@@ -117,12 +171,21 @@ else:
 		"GLEW",
 	])
 
+if env["mode"] == "emcc":
+	flags += ["-Duuid_generate_random=uuid_generate"]
+
+# Required build flags. If you want to use SSE optimization, you can turn on
+# -msse3 or (if just building for your own computer) -march=native.
+env.Append(CCFLAGS = flags)
+env.Append(CCFLAGS = common_flags)
+env.Append(LINKFLAGS = common_flags)
+
 # libmad is not in the Steam runtime, so link it statically:
 if 'steamrt_scout_i386' in chroot_name:
 	env.Append(LIBS = File("/usr/lib/i386-linux-gnu/libmad.a"))
 elif 'steamrt_scout_amd64' in chroot_name:
 	env.Append(LIBS = File("/usr/lib/x86_64-linux-gnu/libmad.a"))
-else:
+elif env["mode"] != "emcc":
 	env.Append(LIBS = "mad")
 
 
@@ -143,11 +206,14 @@ def RecursiveGlob(pattern, dir_name=buildDirectory):
 
 # By default, invoking scons will build the backing archive file and then the game binary.
 sourceLib = env.StaticLibrary(pathjoin(libDirectory, "endless-sky"), RecursiveGlob("*.cpp", buildDirectory))
+outname = "endless-sky"
+if env["mode"] == "emcc":
+    outname += ".html"
 exeObjs = [Glob(pathjoin(buildDirectory, f)) for f in ("main.cpp",)]
 if is_windows_host:
 	windows_icon = env.RES(pathjoin(buildDirectory, "WinApp.rc"))
 	exeObjs.append(windows_icon)
-sky = env.Program(pathjoin(binDirectory, "endless-sky"), exeObjs + sourceLib)
+sky = env.Program(pathjoin(binDirectory, outname), exeObjs + sourceLib)
 env.Default(sky)
 
 
