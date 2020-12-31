@@ -1,0 +1,5 @@
+name: netlify-plugin-emscripten-cache
+inputs:
+  - name: cache
+    description: directories to cache
+    default: ["build"]

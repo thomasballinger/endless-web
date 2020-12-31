@@ -1,0 +1,5 @@
+name: netlify-plugin-emscripten-cache
+inputs:
+  - name: version
+    description: Emscripten version, like 1.39.18 or latest
+    default: 'latest'

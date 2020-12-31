@@ -1,0 +1,19 @@
+[build]
+  publish = "output/"
+
+  # Default build command.
+  command = "./build.sh"
+
+  environment = { PYTHON_VERSION = "3.7" }
+
+[[plugins]]
+  package = "./netlify-plugin-emscripten"
+
+  [plugins.inputs]
+    version = "2.0.12"
+
+[[plugins]]
+  package = "./netlify-plugin-cache"
+
+  [plugins.inputs]
+    cache = ["./build", "./lib", "./emsdk/upstream/emscripten/cache"]

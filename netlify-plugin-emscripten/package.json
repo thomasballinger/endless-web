@@ -1,0 +1,17 @@
+{
+  "name": "netlify-plugin-emscripten",
+  "version": "0.0.1",
+  "description": "Build Emscripten.",
+  "main": "index.js",
+  "repository": "https://github.com/thomasballinger/netlify-plugin-emscripten.git",
+  "bugs": {
+    "url": "https://github.com/thomasballinger/netlify-plugin-emscripten/issues"
+  },
+  "author": "Thomas Ballinger <me@ballingt.com> (http://ballingt.com)",
+  "license": "MIT",
+  "keywords": [
+    "netlify",
+    "netlify-plugin"
+  ],
+  "dependencies": {}
+}
