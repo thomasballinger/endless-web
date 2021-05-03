@@ -76,7 +76,8 @@
         response.headers.get("Content-Length")
       );
       // ContentLength header is not reliable: it might be the length of the compressed resource.
-      if (length) {
+      // response.body is missing in Pale Moon, a Firefox fork that someone on the Endless Sky Discord server uses
+      if (length && response.body) {
         // use a progress bar
         let offset = 0;
         data = new ArrayBuffer(length);
