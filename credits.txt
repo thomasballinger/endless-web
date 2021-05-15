@@ -8,10 +8,13 @@ https://endless-sky.github.io
 This WebAssembly port done by:
   janisozaur
   thomasballinger
+Thanks to Emscripten!
 
 Fork available at
   https://github.com
     /janisozaur/endless-sky
+
+Unofficial theme by Joylin
 
 This game is open source.
 To report bugs, give feedback,
