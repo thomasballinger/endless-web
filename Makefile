@@ -110,6 +110,7 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data 
 	cp endless-sky.wasm endless-sky.data endless-sky.js output/
 	cp -r js/ output/js
 	cp dataversion.js output/
+	cp loading.mp3 output/
 	cp favicon.ico output/
 	cp Ubuntu-Regular.ttf output/
 deploy: output/index.html

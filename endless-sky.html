@@ -22,7 +22,12 @@
           padding: 0;
           overflow: hidden;
       }
-      button {
+      .ugly-header a {
+        appearance: button;
+        text-decoration: none;
+        color: initial;
+      }
+      button, .ugly-header a {
         background-color: rgba(24, 24, 24, 1);
         border-width: 1px;
         color: rgb(115, 115, 115);
@@ -32,9 +37,11 @@
         border-bottom-color: rgb(50, 50, 50);
         border-left-color: rgb(50, 50, 50);
         font-family: 'Ubuntu', "times new roman", times, roman, serif;
+        font-size: 14px;
+        padding: 1px 6px;
         outline: none;
       }
-      button:hover {
+      button:hover, .ugly-header a:hover {
         color: rgb(215, 215, 215);
       }
       h1, h2, h3 {
@@ -129,6 +136,9 @@
         padding-left: 2px;
         z-index: 2;
       }
+      audio {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -138,8 +148,10 @@
       <div></div>
     </div>
     <div class="loading">
+      <audio controls autoplay src="./loading.mp3"></audio>
       <div class="title">E&middot;n&middot;d&middot;l&middot;e&middot;s&middot;s &nbsp;&nbsp;W&middot;e&middot;b</div>
       <div class="progress-bar-section">
+        <p class="music-text">click anywhere to play loading music</p>
         <p class="progress-text">Downloading data...</p>
         <div class="progress-bar">
           <div class="progress"></div>
@@ -164,6 +176,7 @@
       <button class="dismiss-upload">hide top bar</button>
       <button onclick="document.querySelector('.file-selector').click();">upload saved game</button>
       <button class="toggle-debug">download saved games</button>
+      <button class="stop-music">start music</button>
       <a href="https://github.com/thomasballinger/endless-web" target="_blank">Endless Web on GitHub</a>
       <a href="https://github.com/endless-sky/endless-sky" target="_blank">Endless Sky on GitHub</a>
       <a href="https://github.com/thomasballinger/endless-web/issues" target="_blank">report bug</a>
@@ -198,6 +211,31 @@
           tryIdb();
         }).finally(() => clearInterval(intervalId));
       }
+      let musicPlayerResolve;
+      const musicPlayingPromise = new Promise(r => {musicPlayerResolve = r});
+      let readyToLoadResolve;
+      const readyToLoadPromise = new Promise(r => {readyToLoadResolve = r});
+
+      function onThemeMusicPlay() {
+        document.querySelector('.stop-music').innerText = 'stop music';
+        document.querySelector('.music-text').style.visibility = 'hidden';
+        musicPlayerResolve();
+      }
+      document.querySelector('audio').addEventListener('play', onThemeMusicPlay);
+      document.querySelector('.stop-music').addEventListener('click', () => {
+        const button = document.querySelector('.stop-music');
+        if (button.innerText === 'stop music') {
+          button.innerText = 'start music'
+          document.querySelector('audio').pause();
+        } else if (button.innerText === 'start music') {
+          button.innerText = 'stop music';
+          document.querySelector('audio').play();
+        }
+      });
+      document.querySelector('.loading').addEventListener('click', () => {
+        document.querySelector('audio').play();
+      });
+
       function toggleDebugWindow() {
         const debug = document.querySelector('.debug');
         if (debug.style.display === 'none' || debug.style.display === '') {
@@ -211,6 +249,10 @@
         if (e.code === 'Backslash') {
           e.preventDefault();
           toggleDebugWindow();
+        }
+        if (e.code === "KeyI" && e.metaKey && e.altKey) {
+          // capture at the top level so meta-alt-i still opens dev console
+          e.stopPropagation()
         }
       }, {capture: true})
 
@@ -231,9 +273,9 @@
         if (numerator === denominator) {
           progress.style.transition = 'none';
           if (usingCache) {
-            progressText.textContent = "Using cached data"
+            progressText.textContent = "Using cached data. Loading..."
           } else {
-            progressText.textContent = "Downloading complete"
+            progressText.textContent = "Downloading complete. Loading..."
           }
         }
       }
@@ -263,7 +305,7 @@
       });
 
       let runtimeInitializedResolve;
-      const runtimeInitializedPromise = new Promise(r => {runtimeInitializedResolve = r})
+      const runtimeInitializedPromise = new Promise(r => {runtimeInitializedResolve = r});
 
       var Module = {
           print: (function(text) {
@@ -364,6 +406,12 @@
         const dataSize = typeof endlessSkyDataSize === 'undefined' ? 0 : endlessSkyDataSize;
         data = await (new CachedResource("endless-sky.data")).get(dataSize, versionString, updateProgress);
 
+        await Promise.race([
+          musicPlayingPromise,
+          new Promise(resolve => setTimeout(resolve, 2000))
+        ]);
+        // too late, you can't enable music during the load when the browser locks up
+        document.querySelector('.music-text').style.visibility = 'hidden';
         await addMainScriptTag(data);
         await runtimeInitializedPromise;
 
