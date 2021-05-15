@@ -119,13 +119,20 @@
         padding-left: 2px;
         z-index: 2;
       }
+      audio {
+        display: none;
+      }
+      .stop-music {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <div class="loading">
-
+      <audio controls autoplay src="./loading.mp3"></audio>
       <img class="title" src="title.png" />
       <div class="progress-bar-section">
+        <p class="music-text">click anywhere to play loading music</p>
         <p class="progress-text">Downloading data...</p>
         <div class="progress-bar">
           <div class="progress"></div>
@@ -149,6 +156,7 @@
     <div class="ugly-header">
       <button onclick="document.querySelector('.file-selector').click();">Upload save game files</button>
       <button class="toggle-debug">press \ for debug panel</button>
+      <button class="stop-music">stop music</button>
       <button class="dismiss-upload">dismiss these buttons</button>
     </div>
 
@@ -164,6 +172,23 @@
     <script src="js/plugins.js"></script>
     <script src="dataversion.js"></script>
     <script type='text/javascript'>
+      let musicPlayerResolve;
+      const musicPlayingPromise = new Promise(r => {musicPlayerResolve = r});
+      let readyToLoadResolve;
+      const readyToLoadPromise = new Promise(r => {readyToLoadResolve = r});
+
+      function onThemeMusicPlay() {
+        document.querySelector('.stop-music').style.display = 'inline';
+        musicPlayerResolve();
+      }
+      document.querySelector('audio').addEventListener('play', onThemeMusicPlay);
+      document.querySelector('.stop-music').addEventListener('click', () => {
+        document.querySelector('audio').pause();
+      });
+      document.querySelector('.loading').addEventListener('click', () => {
+        document.querySelector('audio').play();
+      });
+
       function toggleDebugWindow() {
         const debug = document.querySelector('.debug');
         if (debug.style.display === 'none' || debug.style.display === '') {
@@ -177,6 +202,10 @@
         if (e.code === 'Backslash') {
           e.preventDefault();
           toggleDebugWindow();
+        }
+        if (e.code === "KeyI" && e.metaKey && e.altKey) {
+          // capture at the top level so meta-alt-i still opens dev console
+          e.stopPropagation()
         }
       }, {capture: true})
 
@@ -197,9 +226,9 @@
         if (numerator === denominator) {
           progress.style.transition = 'none';
           if (usingCache) {
-            progressText.textContent = "Using cached data"
+            progressText.textContent = "Using cached data. Loading..."
           } else {
-            progressText.textContent = "Downloading complete"
+            progressText.textContent = "Downloading complete. Loading..."
           }
         }
       }
@@ -229,7 +258,7 @@
       });
 
       let runtimeInitializedResolve;
-      const runtimeInitializedPromise = new Promise(r => {runtimeInitializedResolve = r})
+      const runtimeInitializedPromise = new Promise(r => {runtimeInitializedResolve = r});
 
       var Module = {
           print: (function(text) {
@@ -305,6 +334,12 @@
         const dataSize = typeof endlessSkyDataSize === 'undefined' ? 0 : endlessSkyDataSize;
         data = await (new CachedResource("endless-sky.data")).get(dataSize, versionString, updateProgress);
 
+        await Promise.race([
+          musicPlayingPromise,
+          new Promise(resolve => setTimeout(resolve, 2000))
+        ]);
+        // too late, you can't enable music during the load when the browser locks up
+        document.querySelector('.music-text').style.visibility = 'hidden';
         await addMainScriptTag(data);
         await runtimeInitializedPromise;
 

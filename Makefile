@@ -29,6 +29,7 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data 
 	cp -r js/ output/js
 	cp dataversion.js output/
 	cp title.png output/
+	cp loading.mp3 output/
 	cp favicon.ico output/
 	cp Ubuntu-Regular.ttf output/
 test: output/index.html
