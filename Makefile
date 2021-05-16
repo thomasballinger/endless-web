@@ -12,15 +12,12 @@ clean:
 clean-full: clean
 	rm -f favicon.ico
 	rm -f Ubuntu-Regular.ttf
-	rm -f title.png
 dev: endless-sky.js
 	emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing endless-sky.html
 favicon.ico:
 	wget https://endless-sky.github.io/favicon.ico
 Ubuntu-Regular.ttf:
 	curl -Ls 'https://github.com/google/fonts/blob/master/ufl/ubuntu/Ubuntu-Regular.ttf?raw=true' > Ubuntu-Regular.ttf
-title.png:
-	cp images/_menu/title.png title.png
 output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data Ubuntu-Regular.ttf dataversion.js
 	rm -rf output
 	mkdir -p output
@@ -28,7 +25,6 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data 
 	cp endless-sky.wasm endless-sky.data endless-sky.js endless-sky.worker.js output/
 	cp -r js/ output/js
 	cp dataversion.js output/
-	cp title.png output/
 	cp loading.mp3 output/
 	cp favicon.ico output/
 	cp Ubuntu-Regular.ttf output/
@@ -43,4 +39,7 @@ deploy: output/index.html
 			echo 'uploading all files, including endless-sky.data...'; \
 			aws s3 sync output s3://play-endless-sky.com/live;\
 	fi
+	# play-endless-sky.com
 	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths /\*
+	# play-endless-web.com
+	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths /\*
