@@ -149,7 +149,7 @@
     <div class="debug">
       <h1>Debug panel</h1>
       <p> press backslash to hide </p>
-      <button onclick="document.querySelector('.file-selector').click();" />upload save game files</button>
+      <button onclick="document.querySelector('.file-selector').click();" />upload saved game</button>
       <button class="show-save-games">Show save game files for download</button>
       <div class="save-games"></div>
       <input type="file" style="display: none;" class="file-selector" multiple="multiple">
@@ -158,10 +158,12 @@
     </div>
 
     <div class="ugly-header">
-      <button onclick="document.querySelector('.file-selector').click();">upload save game files</button>
-      <button class="toggle-debug">press \ for debug panel</button>
+      <button class="dismiss-upload">hide these buttons</button>
+      <button onclick="document.querySelector('.file-selector').click();">upload saved game</button>
+      <button class="toggle-debug">download saved games</button>
       <button class="stop-music">start music</button>
-      <button class="dismiss-upload">dismiss these buttons</button>
+      <a href="https://github.com/thomasballinger/endless-web">Endless Web on GitHub</a>
+      <a href="https://github.com/endless-sky/endless-web">Endless Sky on GitHub</a>
       <a href="https://github.com/thomasballinger/endless-web/issues">report bug</a>
     </div>
 
