@@ -111,7 +111,6 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data 
 	cp endless-sky.wasm endless-sky.data endless-sky.js endless-sky.worker.js output/
 	cp -r js/ output/js
 	cp dataversion.js output/
-	cp title.png output/
 	cp loading.mp3 output/
 	cp favicon.ico output/
 	cp Ubuntu-Regular.ttf output/
@@ -124,4 +123,7 @@ deploy: output/index.html
 			echo 'uploading all files, including endless-sky.data...'; \
 			aws s3 sync output s3://play-endless-sky.com/live;\
 	fi
+	# play-endless-sky.com
 	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths /\*
+	# play-endless-web.com
+	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths /\*
