@@ -22,7 +22,12 @@
           padding: 0;
           overflow: hidden;
       }
-      button {
+      .ugly-header a {
+        appearance: button;
+        text-decoration: none;
+        color: initial;
+      }
+      button, .ugly-header a {
         background-color: rgba(24, 24, 24, 1);
         border-width: 1px;
         color: rgb(115, 115, 115);
@@ -32,9 +37,11 @@
         border-bottom-color: rgb(50, 50, 50);
         border-left-color: rgb(50, 50, 50);
         font-family: 'Ubuntu', "times new roman", times, roman, serif;
+        font-size: 14px;
+        padding: 1px 6px;
         outline: none;
       }
-      button:hover {
+      button:hover, .ugly-header a:hover {
         color: rgb(215, 215, 215);
       }
       h1, h2, h3 {
@@ -122,9 +129,6 @@
       audio {
         display: none;
       }
-      .stop-music {
-        display: none;
-      }
     </style>
   </head>
   <body>
@@ -145,7 +149,7 @@
     <div class="debug">
       <h1>Debug panel</h1>
       <p> press backslash to hide </p>
-      <button onclick="document.querySelector('.file-selector').click();" />Upload save game files</button>
+      <button onclick="document.querySelector('.file-selector').click();" />upload save game files</button>
       <button class="show-save-games">Show save game files for download</button>
       <div class="save-games"></div>
       <input type="file" style="display: none;" class="file-selector" multiple="multiple">
@@ -154,10 +158,11 @@
     </div>
 
     <div class="ugly-header">
-      <button onclick="document.querySelector('.file-selector').click();">Upload save game files</button>
+      <button onclick="document.querySelector('.file-selector').click();">upload save game files</button>
       <button class="toggle-debug">press \ for debug panel</button>
-      <button class="stop-music">stop music</button>
+      <button class="stop-music">start music</button>
       <button class="dismiss-upload">dismiss these buttons</button>
+      <a href="https://github.com/thomasballinger/endless-web/issues">report bug</a>
     </div>
 
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
@@ -178,12 +183,20 @@
       const readyToLoadPromise = new Promise(r => {readyToLoadResolve = r});
 
       function onThemeMusicPlay() {
-        document.querySelector('.stop-music').style.display = 'inline';
+        document.querySelector('.stop-music').innerText = 'stop music';
+        document.querySelector('.music-text').style.visibility = 'hidden';
         musicPlayerResolve();
       }
       document.querySelector('audio').addEventListener('play', onThemeMusicPlay);
       document.querySelector('.stop-music').addEventListener('click', () => {
-        document.querySelector('audio').pause();
+        const button = document.querySelector('.stop-music');
+        if (button.innerText === 'stop music') {
+          button.innerText = 'start music'
+          document.querySelector('audio').pause();
+        } else if (button.innerText === 'start music') {
+          button.innerText = 'stop music';
+          document.querySelector('audio').play();
+        }
       });
       document.querySelector('.loading').addEventListener('click', () => {
         document.querySelector('audio').play();
@@ -338,6 +351,7 @@
           musicPlayingPromise,
           new Promise(resolve => setTimeout(resolve, 2000))
         ]);
+        return;
         // too late, you can't enable music during the load when the browser locks up
         document.querySelector('.music-text').style.visibility = 'hidden';
         await addMainScriptTag(data);
