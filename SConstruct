@@ -115,6 +115,7 @@ if env["mode"] == "emcc":
 		"-fno-rtti",
 		"-I", "libjpeg-turbo-2.1.0",
 	]
+	#env['ENV']['EMCC_DEBUG'] = '1' # Very loud, very useful
 	common_flags += [
 		"-s", "USE_SDL=2",
 		"-s", "USE_LIBPNG=1",
@@ -150,7 +151,7 @@ if env["mode"] == "emcc":
 		"--preload-file", "sounds",
 		"--preload-file", "credits.txt",
 		"--preload-file", "keys.txt",
-		"--emrun",
+		#"--emrun",  # useful in dev, but causes hundreds of errors in prod
 	])
 	env.Append(LIBS = [
 		"idbfs.js"
