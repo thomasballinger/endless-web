@@ -107,6 +107,8 @@ if env["mode"] == "emcc":
 	env['CC'] = "emcc"
 	env['AR'] = "emar"
 	env['RANLIB'] = "emranlib"
+	#env['ENV']['EM_CACHE'] = 'emcache' # This doesn't work yet, maybe it will soon
+	#env['ENV']['EMCC_DEBUG'] = '1' # Very loud, very useful
 	common_flags += [
 		"-s", "DISABLE_EXCEPTION_CATCHING=0",
 		"-s", "USE_SDL=2",
@@ -133,8 +135,8 @@ if env["mode"] == "emcc":
 		"--preload-file", "sounds",
 		"--preload-file", "credits.txt",
 		"--preload-file", "keys.txt",
-		"--emrun",
-		"-g4"
+		#"--emrun",  # useful in dev, but causes hundreds of errors in prod
+		"-g"
 	])
 	env.Append(LIBS = [
 		"idbfs.js"
