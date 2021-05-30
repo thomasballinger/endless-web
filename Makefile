@@ -6,9 +6,11 @@ clean:
 	rm -f endless-sky.data
 	rm -f endless-sky.wasm
 	rm -f dataversion.js
+	rm -rf output
 	rm -f endless-sky.wasm.map
 	rm -f lib/emcc/libendless-sky.a
 clean-full: clean
+	rm -f favicon.ico
 	rm -f Ubuntu-Regular.ttf
 	rm -f title.png
 	rm -rf build/emcc
@@ -30,6 +32,8 @@ title.png:
 	cp images/_menu/title.png title.png
 Ubuntu-Regular.ttf:
 	curl -Ls 'https://github.com/google/fonts/blob/main/ufl/ubuntu/Ubuntu-Regular.ttf?raw=true' > Ubuntu-Regular.ttf
+favicon.ico:
+	wget https://endless-sky.github.io/favicon.ico
 
 # not using -flto because of a change introduced in emscripten in 2.0.27 that I don't understand
 COMMON_FLAGS = -O3\
@@ -100,3 +104,25 @@ endif
 
 dataversion.js: endless-sky.js
 	./hash-data.py endless-sky.data dataversion.js
+output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data Ubuntu-Regular.ttf dataversion.js js/cached-resource.js js/plugins.js js/save-games.js
+	rm -rf output
+	mkdir -p output
+	cp endless-sky.html output/index.html
+	cp endless-sky.wasm endless-sky.data endless-sky.js endless-sky.worker.js output/
+	cp -r js/ output/js
+	cp dataversion.js output/
+	cp favicon.ico output/
+	cp Ubuntu-Regular.ttf output/
+deploy: output/index.html
+	@if curl -s https://play-endless-sky.com/dataversion.js | diff - dataversion.js; \
+		then \
+			echo 'uploading all files except endless-sky.data...'; \
+			aws s3 sync --exclude endless-sky.data output s3://play-endless-sky.com/live;\
+		else \
+			echo 'uploading all files, including endless-sky.data...'; \
+			aws s3 sync output s3://play-endless-sky.com/live;\
+	fi
+	# play-endless-sky.com
+	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths /\*
+	# play-endless-web.com
+	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths /\*
