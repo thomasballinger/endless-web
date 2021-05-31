@@ -74,7 +74,7 @@
           padding: 0 1em;
           width: 80%;
       }
-      .loading {
+      .loading, .error {
         position: absolute;
         top: 0;
         left: 0;
@@ -86,6 +86,13 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
+      }
+      .error {
+        z-index: -2;
+        color: red;
+      }
+      .error * {
+        margin: 10px;
       }
       .title {
         color: white;
@@ -137,6 +144,11 @@
     </style>
   </head>
   <body>
+    <div class="error">
+      <button>Hide error</button>
+      Please report this error!
+      <div></div>
+    </div>
     <div class="loading">
       <audio controls autoplay src="./loading.mp3"></audio>
       <div class="title">E&middot;n&middot;d&middot;l&middot;e&middot;s&middot;s &nbsp;&nbsp;W&middot;e&middot;b</div>
@@ -315,6 +327,8 @@
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl) {
           return 'your browser does not support WebGL2.'
+        } else if (!crossOriginIsolated) {
+          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy'
         } else {
           return true
         }
@@ -327,6 +341,23 @@
         tag.src = "endless-sky.js";
         document.body.appendChild(tag);
       }
+
+      function hideError() {
+        document.querySelector('.error').style.zIndex = -2;
+      }
+      function showError(err) {
+        document.querySelector('.error div').innerText = `${err.message}\n\n${err.stack}`;
+        document.querySelector('.error').style.zIndex = 2;
+      }
+      function onRejectedPromise(errEvent) {
+        showError(errEvent.reason);
+      }
+      function onError(errEvent) {
+        showError(errEvent.error);
+      }
+      window.addEventListener('error', onError);
+      window.addEventListener("unhandledrejection", onRejectedPromise);
+      document.querySelector('.error button').addEventListener('click', hideError);
 
       async function main() {
         const why = supported();
