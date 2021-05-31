@@ -102,7 +102,7 @@ if env["mode"] == "emcc":
 	if env["opengl"] != "gles":
 		print("emcc requires opengl=gles")
 		Exit(1)
-	flags += ["-g4"]
+	flags += ["-gsource-map"]
 	env['CXX'] = "em++"
 	env['CC'] = "emcc"
 	env['AR'] = "emar"
@@ -129,7 +129,7 @@ if env["mode"] == "emcc":
 		"-s", "WASM_MEM_MAX=2147483648", # 2GB
 		"-s", "INITIAL_MEMORY=629145600", # 600MB
 		"-s", "ALLOW_MEMORY_GROWTH=1",
-		"-s", "EXTRA_EXPORTED_RUNTIME_METHODS=['callMain']",
+		"-s", "EXPORTED_RUNTIME_METHODS=['callMain']",
 		"--preload-file", "data",
 		"--preload-file", "images",
 		"--preload-file", "sounds",
