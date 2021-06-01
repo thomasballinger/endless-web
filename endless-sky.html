@@ -327,7 +327,7 @@
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl) {
           return 'your browser does not support WebGL2.'
-        } else if (!crossOriginIsolated) {
+        } else if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === false) {
           return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy'
         } else {
           return true
