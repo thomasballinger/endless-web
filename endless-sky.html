@@ -146,7 +146,7 @@
   <body>
     <div class="error">
       <button>Hide error</button>
-      Please report this error!
+      Please report this error on <a href="https://github.com/thomasballinger/endless-web">GitHub</a> or the #third-party-chat room of <a href="https://discord.gg/ZeuASSx">the Endless Sky Discord</a>.
       <div></div>
     </div>
     <div class="loading">
@@ -326,11 +326,13 @@
       function supported() {
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl) {
-          return 'your browser does not support WebGL2.'
+          return 'your browser does not support WebGL2.';
         } else if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === false) {
-          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy'
+          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy';
+        } else if (typeof Atomics === 'undefined') {
+          return "your browser does not support Atomics, required for the threaded version of Endless Web. There should be a version without it, I'll work on it.";
         } else {
-          return true
+          return true;
         }
       }
 
