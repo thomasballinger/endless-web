@@ -172,6 +172,9 @@ void Audio::Init(const vector<string> &sources)
 #endif
 	
 	// Create the music-streaming threads.
+#ifdef __EMSCRIPTEN__
+	return; // Return early because Emscripten doesn't like threads! (and uses a no-op libmad mock)
+#endif
 	currentTrack.reset(new Music());
 	previousTrack.reset(new Music());
 	alGenSources(1, &musicSource);
@@ -294,6 +297,9 @@ void Audio::Play(const Sound *sound, const Point &position)
 // Play the given music. An empty string means to play nothing.
 void Audio::PlayMusic(const string &name)
 {
+#ifdef __EMSCRIPTEN__
+	return; // Return early because Emscripten doesn't like threads! (and uses a no-op libmad mock)
+#endif
 	if(!isInitialized)
 		return;
 	
@@ -402,6 +408,9 @@ void Audio::Step()
 	}
 	queue.clear();
 	
+#ifdef __EMSCRIPTEN__
+	return; // Return early because Emscripten doesn't like threads! (and uses a no-op libmad mock)
+#endif
 	// Queue up new buffers for the music, if necessary.
 	int buffersDone = 0;
 	alGetSourcei(musicSource, AL_BUFFERS_PROCESSED, &buffersDone);
@@ -488,6 +497,7 @@ void Audio::Quit()
 	sounds.Revert({});
 	
 	// Clean up the music source and buffers.
+#ifndef __EMSCRIPTEN__
 	if(isInitialized)
 	{
 		alSourceStop(musicSource);
@@ -496,6 +506,7 @@ void Audio::Quit()
 		currentTrack.reset();
 		previousTrack.reset();
 	}
+#endif
 	
 	// Close the connection to the OpenAL library.
 	if(context)
