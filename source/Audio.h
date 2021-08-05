@@ -70,6 +70,10 @@ public:
 
 	// Shut down the audio system (because we're about to quit).
 	static void Quit();
+	
+	
+private:
+	static bool musicEnabled;
 };
 
 
