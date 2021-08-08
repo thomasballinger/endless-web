@@ -38,7 +38,6 @@ favicon.ico:
 COMMON_FLAGS = -O3 -flto\
 		-s USE_SDL=2\
 		-s USE_LIBPNG=1\
-		-s DISABLE_EXCEPTION_CATCHING=0
 
 CFLAGS = $(COMMON_FLAGS)\
 	-Duuid_generate_random=uuid_generate\
@@ -48,9 +47,10 @@ CFLAGS = $(COMMON_FLAGS)\
 	-Wold-style-cast\
 	-DES_GLES\
 	-DES_NO_THREADS\
-	-gsource-map\
 	-fno-rtti\
 	-I libjpeg-turbo-2.1.0\
+
+DEBUG_CFLAGS = -gsource-map
 
 
 # Note that that libmad is not linked! It's mocked out until it works with Emscripten
@@ -60,9 +60,6 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 	-lidbfs.js\
 	--source-map-base http://localhost:6931/\
 	-s USE_WEBGL2=1\
-	-s ASSERTIONS=2\
-	-s DEMANGLE_SUPPORT=1\
-	-s GL_ASSERTIONS=1\
 	--closure 1\
 	-s ASYNCIFY\
 	-s MIN_WEBGL_VERSION=2\
@@ -76,7 +73,12 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 	--preload-file credits.txt\
 	--preload-file keys.txt\
 	-s EXPORTED_RUNTIME_METHODS=['callMain']\
-	--emrun
+
+DEBUG_LINK_FLAGS = --emrun\
+	-s DEMANGLE_SUPPORT=1\
+	-s ASSERTIONS=2\
+	-s GL_ASSERTIONS=1
+
 
 CPPS := $(shell ls source/*.cpp) $(shell ls source/text/*.cpp)
 CPPS_EXCEPT_MAIN := $(shell ls source/*.cpp | grep -v main.cpp) $(shell ls source/text/*.cpp)
