@@ -196,6 +196,24 @@
     <script src="js/plugins.js"></script>
     <script src="dataversion.js"></script>
     <script type='text/javascript'>
+      function idbReady() {
+        const isSafari =
+          !navigator.userAgentData &&
+          /Safari\//.test(navigator.userAgent) &&
+          !/Chrom(e|ium)\//.test(navigator.userAgent);
+
+        // No point putting other browsers or older versions of Safari through this mess.
+        if (!isSafari || !indexedDB.databases) return Promise.resolve();
+
+        let intervalId;
+
+        return new Promise((resolve) => {
+          const tryIdb = () => indexedDB.databases().finally(resolve);
+          intervalId = setInterval(tryIdb, 100);
+          tryIdb();
+        }).finally(() => clearInterval(intervalId));
+      }
+
       let musicPlayerResolve;
       const musicPlayingPromise = new Promise(r => {musicPlayerResolve = r});
       let readyToLoadResolve;
@@ -370,6 +388,7 @@
           progressText.textContent = `Not supported because ${why}`
           return;
         }
+        await idbReady();
 
         const showPluginManager = (new URL(location)).searchParams.has('plugins');
 
