@@ -24,14 +24,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <cstring>
 #include <map>
 
-#pragma clang diagnostic ignored "-Wunused-private-field"
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-
 using namespace std;
 
 namespace {
 	// How many bytes to read from the file at a time:
+#ifndef ES_NO_THREADS
 	const size_t INPUT_CHUNK = 65536;
+#endif
 	// How many samples to put in each output block. Because the output is in
 	// stereo, the duration of the sample is half this amount:
 	const size_t OUTPUT_CHUNK = 32768;

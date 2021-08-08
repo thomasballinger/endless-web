@@ -57,9 +57,11 @@ private:
 	// This pointer holds the file for as long as it is owned by the main
 	// thread. When the decode thread takes possession of it, it sets this
 	// pointer to null.
+#ifndef ES_NO_THREADS
 	FILE *nextFile = nullptr;
 	bool hasNewFile = false;
 	bool done = false;
+#endif
 	
 #ifndef ES_NO_THREADS
 	std::thread thread;

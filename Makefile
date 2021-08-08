@@ -3,7 +3,7 @@ EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
 dataversion.js: endless-sky.js
 clean:
 	rm -f endless-sky.js
-	rm -f endless-sky.worker.js
+	#rm -f endless-sky.worker.js
 	rm -f endless-sky.data
 	rm -f endless-sky.wasm
 	rm -f dataversion.js
@@ -109,7 +109,7 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data 
 	rm -rf output
 	mkdir -p output
 	cp endless-sky.html output/index.html
-	cp endless-sky.wasm endless-sky.data endless-sky.js endless-sky.worker.js output/
+	cp endless-sky.wasm endless-sky.data endless-sky.js output/
 	cp -r js/ output/js
 	cp dataversion.js output/
 	cp loading.mp3 output/
