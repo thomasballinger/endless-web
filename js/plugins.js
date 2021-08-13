@@ -46,8 +46,8 @@
         row.querySelector(".plugin-author").textContent = author;
 
         const proxy = "https://temp-cors-proxy.herokuapp.com/";
-        const githubZip = `${proxy}${url}/archive/master.zip`;
-        const pluginPath = url.split("/").reverse()[0] + "-master";
+        const githubZip = `${proxy}${url}`;
+        //const pluginPath = url.split("/").reverse()[0] + "-master";
         container.appendChild(row);
 
         row
