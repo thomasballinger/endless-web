@@ -45,7 +45,7 @@
         row.querySelector(".plugin-description").textContent = description;
         row.querySelector(".plugin-author").textContent = author;
 
-        const proxy = "https://cors-anywhere.herokuapp.com/";
+        const proxy = "https://temp-cors-proxy.herokuapp.com/";
         const githubZip = `${proxy}${url}/archive/master.zip`;
         const pluginPath = url.split("/").reverse()[0] + "-master";
         container.appendChild(row);
