@@ -1,3 +1,16 @@
+# Editor
+
+This is a proof of concept map editor for Endless Sky. It is still in alpha. Current features:
+
+- Load/Save an existing plugin
+- Create new systems/planets/ships
+- Edit various properties of them (not all are currently supported)
+- Doesn't mess up your plugin structure (if system X is in X.txt and system Y in Y.txt it will respect that).
+
+You can build this editor like the main game, except that you might need a newer version of MinGW because of C++14.
+
+------
+
 # Endless Sky
 
 Explore other star systems. Earn money by trading, carrying passengers, or completing missions. Use your earnings to buy a better ship or to upgrade the weapons and engines on your current one. Blow up pirates. Take sides in a civil war. Or leave human space behind and hope to find some friendly aliens whose culture is more civilized than your own...
