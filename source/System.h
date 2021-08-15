@@ -69,6 +69,8 @@ public:
 		const Minable *type = nullptr;
 		int count;
 		double energy;
+
+		friend class SystemEditor;
 	};
 	
 	class FleetProbability {
@@ -91,6 +93,8 @@ public:
 	private:
 		const Fleet *fleet;
 		int period;
+
+		friend class SystemEditor;
 	};
 	
 	class HazardProbability {
@@ -113,6 +117,8 @@ public:
 	private:
 		const Hazard *hazard;
 		int period;
+
+		friend class SystemEditor;
 	};
 	
 	

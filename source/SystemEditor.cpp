@@ -278,39 +278,224 @@ void SystemEditor::RenderSystem()
 		ImGui::TreePop();
 	}
 
-	if(ImGui::TreeNode("asteroids/mineables"))
+	bool asteroidsOpen = ImGui::TreeNode("asteroids");
+	if(ImGui::BeginPopupContextItem())
+	{
+		if(ImGui::Selectable("Add Asteroid"))
+		{
+			system->asteroids.emplace_back("small rock", 1, 1.);
+			dirty.insert(system);
+		}
+		if(ImGui::Selectable("Add Mineable"))
+		{
+			system->asteroids.emplace_back(&GameData::Minables().begin()->second, 1, 1.);
+			dirty.insert(system);
+		}
+		ImGui::EndPopup();
+	}
+
+	if(asteroidsOpen)
 	{
 		index = 0;
-		for(const auto &asteroid : system->asteroids)
+		int toRemove = -1;
+		for(auto &asteroid : system->asteroids)
 		{
-			ImGui::PushID(index++);
-			const auto &name = asteroid.Name().empty() ? asteroid.Type()->Name() : asteroid.Name();
-			ImGui::Text("%s: %s %d %g", asteroid.Type() ? "minables" : "asteroids", name.c_str(), asteroid.Count(), asteroid.Energy());
+			ImGui::PushID(index);
+			if(asteroid.Type())
+			{
+				bool open = ImGui::TreeNode("minables");
+				if(ImGui::BeginPopupContextItem())
+				{
+					if(ImGui::Selectable("Remove"))
+						toRemove = index;
+					ImGui::EndPopup();
+				}
+
+				if(open)
+				{
+					ImGui::SetNextItemWidth(300.f);
+					if(ImGui::BeginCombo("##minables", asteroid.Type()->Name().c_str()))
+					{
+						int index = 0;
+						for(const auto &item : GameData::Minables())
+						{
+							const bool selected = &item.second == asteroid.Type();
+							if(ImGui::Selectable(item.first.c_str(), selected))
+							{
+								asteroid.type = &item.second;
+								dirty.insert(system);
+							}
+							++index;
+
+							if(selected)
+								ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(100.f);
+					if(ImGui::InputInt("##count", &asteroid.count))
+						dirty.insert(system);
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(100.f);
+					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
+						dirty.insert(system);
+					ImGui::TreePop();
+				}
+			}
+			else
+			{
+				bool open = ImGui::TreeNode("asteroids");
+				if(ImGui::BeginPopupContextItem())
+				{
+					if(ImGui::Selectable("Remove"))
+						toRemove = index;
+					ImGui::EndPopup();
+				}
+
+				if(open)
+				{
+					ImGui::SetNextItemWidth(300.f);
+					if(ImGui::InputText("##asteroids", &asteroid.name))
+						dirty.insert(system);
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(100.f);
+					if(ImGui::InputInt("##count", &asteroid.count))
+						dirty.insert(system);
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(100.f);
+					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
+						dirty.insert(system);
+					ImGui::TreePop();
+				}
+			}
+			++index;
 			ImGui::PopID();
+		}
+
+		if(toRemove != -1)
+		{
+			system->asteroids.erase(system->asteroids.begin() + toRemove);
+			dirty.insert(system);
 		}
 		ImGui::TreePop();
 	}
 
-	if(ImGui::TreeNode("fleets"))
+	bool fleetOpen = ImGui::TreeNode("fleets");
+	if(ImGui::BeginPopupContextItem())
+	{
+		if(ImGui::Selectable("Add Fleet"))
+			system->fleets.emplace_back(&GameData::Fleets().begin()->second, 1);
+		ImGui::EndPopup();
+	}
+
+	if(fleetOpen)
 	{
 		index = 0;
-		for(const auto &fleet : system->fleets)
+		int toRemove = -1;
+		for(auto &fleet : system->fleets)
 		{
-			ImGui::PushID(index++);
-			ImGui::Text("fleet: %s %d", fleet.Get()->Name().c_str(), fleet.Period());
+			ImGui::PushID(index);
+			bool open = ImGui::TreeNode("fleet");
+			if(ImGui::BeginPopupContextItem())
+			{
+				if(ImGui::Selectable("Remove"))
+					toRemove = index;
+				ImGui::EndPopup();
+			}
+
+			if(open)
+			{
+				if(ImGui::BeginCombo("##fleets", fleet.Get()->Name().c_str()))
+				{
+					int index = 0;
+					for(const auto &item : GameData::Fleets())
+					{
+						const bool selected = &item.second == fleet.Get();
+						if(ImGui::Selectable(item.first.c_str(), selected))
+						{
+							fleet.fleet = &item.second;
+							dirty.insert(system);
+						}
+						++index;
+
+						if(selected)
+							ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::SameLine();
+				if(ImGui::InputInt("##period", &fleet.period))
+					dirty.insert(system);
+				ImGui::TreePop();
+			}
+			++index;
 			ImGui::PopID();
+		}
+		if(toRemove != -1)
+		{
+			system->fleets.erase(system->fleets.begin() + toRemove);
+			dirty.insert(system);
 		}
 		ImGui::TreePop();
 	}
 
-	if(ImGui::TreeNode("hazards"))
+	bool hazardOpen = ImGui::TreeNode("hazards");
+	if(ImGui::BeginPopupContextItem())
+	{
+		if(ImGui::Selectable("Add Hazard"))
+			system->hazards.emplace_back(&GameData::Hazards().begin()->second, 1);
+		ImGui::EndPopup();
+	}
+
+	if(hazardOpen)
 	{
 		index = 0;
-		for(const auto &hazard : system->hazards)
+		int toRemove = -1;
+		for(auto &hazard : system->hazards)
 		{
-			ImGui::PushID(index++);
-			ImGui::Text("hazard: %s %d", hazard.Get()->Name().c_str(), hazard.Period());
+			ImGui::PushID(index);
+			bool open = ImGui::TreeNode("hazard");
+			if(ImGui::BeginPopupContextItem())
+			{
+				if(ImGui::Selectable("Remove"))
+					toRemove = index;
+				ImGui::EndPopup();
+			}
+
+			if(open)
+			{
+				if(ImGui::BeginCombo("##hazards", hazard.Get()->Name().c_str()))
+				{
+					int index = 0;
+					for(const auto &item : GameData::Hazards())
+					{
+						const bool selected = &item.second == hazard.Get();
+						if(ImGui::Selectable(item.first.c_str(), selected))
+						{
+							hazard.hazard = &item.second;
+							dirty.insert(system);
+						}
+						++index;
+
+						if(selected)
+							ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::SameLine();
+				if(ImGui::InputInt("##period", &hazard.period))
+					dirty.insert(system);
+				ImGui::TreePop();
+			}
+			++index;
 			ImGui::PopID();
+		}
+
+		if(toRemove != -1)
+		{
+			system->hazards.erase(system->hazards.begin() + toRemove);
+			dirty.insert(system);
 		}
 		ImGui::TreePop();
 	}
@@ -342,7 +527,6 @@ void SystemEditor::RenderSystem()
 	{
 		if(ImGui::BeginCombo("governments", system->government ? system->government->GetName().c_str() : ""))
 		{
-			int index = 0;
 			for(const auto &government : GameData::Governments())
 			{
 				const bool selected = &government.second == system->government;
@@ -352,7 +536,6 @@ void SystemEditor::RenderSystem()
 					UpdateMap(/*updateSystems=*/false);
 					dirty.insert(system);
 				}
-				++index;
 
 				if(selected)
 					ImGui::SetItemDefaultFocus();
@@ -377,8 +560,16 @@ void SystemEditor::RenderSystem()
 
 	if(ImGui::TreeNode("trades"))
 	{
-		for(auto &&trade : system->trade)
-			ImGui::Text("trade %s %d", trade.first.c_str(), trade.second.base);
+		index = 0;
+		for(auto &&commodity : GameData::Commodities())
+		{
+			ImGui::PushID(index++);
+			ImGui::Text("trade: %s", commodity.name.c_str());
+			ImGui::SameLine();
+			if(ImGui::InputInt("", &system->trade[commodity.name].base))
+				dirty.insert(system);
+			ImGui::PopID();
+		}
 		ImGui::TreePop();
 	}
 

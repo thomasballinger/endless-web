@@ -94,6 +94,8 @@ private:
 	std::map<const Outfit *, int> payload;
 	// Explosion effects created when this object is destroyed.
 	std::map<const Effect *, int> explosions;
+
+	friend class SystemEditor;
 };
 
 
