@@ -72,6 +72,8 @@ private:
 	float width = 0.f;
 	float height = 0.f;
 	int frames = 0;
+
+	friend class Editor;
 };
 
 

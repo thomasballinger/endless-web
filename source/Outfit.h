@@ -126,6 +126,8 @@ private:
 	std::map<const Sound *, int> jumpInSounds;
 	std::map<const Sound *, int> jumpOutSounds;
 	const Sprite *flotsamSprite = nullptr;
+
+	friend class ShipEditor;
 };
 
 

@@ -15,6 +15,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "BoardingPanel.h"
 #include "CoreStartData.h"
 #include "Dialog.h"
+#include "Editor.h"
 #include "text/Font.h"
 #include "text/FontSet.h"
 #include "text/Format.h"

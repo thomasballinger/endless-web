@@ -405,7 +405,7 @@ bool MapPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command, bool
 bool MapPanel::Click(int x, int y, int clicks)
 {
 	// Figure out if a system was clicked on.
-	Point click = Point(x, y) / Zoom() - center;
+	click = Point(x, y) / Zoom() - center;
 	for(const auto &it : GameData::Systems())
 		if(it.second.IsValid() && click.Distance(it.second.Position()) < 10.
 				&& (player.HasSeen(it.second) || &it.second == specialSystem))

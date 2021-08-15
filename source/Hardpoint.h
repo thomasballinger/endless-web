@@ -107,6 +107,8 @@ private:
 	int burstCount = 0;
 	bool isFiring = false;
 	bool wasFiring = false;
+
+	friend class ShipEditor;
 };
 
 

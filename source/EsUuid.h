@@ -70,6 +70,9 @@ public:
 	
 	// Get a string representation of this ID, e.g. for serialization.
 	std::string ToString() const noexcept(false);
+
+	// Whether this uuid is nil.
+	bool IsNil() const;
 	
 	
 private:

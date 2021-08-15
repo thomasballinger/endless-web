@@ -95,8 +95,6 @@ namespace {
 	
 	Set<Fleet> defaultFleets;
 	Set<Government> defaultGovernments;
-	Set<Planet> defaultPlanets;
-	Set<System> defaultSystems;
 	Set<Galaxy> defaultGalaxies;
 	Set<Sale<Ship>> defaultShipSales;
 	Set<Sale<Outfit>> defaultOutfitSales;
@@ -156,6 +154,12 @@ namespace {
 		Warn(noun, it.first);
 	}
 }
+
+
+
+Set<Ship> GameData::defaultShips;
+Set<System> GameData::defaultSystems;
+Set<Planet> GameData::defaultPlanets;
 
 
 
@@ -248,6 +252,7 @@ bool GameData::BeginLoad(const char * const *argv)
 	defaultGalaxies = galaxies;
 	defaultShipSales = shipSales;
 	defaultOutfitSales = outfitSales;
+	defaultShips = ships;
 	playerGovernment = governments.Get("Escort");
 	
 	politics.Reset();
@@ -478,6 +483,7 @@ void GameData::Revert()
 	galaxies.Revert(defaultGalaxies);
 	shipSales.Revert(defaultShipSales);
 	outfitSales.Revert(defaultOutfitSales);
+	ships.Revert(defaultShips);
 	for(auto &it : persons)
 		it.second.Restore();
 	

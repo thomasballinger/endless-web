@@ -13,6 +13,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "UI.h"
 
 #include "Command.h"
+#include "imgui.h"
 #include "Panel.h"
 #include "Screen.h"
 
@@ -29,6 +30,7 @@ using namespace std;
 bool UI::Handle(const SDL_Event &event)
 {
 	bool handled = false;
+	const auto &io = ImGui::GetIO();
 	
 	vector<shared_ptr<Panel>>::iterator it = stack.end();
 	while(it != stack.begin() && !handled)
@@ -38,7 +40,7 @@ bool UI::Handle(const SDL_Event &event)
 		if(count(toPop.begin(), toPop.end(), it->get()))
 			continue;
 		
-		if(event.type == SDL_MOUSEMOTION)
+		if(event.type == SDL_MOUSEMOTION && !io.WantCaptureMouse)
 		{
 			if(event.motion.state & SDL_BUTTON(1))
 				handled = (*it)->Drag(
@@ -49,7 +51,7 @@ bool UI::Handle(const SDL_Event &event)
 					Screen::Left() + event.motion.x * 100 / Screen::Zoom(),
 					Screen::Top() + event.motion.y * 100 / Screen::Zoom());
 		}
-		else if(event.type == SDL_MOUSEBUTTONDOWN)
+		else if(event.type == SDL_MOUSEBUTTONDOWN && !io.WantCaptureMouse)
 		{
 			int x = Screen::Left() + event.button.x * 100 / Screen::Zoom();
 			int y = Screen::Top() + event.button.y * 100 / Screen::Zoom();
@@ -62,15 +64,15 @@ bool UI::Handle(const SDL_Event &event)
 			else if(event.button.button == 3)
 				handled = (*it)->RClick(x, y);
 		}
-		else if(event.type == SDL_MOUSEBUTTONUP)
+		else if(event.type == SDL_MOUSEBUTTONUP && !io.WantCaptureMouse)
 		{
 			int x = Screen::Left() + event.button.x * 100 / Screen::Zoom();
 			int y = Screen::Top() + event.button.y * 100 / Screen::Zoom();
 			handled = (*it)->Release(x, y);
 		}
-		else if(event.type == SDL_MOUSEWHEEL)
+		else if(event.type == SDL_MOUSEWHEEL && !io.WantCaptureMouse)
 			handled = (*it)->Scroll(event.wheel.x, event.wheel.y);
-		else if(event.type == SDL_KEYDOWN)
+		else if(event.type == SDL_KEYDOWN && !io.WantCaptureKeyboard)
 		{
 			Command command(event.key.keysym.sym);
 			handled = (*it)->KeyDown(event.key.keysym.sym, event.key.keysym.mod, command, !event.key.repeat);

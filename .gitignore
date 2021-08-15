@@ -61,3 +61,4 @@ ipch/
 .idea_modules/
 CMakeLists.txt
 /.gitmodules
+*.ini

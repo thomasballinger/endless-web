@@ -149,3 +149,19 @@ double StellarObject::Distance() const
 {
 	return distance;
 }
+
+
+
+// Find out how fast this object is goin.
+double StellarObject::Speed() const
+{
+	return speed;
+}
+
+
+
+// Find out the offset of this object.
+double StellarObject::Offset() const
+{
+	return offset;
+}

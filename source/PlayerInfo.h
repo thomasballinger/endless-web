@@ -376,6 +376,10 @@ private:
 	
 	// Basic information about the player's starting scenario.
 	CoreStartData startData;
+
+	friend class Editor;
+	friend class SystemEditor;
+	friend class ShipEditor;
 };
 
 

@@ -174,6 +174,8 @@ private:
 	mutable std::list<std::shared_ptr<Ship>> defenders;
 	
 	std::vector<const System *> systems;
+
+	friend class PlanetEditor;
 };
 
 

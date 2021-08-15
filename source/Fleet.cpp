@@ -237,6 +237,13 @@ void Fleet::Load(const DataNode &node)
 
 
 
+const string &Fleet::Name() const
+{
+	return fleetName;
+}
+
+
+
 bool Fleet::IsValid(bool requireGovernment) const
 {
 	// Generally, a government is required for a fleet to be valid.

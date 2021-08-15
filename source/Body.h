@@ -127,6 +127,8 @@ private:
 	// the same step over and over again.
 	mutable int currentStep = -1;
 	mutable float frame = 0.f;
+
+	friend class ShipEditor;
 };
 
 

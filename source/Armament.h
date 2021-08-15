@@ -78,6 +78,8 @@ private:
 	// elements of this Armament itself).
 	std::map<const Outfit *, int> streamReload;
 	std::vector<Hardpoint> hardpoints;
+
+	friend class ShipEditor;
 };
 
 

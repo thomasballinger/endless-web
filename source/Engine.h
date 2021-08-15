@@ -233,6 +233,8 @@ private:
 	double load = 0.;
 	int loadCount = 0;
 	double loadSum = 0.;
+
+	friend class Editor;
 };
 
 

@@ -46,6 +46,8 @@ public:
 	Fleet(const DataNode &node);
 	
 	void Load(const DataNode &node);
+
+	const std::string &Name() const;
 	
 	// Determine if this fleet template uses well-defined data.
 	bool IsValid(bool requireGovernment = true) const;

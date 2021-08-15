@@ -31,6 +31,10 @@ public:
 	void Add(const Sale<Item> &other);
 	
 	bool Has(const Item *item) const;
+
+
+public:
+	std::string name;
 };
 
 
@@ -38,6 +42,7 @@ public:
 template <class Item>
 void Sale<Item>::Load(const DataNode &node, const Set<Item> &items)
 {
+	name = node.Token(1);
 	for(const DataNode &child : node)
 	{
 		const std::string &token = child.Token(0);

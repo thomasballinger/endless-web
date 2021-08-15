@@ -14,6 +14,9 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 #include "Files.h"
 #include "ImageBuffer.h"
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
 #include "Screen.h"
 
 #include "gl_header.h"
@@ -223,6 +226,16 @@ bool GameWindow::Init()
 	// want, because the ".icns" icon that is used automatically is prettier.
 	SetIcon();
 #endif
+
+	// Setup Dear ImGUI.
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+	ImGui::StyleColorsDark();
+
+	ImGui_ImplSDL2_InitForOpenGL(mainWindow, context);
+	ImGui_ImplOpenGL3_Init("#version 460");
 	
 	return true;
 }
@@ -234,6 +247,10 @@ void GameWindow::Quit()
 {
 	// Make sure the cursor is visible.
 	SDL_ShowCursor(true);
+
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplSDL2_Shutdown();
+	ImGui::DestroyContext();
 	
 	// Clean up in the reverse order that everything is launched.
 //#ifndef _WIN32

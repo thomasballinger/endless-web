@@ -159,6 +159,15 @@ private:
 	static void PrintShipTable();
 	static void PrintTestsTable();
 	static void PrintWeaponTable();
+
+	static Set<Ship> defaultShips;
+	static Set<System> defaultSystems;
+	static Set<Planet> defaultPlanets;
+
+	friend class Editor;
+	friend class SystemEditor;
+	friend class PlanetEditor;
+	friend class ShipEditor;
 };
 
 

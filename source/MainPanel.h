@@ -88,6 +88,8 @@ private:
 	bool hasShift = false;
 	bool canClick = false;
 	bool canDrag = false;
+
+	friend class Editor;
 };
 
 

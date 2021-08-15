@@ -576,6 +576,8 @@ private:
 	// Links between escorts and parents.
 	std::vector<std::weak_ptr<Ship>> escorts;
 	std::weak_ptr<Ship> parent;
+
+	friend class ShipEditor;
 };
 
 

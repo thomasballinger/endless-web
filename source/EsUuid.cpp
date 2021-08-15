@@ -174,6 +174,13 @@ std::string EsUuid::ToString() const noexcept(false)
 
 
 
+bool EsUuid::IsNil() const
+{
+	return ::IsNil(value.id);
+}
+
+
+
 // Internal constructor. Note that the provided value may not be a valid v4 UUID,
 // in which case an error is logged and we return a new UUID.
 EsUuid::EsUuid(const std::string &input)
@@ -191,7 +198,7 @@ EsUuid::EsUuid(const std::string &input)
 
 const EsUuid::UuidType &EsUuid::Value() const
 {
-	if(IsNil(value.id))
+	if(::IsNil(value.id))
 		value = MakeUuid();
 	
 	return value;

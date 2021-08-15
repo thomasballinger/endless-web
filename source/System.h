@@ -51,6 +51,18 @@ public:
 		const Minable *Type() const;
 		int Count() const;
 		double Energy() const;
+
+		bool operator==(const Asteroid &rhs) const
+		{
+			return name == rhs.name
+				&& type == rhs.type
+				&& count == rhs.count
+				&& energy == rhs.energy;
+		}
+		bool operator!=(const Asteroid &rhs) const
+		{
+			return !(*this == rhs);
+		}
 		
 	private:
 		std::string name;
@@ -65,6 +77,16 @@ public:
 		
 		const Fleet *Get() const;
 		int Period() const;
+
+		bool operator==(const FleetProbability &rhs) const
+		{
+			return fleet == rhs.fleet
+				&& period == rhs.period;
+		}
+		bool operator!=(const FleetProbability &rhs) const
+		{
+			return !(*this == rhs);
+		}
 		
 	private:
 		const Fleet *fleet;
@@ -77,6 +99,16 @@ public:
 		
 		const Hazard *Get() const;
 		int Period() const;
+
+		bool operator==(const HazardProbability &rhs) const
+		{
+			return hazard == rhs.hazard
+				&& period == rhs.period;
+		}
+		bool operator!=(const HazardProbability &rhs) const
+		{
+			return !(*this == rhs);
+		}
 		
 	private:
 		const Hazard *hazard;
@@ -240,6 +272,8 @@ private:
 	
 	// Attributes, for use in location filters.
 	std::set<std::string> attributes;
+
+	friend class SystemEditor;
 };
 
 

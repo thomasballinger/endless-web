@@ -19,11 +19,15 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "DataFile.h"
 #include "DataNode.h"
 #include "Dialog.h"
+#include "Editor.h"
 #include "Files.h"
 #include "text/Font.h"
 #include "FrameTimer.h"
 #include "GameData.h"
 #include "GameWindow.h"
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
 #include "MenuPanel.h"
 #include "Panel.h"
 #include "PlayerInfo.h"
@@ -171,6 +175,8 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 	// menuPanels is used for the panels related to pilot creation, preferences,
 	// game loading and game saving.
 	UI menuPanels;
+
+	Editor editor(player, gamePanels);
 	
 	menuPanels.Push(new MenuPanel(player, gamePanels));
 	if(!conversation.IsEmpty())
@@ -211,6 +217,7 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 			if(event.type == SDL_MOUSEMOTION)
 				cursorTime = 0;
 			
+			isPaused = ImGui::GetIO().NavActive;
 			if(debugMode && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKQUOTE)
 			{
 				isPaused = !isPaused;
@@ -221,7 +228,7 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 			{
 				// User pressed the Menu key.
 				menuPanels.Push(shared_ptr<Panel>(
-					new MenuPanel(player, gamePanels)));
+							new MenuPanel(player, gamePanels)));
 			}
 			else if(event.type == SDL_QUIT)
 			{
@@ -249,6 +256,8 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 			{
 				isFastForward = !isFastForward;
 			}
+
+			ImGui_ImplSDL2_ProcessEvent(&event);
 		}
 		SDL_Keymod mod = SDL_GetModState();
 		Font::ShowUnderlines(mod & KMOD_ALT);
@@ -305,13 +314,20 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 		}
 		
 		Audio::Step();
-		
+
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+		ImGui::NewFrame();
+		editor.RenderMain();
+		ImGui::Render();
+
 		// Events in this frame may have cleared out the menu, in which case
 		// we should draw the game panels instead:
 		(menuPanels.IsEmpty() ? gamePanels : menuPanels).DrawAll();
 		if(isFastForward)
 			SpriteShader::Draw(SpriteSet::Get("ui/fast forward"), Screen::TopLeft() + Point(10., 10.));
 		
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		GameWindow::Step();
 		
 		timer.Wait();

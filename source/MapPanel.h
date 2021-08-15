@@ -183,6 +183,11 @@ private:
 		Color color;
 	};
 	std::vector<Link> links;
+
+	Point click;
+
+	friend class Editor;
+	friend class SystemEditor;
 };
 
 
