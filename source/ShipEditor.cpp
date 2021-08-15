@@ -418,10 +418,10 @@ void ShipEditor::RenderElement(Body *sprite, const std::string &name) const
 	if(ImGui::TreeNode("sprite", "%s: %s", name.c_str(), sprite->GetSprite()->Name().c_str()))
 	{
 		double value = sprite->frameRate / 60.;
-		if(ImGui::InputScalar("frame rate", ImGuiDataType_Double, &value, nullptr, nullptr, "%g", ImGuiInputTextFlags_EnterReturnsTrue))
+		if(ImGui::InputDoubleEx("frame rate", &value, ImGuiInputTextFlags_EnterReturnsTrue))
 			sprite->frameRate = value * 60.;
 
-		ImGui::InputScalar("delay", ImGuiDataType_Double, &sprite->delay, nullptr, nullptr, "%g");
+		ImGui::InputInt("delay", &sprite->delay);
 		ImGui::Checkbox("random start frame", &sprite->randomize);
 		bool bvalue = !sprite->repeat;
 		ImGui::Checkbox("no repeat", &bvalue);
