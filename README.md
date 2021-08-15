@@ -9,6 +9,20 @@ This is a proof of concept map editor for Endless Sky. It is still in alpha. Cur
 
 You can build this editor like the main game, except that you might need a newer version of MinGW because of C++14.
 
+Checklist:
+
+- [x] Systems can be fully edited
+	- [ ] Better visual editing in the map panel
+- [ ] Planets can be fully edited
+- [ ] Outfits can be fully edited
+- [ ] Ships can be fully edited
+- [ ] Governments can be fully edited
+- [ ] Hazards can be fully edited
+- [ ] Fleets can be fully edited
+- [ ] Outfitter can be fully edited
+- [ ] Shipyards can be fully edited
+- [ ] ...
+
 ------
 
 # Endless Sky
