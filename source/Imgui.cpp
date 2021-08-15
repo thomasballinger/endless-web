@@ -23,6 +23,13 @@ namespace ImGui
 
 
 
+	IMGUI_API bool InputFloatEx(const char *label, float *v, ImGuiInputTextFlags flags)
+	{
+		return InputFloat(label, v, 0., 0., "%g", flags);
+	}
+
+
+
 	IMGUI_API bool InputDouble2Ex(const char *label, double *v, ImGuiInputTextFlags flags)
 	{
 		return InputScalarN(label, ImGuiDataType_Double, v, 2, nullptr, nullptr, "%g", flags);

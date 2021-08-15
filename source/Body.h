@@ -129,6 +129,7 @@ private:
 	mutable float frame = 0.f;
 
 	friend class ShipEditor;
+	friend class SystemEditor;
 };
 
 

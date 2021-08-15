@@ -66,52 +66,6 @@ void SystemEditor::Render()
 	if(dirty.count(system))
 		ImGui::PopStyleColor(3);
 
-	bool addStellarObject = false;
-	if(ImGui::BeginMenuBar())
-	{
-		if(ImGui::BeginMenu("Tools"))
-		{
-			ImGui::MenuItem("Add Stellar Object", nullptr, &addStellarObject, system);
-			ImGui::EndMenu();
-		}
-		ImGui::EndMenuBar();
-	}
-
-	if(addStellarObject)
-		ImGui::OpenPopup("Add Stellar Object##popup");
-
-	if(ImGui::BeginPopupModal("Add Stellar Object##popup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		static string buffer;
-		ImGui::InputTextMultiline("", &buffer);
-		if(ImGui::Button("Add"))
-		{
-			std::istringstream in;
-			in.str(move(buffer));
-			DataFile file(in);
-
-			if(file.begin() != file.end())
-				system->LoadObject(*file.begin(), const_cast<Set<Planet> &>(GameData::Planets()));
-
-			if(system->objects.back().HasValidPlanet())
-			{
-				const Planet &planet = *system->objects.back().GetPlanet();
-				if(!planet.IsWormhole() && planet.IsInhabited() && planet.IsAccessible(nullptr))
-					system->attributes.erase("uninhabited");
-			}
-			buffer.clear();
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::SameLine();
-		if(ImGui::Button("Cancel"))
-		{
-			ImGui::CloseCurrentPopup();
-			buffer.clear();
-		}
-
-		ImGui::EndPopup();
-	}
-
 	if(ImGui::InputText("system", &searchBox))
 		if(auto *ptr = GameData::Systems().Find(searchBox))
 		{
@@ -573,7 +527,108 @@ void SystemEditor::RenderSystem()
 		ImGui::TreePop();
 	}
 
-	if(ImGui::TreeNode("objects"))
+	bool openObjects = ImGui::TreeNode("objects");
+	bool openAddObject = false;
+	if(ImGui::BeginPopupContextItem())
+	{
+		if(ImGui::Selectable("Add Object"))
+			openAddObject = true;
+		ImGui::EndPopup();
+	}
+	if(openAddObject)
+		ImGui::OpenPopup("Add Stellar Object##popup");
+
+	if(ImGui::BeginPopupModal("Add Stellar Object##popup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		static string planet;
+		static int parent = -1;
+		static double distance;
+		static double period;
+		static double offset;
+		ImGui::InputText("object", &planet);
+
+		static string spriteName;
+		static float frameRate = 2.f / 60.f;
+		static double delay;
+		static bool randomStartFrame;
+		static bool noRepeat;
+		static bool rewind;
+		if(ImGui::TreeNode("sprite"))
+		{
+			ImGui::InputText("sprite", &spriteName);
+			ImGui::InputFloatEx("frame rate", &frameRate);
+			ImGui::InputDoubleEx("delay", &delay);
+			ImGui::Checkbox("random start frame", &randomStartFrame);
+			ImGui::Checkbox("no repeat", &noRepeat);
+			ImGui::Checkbox("rewind", &rewind);
+
+			ImGui::TreePop();
+		}
+
+		ImGui::InputInt("parent", &parent);
+		ImGui::InputDoubleEx("distance", &distance);
+		ImGui::InputDoubleEx("period", &period);
+		ImGui::InputDoubleEx("offset", &offset);
+
+		if(ImGui::Button("Add"))
+		{
+			StellarObject object;
+			object.parent = parent;
+			object.distance = distance;
+			object.speed = 360. / period;
+			object.offset = offset;
+			object.sprite = SpriteSet::Get(spriteName);
+			object.frameRate = frameRate / 60.f;
+			object.delay = delay;
+			object.randomize = randomStartFrame;
+			object.repeat = !noRepeat;
+			object.rewind = rewind;
+			object.planet = GameData::Planets().Find(planet);
+			system->objects.insert(system->objects.begin() + parent + 1, object);
+
+			planet.clear();
+			parent = -1;
+			distance = 0.;
+			period = 0.;
+			offset = 0.;
+			spriteName.clear();
+			frameRate = 2.f / 60.f;
+			delay = 0.;
+			randomStartFrame = false;
+			noRepeat = false;
+			rewind = false;
+
+			if(system->objects.back().HasValidPlanet())
+			{
+				const Planet &planet = *system->objects.back().GetPlanet();
+				if(!planet.IsWormhole() && planet.IsInhabited() && planet.IsAccessible(nullptr))
+					system->attributes.erase("uninhabited");
+			}
+			dirty.insert(system);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if(ImGui::Button("Cancel"))
+		{
+			planet.clear();
+			parent = -1;
+			distance = 0.;
+			period = 0.;
+			offset = 0.;
+			spriteName.clear();
+			frameRate = 2.f / 60.f;
+			delay = 0.;
+			randomStartFrame = false;
+			noRepeat = false;
+			rewind = false;
+
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
+
+	if(openObjects)
 	{
 		bool hovered = false;
 		index = 0;
