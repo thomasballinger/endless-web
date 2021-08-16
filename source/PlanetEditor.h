@@ -14,6 +14,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #define PLANET_EDITOR_H_
 
 #include "Planet.h"
+#include "TemplateEditor.h"
 
 #include <set>
 #include <string>
@@ -25,37 +26,16 @@ class Editor;
 
 
 // Class representing the planet editor window.
-class PlanetEditor {
+class PlanetEditor : public TemplateEditor<Planet> {
 public:
 	PlanetEditor(Editor &editor, bool &show) noexcept;
-	PlanetEditor(const PlanetEditor &) = delete;
-	PlanetEditor& operator=(const PlanetEditor &) = delete;
-
-	const std::list<Planet> &Planets() const;
-	const std::set<const Planet *> &Dirty() const;
 
 	void Render();
 	void WriteToFile(DataWriter &writer, const Planet *planet);
-	void WriteToPlugin(const Planet *planet);
-	void WriteAll();
 
 private:
 	void RenderPlanetMenu();
-
 	void RenderPlanet();
-
-
-
-private:
-	Editor &editor;
-	bool &showPlanetMenu;
-
-	std::string searchBox;
-	Planet *planet = nullptr;
-
-	std::set<const Planet *> dirty;
-	std::list<Planet> planets;
-	std::vector<std::string> originalPlanets;
 };
 
 

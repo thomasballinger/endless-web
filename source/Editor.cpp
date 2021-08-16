@@ -81,9 +81,9 @@ void Editor::WriteAll()
 	if(!HasPlugin())
 		return;
 
-	const auto &planets = planetEditor.Planets();
+	const auto &planets = planetEditor.Changes();
 	const auto &ships = shipEditor.Ships();
-	const auto &systems = systemEditor.Systems();
+	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.
 	set<string> planetsSaved;

@@ -13,34 +13,26 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #ifndef SYSTEM_EDITOR_H_
 #define SYSTEM_EDITOR_H_
 
-#include "DataWriter.h"
-#include "Ship.h"
 #include "System.h"
+#include "TemplateEditor.h"
 
-#include <memory>
 #include <set>
 #include <string>
 #include <list>
 
+class DataWriter;
 class Editor;
 class StellarObject;
 
 
 
 // Class representing the system editor window.
-class SystemEditor {
+class SystemEditor : public TemplateEditor<System> {
 public:
 	SystemEditor(Editor &editor, bool &show) noexcept;
-	SystemEditor(const SystemEditor &) = delete;
-	SystemEditor& operator=(const SystemEditor &) = delete;
-
-	const std::list<System> &Systems() const;
-	const std::set<const System *> &Dirty() const;
 
 	void Render();
 	void WriteToFile(DataWriter &writer, const System *system);
-	void WriteToPlugin(const System *system);
-	void WriteAll();
 
 
 private:
@@ -50,18 +42,6 @@ private:
 	void WriteObject(DataWriter &writer, const StellarObject *object);
 
 	void UpdateMap(bool updateSystem = true) const;
-
-
-private:
-	Editor &editor;
-	bool &showSystemMenu;
-
-	std::string searchBox;
-	System *system = nullptr;
-
-	std::set<const System *> dirty;
-	std::list<System> systems;
-	std::vector<std::string> originalSystems;
 };
 
 

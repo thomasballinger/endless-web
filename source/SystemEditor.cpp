@@ -36,29 +36,15 @@ using namespace std;
 
 
 SystemEditor::SystemEditor(Editor &editor, bool &show) noexcept
-	: editor(editor), showSystemMenu(show)
+	: TemplateEditor<System>(editor, show)
 {
-}
-
-
-
-const list<System> &SystemEditor::Systems() const
-{
-	return systems;
-}
-
-
-
-const set<const System *> &SystemEditor::Dirty() const
-{
-	return dirty;
 }
 
 
 
 void SystemEditor::Render()
 {
-	if(dirty.count(system))
+	if(IsDirty())
 	{
 		ImGui::PushStyleColor(ImGuiCol_TitleBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
 		ImGui::PushStyleColor(ImGuiCol_TitleBgActive, static_cast<ImVec4>(ImColor(255, 91, 71)));
@@ -66,69 +52,69 @@ void SystemEditor::Render()
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
-	if(!ImGui::Begin("System Editor", &showSystemMenu))
+	if(!ImGui::Begin("System Editor", &show))
 	{
 		ImGui::End();
 		return;
 	}
 
-	if(dirty.count(system))
+	if(IsDirty())
 		ImGui::PopStyleColor(3);
 
 	if(ImGui::InputText("system", &searchBox))
 		if(auto *ptr = GameData::Systems().Find(searchBox))
 		{
-			system = const_cast<System *>(ptr);
+			object = const_cast<System *>(ptr);
 			searchBox.clear();
 		}
-	if(!system || !dirty.count(system))
+	if(!object || !IsDirty())
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
-	if(!system || !dirty.count(system))
+	if(!object || !IsDirty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		{
-			if(!system)
+			if(!object)
 				ImGui::SetTooltip("Select a system first.");
-			else if(!dirty.count(system))
+			else if(!IsDirty())
 				ImGui::SetTooltip("No changes to reset.");
 		}
 	}
 	ImGui::SameLine();
-	if(!system || searchBox.empty())
+	if(!object || searchBox.empty())
 		ImGui::PushDisabled();
 	bool clone = ImGui::Button("Clone");
-	if(!system || searchBox.empty())
+	if(!object || searchBox.empty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		{
 			if(searchBox.empty())
 				ImGui::SetTooltip("Input the new name for the system above.");
-			else if(!system)
+			else if(!object)
 				ImGui::SetTooltip("Select a system first.");
 		}
 	}
 	ImGui::SameLine();
-	if(!system || !editor.HasPlugin() || !dirty.count(system))
+	if(!object || !editor.HasPlugin() || !IsDirty())
 		ImGui::PushDisabled();
 	bool save = ImGui::Button("Save");
-	if(!system || !editor.HasPlugin() || !dirty.count(system))
+	if(!object || !editor.HasPlugin() || !IsDirty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		{
-			if(!system)
+			if(!object)
 				ImGui::SetTooltip("Select a system first.");
 			else if(!editor.HasPlugin())
 				ImGui::SetTooltip("Load a plugin to save to a file.");
-			else if(!dirty.count(system))
+			else if(!IsDirty())
 				ImGui::SetTooltip("No changes to save.");
 		}
 	}
 
-	if(!system)
+	if(!object)
 	{
 		ImGui::End();
 		return;
@@ -136,32 +122,32 @@ void SystemEditor::Render()
 
 	if(reset)
 	{
-		*system = *GameData::defaultSystems.Get(system->name);
-		for(auto &&link : system->links)
-			const_cast<System *>(link)->Link(system);
+		*object = *GameData::defaultSystems.Get(object->name);
+		for(auto &&link : object->links)
+			const_cast<System *>(link)->Link(object);
 		UpdateMap();
-		dirty.erase(system);
+		SetClean();
 	} 
 	if(clone)
 	{
 		auto *clone = const_cast<System *>(GameData::Systems().Get(searchBox));
-		*clone = *system;
-		system = clone;
+		*clone = *object;
+		object = clone;
 
-		system->name = searchBox;
-		system->position += Point(100., 0.);
-		system->objects.clear();
-		system->links.clear();
-		system->attributes.insert("uninhabited");
+		object->name = searchBox;
+		object->position += Point(100., 0.);
+		object->objects.clear();
+		object->links.clear();
+		object->attributes.insert("uninhabited");
 		GameData::UpdateSystems();
 		for(auto &&link : editor.Player().visitedSystems)
 			editor.Player().Visit(*link);
 		UpdateMap(/*updateSystem=*/false);
 		searchBox.clear();
-		dirty.insert(system);
+		SetDirty();
 	}
 	if(save)
-		WriteToPlugin(system);
+		WriteToPlugin(object);
 
 	ImGui::Separator();
 	ImGui::Spacing();
@@ -175,15 +161,15 @@ void SystemEditor::RenderSystem()
 {
 	int index = 0;
 
-	ImGui::Text("name: %s", system->name.c_str());
-	if(ImGui::Checkbox("hidden", &system->hidden))
-		dirty.insert(system);
+	ImGui::Text("name: %s", object->name.c_str());
+	if(ImGui::Checkbox("hidden", &object->hidden))
+		SetDirty();
 
 	if(ImGui::TreeNode("attributes"))
 	{
 		set<string> toAdd;
 		set<string> toRemove;
-		for(auto &attribute : system->attributes)
+		for(auto &attribute : object->attributes)
 		{
 			if(attribute == "uninhabited")
 				continue;
@@ -199,19 +185,19 @@ void SystemEditor::RenderSystem()
 			ImGui::PopID();
 		}
 		for(auto &&attribute : toAdd)
-			system->attributes.insert(attribute);
+			object->attributes.insert(attribute);
 		for(auto &&attribute : toRemove)
-			system->attributes.erase(attribute);
+			object->attributes.erase(attribute);
 		if(!toAdd.empty() || !toRemove.empty())
-			dirty.insert(system);
+			SetDirty();
 
 		ImGui::Spacing();
 
 		static string addAttribute;
 		if(ImGui::InputText("##system", &addAttribute, ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			system->attributes.insert(move(addAttribute));
-			dirty.insert(system);
+			object->attributes.insert(move(addAttribute));
+			SetDirty();
 		}
 		ImGui::TreePop();
 	}
@@ -221,7 +207,7 @@ void SystemEditor::RenderSystem()
 		set<System *> toAdd;
 		set<System *> toRemove;
 		index = 0;
-		for(auto &link : system->links)
+		for(auto &link : object->links)
 		{
 			ImGui::PushID(index++);
 			string name = link->Name();
@@ -241,17 +227,17 @@ void SystemEditor::RenderSystem()
 
 		for(auto &sys : toAdd)
 		{
-			system->Link(sys);
-			dirty.insert(sys);
+			object->Link(sys);
+			SetDirty(sys);
 		}
 		for(auto &&sys : toRemove)
 		{
-			system->Unlink(sys);
-			dirty.insert(sys);
+			object->Unlink(sys);
+			SetDirty(sys);
 		}
 		if(!toAdd.empty() || !toRemove.empty())
 		{
-			dirty.insert(system);
+			SetDirty();
 			UpdateMap();
 		}
 		ImGui::TreePop();
@@ -262,13 +248,13 @@ void SystemEditor::RenderSystem()
 	{
 		if(ImGui::Selectable("Add Asteroid"))
 		{
-			system->asteroids.emplace_back("small rock", 1, 1.);
-			dirty.insert(system);
+			object->asteroids.emplace_back("small rock", 1, 1.);
+			SetDirty();
 		}
 		if(ImGui::Selectable("Add Mineable"))
 		{
-			system->asteroids.emplace_back(&GameData::Minables().begin()->second, 1, 1.);
-			dirty.insert(system);
+			object->asteroids.emplace_back(&GameData::Minables().begin()->second, 1, 1.);
+			SetDirty();
 		}
 		ImGui::EndPopup();
 	}
@@ -277,7 +263,7 @@ void SystemEditor::RenderSystem()
 	{
 		index = 0;
 		int toRemove = -1;
-		for(auto &asteroid : system->asteroids)
+		for(auto &asteroid : object->asteroids)
 		{
 			ImGui::PushID(index);
 			if(asteroid.Type())
@@ -302,7 +288,7 @@ void SystemEditor::RenderSystem()
 							if(ImGui::Selectable(item.first.c_str(), selected))
 							{
 								asteroid.type = &item.second;
-								dirty.insert(system);
+								SetDirty();
 							}
 							++index;
 
@@ -314,11 +300,11 @@ void SystemEditor::RenderSystem()
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputInt("##count", &asteroid.count))
-						dirty.insert(system);
+						SetDirty();
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
-						dirty.insert(system);
+						SetDirty();
 					ImGui::TreePop();
 				}
 			}
@@ -336,15 +322,15 @@ void SystemEditor::RenderSystem()
 				{
 					ImGui::SetNextItemWidth(300.f);
 					if(ImGui::InputText("##asteroids", &asteroid.name))
-						dirty.insert(system);
+						SetDirty();
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputInt("##count", &asteroid.count))
-						dirty.insert(system);
+						SetDirty();
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
-						dirty.insert(system);
+						SetDirty();
 					ImGui::TreePop();
 				}
 			}
@@ -354,8 +340,8 @@ void SystemEditor::RenderSystem()
 
 		if(toRemove != -1)
 		{
-			system->asteroids.erase(system->asteroids.begin() + toRemove);
-			dirty.insert(system);
+			object->asteroids.erase(object->asteroids.begin() + toRemove);
+			SetDirty();
 		}
 		ImGui::TreePop();
 	}
@@ -364,7 +350,7 @@ void SystemEditor::RenderSystem()
 	if(ImGui::BeginPopupContextItem())
 	{
 		if(ImGui::Selectable("Add Fleet"))
-			system->fleets.emplace_back(&GameData::Fleets().begin()->second, 1);
+			object->fleets.emplace_back(&GameData::Fleets().begin()->second, 1);
 		ImGui::EndPopup();
 	}
 
@@ -372,7 +358,7 @@ void SystemEditor::RenderSystem()
 	{
 		index = 0;
 		int toRemove = -1;
-		for(auto &fleet : system->fleets)
+		for(auto &fleet : object->fleets)
 		{
 			ImGui::PushID(index);
 			bool open = ImGui::TreeNode("fleet");
@@ -394,7 +380,7 @@ void SystemEditor::RenderSystem()
 						if(ImGui::Selectable(item.first.c_str(), selected))
 						{
 							fleet.fleet = &item.second;
-							dirty.insert(system);
+							SetDirty();
 						}
 						++index;
 
@@ -405,7 +391,7 @@ void SystemEditor::RenderSystem()
 				}
 				ImGui::SameLine();
 				if(ImGui::InputInt("##period", &fleet.period))
-					dirty.insert(system);
+					SetDirty();
 				ImGui::TreePop();
 			}
 			++index;
@@ -413,8 +399,8 @@ void SystemEditor::RenderSystem()
 		}
 		if(toRemove != -1)
 		{
-			system->fleets.erase(system->fleets.begin() + toRemove);
-			dirty.insert(system);
+			object->fleets.erase(object->fleets.begin() + toRemove);
+			SetDirty();
 		}
 		ImGui::TreePop();
 	}
@@ -423,7 +409,7 @@ void SystemEditor::RenderSystem()
 	if(ImGui::BeginPopupContextItem())
 	{
 		if(ImGui::Selectable("Add Hazard"))
-			system->hazards.emplace_back(&GameData::Hazards().begin()->second, 1);
+			object->hazards.emplace_back(&GameData::Hazards().begin()->second, 1);
 		ImGui::EndPopup();
 	}
 
@@ -431,7 +417,7 @@ void SystemEditor::RenderSystem()
 	{
 		index = 0;
 		int toRemove = -1;
-		for(auto &hazard : system->hazards)
+		for(auto &hazard : object->hazards)
 		{
 			ImGui::PushID(index);
 			bool open = ImGui::TreeNode("hazard");
@@ -453,7 +439,7 @@ void SystemEditor::RenderSystem()
 						if(ImGui::Selectable(item.first.c_str(), selected))
 						{
 							hazard.hazard = &item.second;
-							dirty.insert(system);
+							SetDirty();
 						}
 						++index;
 
@@ -464,7 +450,7 @@ void SystemEditor::RenderSystem()
 				}
 				ImGui::SameLine();
 				if(ImGui::InputInt("##period", &hazard.period))
-					dirty.insert(system);
+					SetDirty();
 				ImGui::TreePop();
 			}
 			++index;
@@ -473,17 +459,17 @@ void SystemEditor::RenderSystem()
 
 		if(toRemove != -1)
 		{
-			system->hazards.erase(system->hazards.begin() + toRemove);
-			dirty.insert(system);
+			object->hazards.erase(object->hazards.begin() + toRemove);
+			SetDirty();
 		}
 		ImGui::TreePop();
 	}
 
-	double pos[2] = {system->position.X(), system->Position().Y()};
+	double pos[2] = {object->position.X(), object->Position().Y()};
 	bool updatedPos = false;
 	if(ImGui::InputDouble2Ex("pos", pos, ImGuiInputTextFlags_EnterReturnsTrue))
 	{
-		system->position.Set(pos[0], pos[1]);
+		object->position.Set(pos[0], pos[1]);
 		updatedPos = true;
 	}
 	ImGui::SameLine();
@@ -492,7 +478,7 @@ void SystemEditor::RenderSystem()
 		ImGui::PushDisabled();
 	if(ImGui::Button("set to last click pos"))
 	{
-		system->position = mapPanel->click;
+		object->position = mapPanel->click;
 		updatedPos = true;
 	}
 	if(!mapPanel)
@@ -500,20 +486,20 @@ void SystemEditor::RenderSystem()
 	if(updatedPos)
 	{
 		mapPanel->UpdateCache();
-		dirty.insert(system);
+		SetDirty();
 	}
 
 	{
-		if(ImGui::BeginCombo("governments", system->government ? system->government->GetName().c_str() : ""))
+		if(ImGui::BeginCombo("governments", object->government ? object->government->GetName().c_str() : ""))
 		{
 			for(const auto &government : GameData::Governments())
 			{
-				const bool selected = &government.second == system->government;
+				const bool selected = &government.second == object->government;
 				if(ImGui::Selectable(government.first.c_str(), selected))
 				{
-					system->government = &government.second;
+					object->government = &government.second;
 					UpdateMap(/*updateSystems=*/false);
-					dirty.insert(system);
+					SetDirty();
 				}
 
 				if(selected)
@@ -523,18 +509,22 @@ void SystemEditor::RenderSystem()
 		}
 	}
 
-	ImGui::InputText("music", &system->music);
+	if(ImGui::InputText("music", &object->music))
+		SetDirty();
 
-	ImGui::InputDoubleEx("habitable", &system->habitable);
-	ImGui::InputDoubleEx("belt", &system->asteroidBelt);
-	ImGui::InputDoubleEx("jump range", &system->jumpRange);
-	if(system->jumpRange < 0.)
-		system->jumpRange = 0.;
-	string enterHaze = system->haze ? system->haze->Name() : "";
+	if(ImGui::InputDoubleEx("habitable", &object->habitable))
+		SetDirty();
+	if(ImGui::InputDoubleEx("belt", &object->asteroidBelt))
+		SetDirty();
+	if(ImGui::InputDoubleEx("jump range", &object->jumpRange))
+		SetDirty();
+	if(object->jumpRange < 0.)
+		object->jumpRange = 0.;
+	string enterHaze = object->haze ? object->haze->Name() : "";
 	if(ImGui::InputText("haze", &enterHaze, ImGuiInputTextFlags_EnterReturnsTrue))
 	{
-		system->haze = SpriteSet::Get(enterHaze);
-		dirty.insert(system);
+		object->haze = SpriteSet::Get(enterHaze);
+		SetDirty();
 	}
 
 	if(ImGui::TreeNode("trades"))
@@ -545,8 +535,8 @@ void SystemEditor::RenderSystem()
 			ImGui::PushID(index++);
 			ImGui::Text("trade: %s", commodity.name.c_str());
 			ImGui::SameLine();
-			if(ImGui::InputInt("", &system->trade[commodity.name].base))
-				dirty.insert(system);
+			if(ImGui::InputInt("", &object->trade[commodity.name].base))
+				SetDirty();
 			ImGui::PopID();
 		}
 		ImGui::TreePop();
@@ -590,21 +580,21 @@ void SystemEditor::RenderSystem()
 		{
 			object.sprite = SpriteSet::Get(spriteName);
 			object.planet = GameData::Planets().Find(planetName);
-			system->objects.insert(system->objects.begin() + object.parent + 1, object);
+			this->object->objects.insert(this->object->objects.begin() + object.parent + 1, object);
 
-			system->SetDate(editor.Player().GetDate());
+			this->object->SetDate(editor.Player().GetDate());
 
 			planetName.clear();
 			spriteName.clear();
 			object = {};
 
-			if(system->objects.back().HasValidPlanet())
+			if(this->object->objects.back().HasValidPlanet())
 			{
-				const Planet &planet = *system->objects.back().GetPlanet();
+				const Planet &planet = *this->object->objects.back().GetPlanet();
 				if(!planet.IsWormhole() && planet.IsInhabited() && planet.IsAccessible(nullptr))
-					system->attributes.erase("uninhabited");
+					this->object->attributes.erase("uninhabited");
 			}
-			dirty.insert(system);
+			SetDirty();
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -625,8 +615,8 @@ void SystemEditor::RenderSystem()
 		bool hovered = false;
 		index = 0;
 		int nested = 0;
-		auto selected = system->objects.end();
-		for(auto it = system->objects.begin(); it != system->objects.end(); ++it)
+		auto selected = object->objects.end();
+		for(auto it = object->objects.begin(); it != object->objects.end(); ++it)
 		{
 			ImGui::PushID(index);
 			RenderObject(*it, index, nested, hovered);
@@ -640,31 +630,31 @@ void SystemEditor::RenderSystem()
 		}
 		ImGui::TreePop();
 
-		if(selected != system->objects.end())
+		if(selected != object->objects.end())
 		{
-			dirty.insert(system);
+			SetDirty();
 			auto parent = selected->Parent();
-			auto next = system->objects.erase(selected);
+			auto next = object->objects.erase(selected);
 			size_t removed = 1;
 			// Remove any child objects too.
-			while(next != system->objects.end() && next->Parent() != parent)
+			while(next != object->objects.end() && next->Parent() != parent)
 			{
-				next = system->objects.erase(next);
+				next = object->objects.erase(next);
 				++removed;
 			}
 
 			// Recalculate every parent index.
-			for(auto it = next; it != system->objects.end(); ++it)
+			for(auto it = next; it != object->objects.end(); ++it)
 				if(it->Parent() != -1)
 					it->parent -= removed;
 		}
 	}
 
-	double arrival[2] = {system->extraHyperArrivalDistance, system->extraJumpArrivalDistance};
+	double arrival[2] = {object->extraHyperArrivalDistance, object->extraJumpArrivalDistance};
 	if(ImGui::InputDouble2Ex("arrival", arrival))
-		dirty.insert(system);
-	system->extraHyperArrivalDistance = arrival[0];
-	system->extraJumpArrivalDistance = fabs(arrival[1]);
+		SetDirty();
+	object->extraHyperArrivalDistance = arrival[0];
+	object->extraJumpArrivalDistance = fabs(arrival[1]);
 }
 
 
@@ -690,22 +680,22 @@ void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, b
 		if(ImGui::InputText("sprite", &spriteName, ImGuiInputTextFlags_EnterReturnsTrue))
 		{
 			object.sprite = SpriteSet::Get(spriteName);
-			dirty.insert(system);
+			SetDirty();
 		}
 
 		if(ImGui::InputDoubleEx("distance", &object.distance))
-			dirty.insert(system);
+			SetDirty();
 		double period = 360. / object.Speed();
 		if(ImGui::InputDoubleEx("period", &period))
-			dirty.insert(system);
+			SetDirty();
 		object.speed = 360. / period;
 		if(ImGui::InputDoubleEx("offset", &object.offset))
-			dirty.insert(system);
+			SetDirty();
 
-		if(dirty.count(system))
-			system->SetDate(editor.Player().GetDate());
+		if(IsDirty())
+			this->object->SetDate(editor.Player().GetDate());
 
-		if(index + 1 < static_cast<int>(system->objects.size()) && system->objects[index + 1].Parent() == index)
+		if(index + 1 < static_cast<int>(this->object->objects.size()) && this->object->objects[index + 1].Parent() == index)
 		{
 			++nested; // If the next object is a child, don't close this tree node just yet.
 			return;
@@ -715,17 +705,17 @@ void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, b
 	}
 
 	// If are nested, then we need to remove this nesting until we are at the next desired level.
-	if(nested && index + 1 >= static_cast<int>(system->objects.size()))
+	if(nested && index + 1 >= static_cast<int>(this->object->objects.size()))
 		while(nested--)
 			ImGui::TreePop();
 	else if(nested)
 	{
-		int nextParent = system->objects[index + 1].Parent();
+		int nextParent = this->object->objects[index + 1].Parent();
 		if(nextParent == object.Parent())
 			return;
 		while(nextParent != index)
 		{
-			nextParent = nextParent == -1 ? index : system->objects[nextParent].Parent();
+			nextParent = nextParent == -1 ? index : this->object->objects[nextParent].Parent();
 			--nested;
 			ImGui::TreePop();
 		}
@@ -742,7 +732,7 @@ void SystemEditor::WriteObject(DataWriter &writer, const StellarObject *object)
 	int nested = 0;
 	while(i != -1)
 	{
-		i = system->objects[i].Parent();
+		i = this->object->objects[i].Parent();
 		++nested;
 	}
 
@@ -765,24 +755,6 @@ void SystemEditor::WriteObject(DataWriter &writer, const StellarObject *object)
 
 	for(i = 0; i < nested; ++i)
 		writer.EndChild();
-}
-
-
-
-void SystemEditor::WriteToPlugin(const System *system)
-{
-	if(!editor.HasPlugin())
-		return;
-
-	dirty.erase(system);
-	for(auto &&sys : systems)
-		if(system->name == sys.name)
-		{
-			sys = *system;
-			return;
-		}
-
-	systems.push_back(*system);
 }
 
 
@@ -848,15 +820,6 @@ void SystemEditor::WriteToFile(DataWriter &writer, const System *system)
 	}
 
 	writer.EndChild();
-}
-
-
-
-void SystemEditor::WriteAll()
-{
-	auto copy = dirty;
-	for(auto &&sys : copy)
-		WriteToPlugin(sys);
 }
 
 

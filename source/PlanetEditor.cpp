@@ -47,29 +47,15 @@ using namespace std;
 
 
 PlanetEditor::PlanetEditor(Editor &editor, bool &show) noexcept
-	: editor(editor), showPlanetMenu(show)
+	: TemplateEditor<Planet>(editor, show)
 {
-}
-
-
-
-const list<Planet> &PlanetEditor::Planets() const
-{
-	return planets;
-}
-
-
-
-const set<const Planet *> &PlanetEditor::Dirty() const
-{
-	return dirty;
 }
 
 
 
 void PlanetEditor::Render()
 {
-	if(dirty.count(planet))
+	if(IsDirty())
 	{
 		ImGui::PushStyleColor(ImGuiCol_TitleBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
 		ImGui::PushStyleColor(ImGuiCol_TitleBgActive, static_cast<ImVec4>(ImColor(255, 91, 71)));
@@ -77,71 +63,71 @@ void PlanetEditor::Render()
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
-	if(!ImGui::Begin("Planet Editor", &showPlanetMenu))
+	if(!ImGui::Begin("Planet Editor", &show))
 	{
 		ImGui::End();
 		return;
 	}
 
-	if(dirty.count(planet))
+	if(IsDirty())
 		ImGui::PopStyleColor(3);
 
 	if(ImGui::InputText("planet", &searchBox))
 	{
 		if(auto *ptr = GameData::Planets().Find(searchBox))
 		{
-			planet = const_cast<Planet *>(ptr);
+			object = const_cast<Planet *>(ptr);
 			searchBox.clear();
 		}
 	}
-	if(!planet || !dirty.count(planet))
+	if(!object || !IsDirty())
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
-	if(!planet || !dirty.count(planet))
+	if(!object || !IsDirty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		{
-			if(!planet)
+			if(!object)
 				ImGui::SetTooltip("Select a planet first.");
-			else if(!dirty.count(planet))
+			else if(!IsDirty())
 				ImGui::SetTooltip("No changes to reset.");
 		}
 	}
 	ImGui::SameLine();
-	if(!planet || searchBox.empty())
+	if(!object || searchBox.empty())
 		ImGui::PushDisabled();
 	bool clone = ImGui::Button("Clone");
-	if(!planet || searchBox.empty())
+	if(!object || searchBox.empty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		{
 			if(searchBox.empty())
 				ImGui::SetTooltip("Input the new name for the planet above.");
-			else if(!planet)
+			else if(!object)
 				ImGui::SetTooltip("Select a planet first.");
 		}
 	}
 	ImGui::SameLine();
-	if(!planet || !editor.HasPlugin() || !dirty.count(planet))
+	if(!object || !editor.HasPlugin() || !IsDirty())
 		ImGui::PushDisabled();
 	bool save = ImGui::Button("Save");
-	if(!planet || !editor.HasPlugin() || !dirty.count(planet))
+	if(!object || !editor.HasPlugin() || !IsDirty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		{
-			if(!planet)
+			if(!object)
 				ImGui::SetTooltip("Select a planet first.");
 			else if(!editor.HasPlugin())
 				ImGui::SetTooltip("Load a plugin to save to a file.");
-			else if(!dirty.count(planet))
+			else if(!IsDirty())
 				ImGui::SetTooltip("No changes to save.");
 		}
 	}
 
-	if(!planet)
+	if(!object)
 	{
 		ImGui::End();
 		return;
@@ -149,21 +135,21 @@ void PlanetEditor::Render()
 
 	if(reset)
 	{
-		*planet = *GameData::defaultPlanets.Get(planet->name);
-		dirty.erase(planet);
+		*object = *GameData::defaultPlanets.Get(object->name);
+		SetClean();
 	} 
 	if(clone)
 	{
 		auto *clone = const_cast<Planet *>(GameData::Planets().Get(searchBox));
-		*clone = *planet;
-		planet = clone;
+		*clone = *object;
+		object = clone;
 
-		planet->name = searchBox;
+		object->name = searchBox;
 		searchBox.clear();
-		dirty.insert(planet);
+		SetDirty();
 	}
 	if(save)
-		WriteToPlugin(planet);
+		WriteToPlugin(object);
 
 	ImGui::Separator();
 	ImGui::Spacing();
@@ -177,13 +163,13 @@ void PlanetEditor::RenderPlanet()
 {
 	int index = 0;
 
-	ImGui::Text("name: %s", planet->name.c_str());
+	ImGui::Text("name: %s", object->name.c_str());
 
 	if(ImGui::TreeNode("attributes"))
 	{
 		set<string> toAdd;
 		set<string> toRemove;
-		for(auto &attribute : planet->attributes)
+		for(auto &attribute : object->attributes)
 		{
 			if(attribute == "spaceport" || attribute == "shipyard" || attribute == "outfitter")
 				continue;
@@ -200,26 +186,26 @@ void PlanetEditor::RenderPlanet()
 		}
 		for(auto &&attribute : toAdd)
 		{
-			planet->attributes.insert(attribute);
+			object->attributes.insert(attribute);
 			if(attribute.compare(0, 10, "requires: "))
-				planet->requiredAttributes.insert(attribute.substr(10));
+				object->requiredAttributes.insert(attribute.substr(10));
 		}
 		for(auto &&attribute : toRemove)
 		{
-			planet->attributes.erase(attribute);
+			object->attributes.erase(attribute);
 			if(attribute.compare(0, 10, "requires: "))
-				planet->requiredAttributes.erase(attribute.substr(10));
+				object->requiredAttributes.erase(attribute.substr(10));
 		}
 		if(!toAdd.empty() || !toRemove.empty())
-			dirty.insert(planet);
+			SetDirty();
 
 		ImGui::Spacing();
 
 		static string addAttribute;
 		if(ImGui::InputText("##planet", &addAttribute, ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			planet->attributes.insert(addAttribute);
-			dirty.insert(planet);
+			object->attributes.insert(addAttribute);
+			SetDirty();
 		}
 		ImGui::TreePop();
 	}
@@ -229,7 +215,7 @@ void PlanetEditor::RenderPlanet()
 		index = 0;
 		const Sale<Ship> *toAdd = nullptr;
 		const Sale<Ship> *toRemove = nullptr;
-		for(auto it = planet->shipSales.begin(); it != planet->shipSales.end(); ++it)
+		for(auto it = object->shipSales.begin(); it != object->shipSales.end(); ++it)
 		{
 			ImGui::PushID(index++);
 			if(ImGui::BeginCombo("shipyard", (*it)->name.c_str()))
@@ -241,7 +227,7 @@ void PlanetEditor::RenderPlanet()
 					{
 						toAdd = &item.second;
 						toRemove = *it;
-						dirty.insert(planet);
+						SetDirty();
 					}
 					if(selected)
 						ImGui::SetItemDefaultFocus();
@@ -250,23 +236,23 @@ void PlanetEditor::RenderPlanet()
 				if(ImGui::Selectable("[remove]"))
 				{
 					toRemove = *it;
-					dirty.insert(planet);
+					SetDirty();
 				}
 				ImGui::EndCombo();
 			}
 			ImGui::PopID();
 		}
 		if(toAdd)
-			planet->shipSales.insert(toAdd);
+			object->shipSales.insert(toAdd);
 		if(toRemove)
-			planet->shipSales.erase(toRemove);
+			object->shipSales.erase(toRemove);
 		if(ImGui::BeginCombo("add shipyard", ""))
 		{
 			for(const auto &item : GameData::Shipyards())
 				if(ImGui::Selectable(item.first.c_str()))
 				{
-					planet->shipSales.insert(&item.second);
-					dirty.insert(planet);
+					object->shipSales.insert(&item.second);
+					SetDirty();
 				}
 			ImGui::EndCombo();
 		}
@@ -277,7 +263,7 @@ void PlanetEditor::RenderPlanet()
 		index = 0;
 		const Sale<Outfit> *toAdd = nullptr;
 		const Sale<Outfit> *toRemove = nullptr;
-		for(auto it = planet->outfitSales.begin(); it != planet->outfitSales.end(); ++it)
+		for(auto it = object->outfitSales.begin(); it != object->outfitSales.end(); ++it)
 		{
 			ImGui::PushID(index++);
 			if(ImGui::BeginCombo("outfitter", (*it)->name.c_str()))
@@ -289,7 +275,7 @@ void PlanetEditor::RenderPlanet()
 					{
 						toAdd = &item.second;
 						toRemove = *it;
-						dirty.insert(planet);
+						SetDirty();
 					}
 					if(selected)
 						ImGui::SetItemDefaultFocus();
@@ -298,23 +284,23 @@ void PlanetEditor::RenderPlanet()
 				if(ImGui::Selectable("[remove]"))
 				{
 					toRemove = *it;
-					dirty.insert(planet);
+					SetDirty();
 				}
 				ImGui::EndCombo();
 			}
 			ImGui::PopID();
 		}
 		if(toAdd)
-			planet->outfitSales.insert(toAdd);
+			object->outfitSales.insert(toAdd);
 		if(toRemove)
-			planet->outfitSales.erase(toRemove);
+			object->outfitSales.erase(toRemove);
 		if(ImGui::BeginCombo("add outfitter", ""))
 		{
 			for(const auto &item : GameData::Outfitters())
 				if(ImGui::Selectable(item.first.c_str()))
 				{
-					planet->outfitSales.insert(&item.second);
-					dirty.insert(planet);
+					object->outfitSales.insert(&item.second);
+					SetDirty();
 				}
 			ImGui::EndCombo();
 		}
@@ -323,20 +309,20 @@ void PlanetEditor::RenderPlanet()
 
 	if(ImGui::TreeNode("tribute"))
 	{
-		if(ImGui::InputInt("tribute", &planet->tribute))
-			dirty.insert(planet);
-		if(ImGui::InputInt("threshold", &planet->defenseThreshold))
-			dirty.insert(planet);
+		if(ImGui::InputInt("tribute", &object->tribute))
+			SetDirty();
+		if(ImGui::InputInt("threshold", &object->defenseThreshold))
+			SetDirty();
 
 		if(ImGui::TreeNode("fleets"))
 		{
 			index = 0;
 			map<const Fleet *, int> modify;
-			for(auto it = planet->defenseFleets.begin(); it != planet->defenseFleets.end();)
+			for(auto it = object->defenseFleets.begin(); it != object->defenseFleets.end();)
 			{
 				int count = 1;
 				auto counter = it;
-				while(next(counter) != planet->defenseFleets.end()
+				while(next(counter) != object->defenseFleets.end()
 						&& (*next(counter))->Name() == (*counter)->Name())
 				{
 					++counter;
@@ -356,7 +342,7 @@ void PlanetEditor::RenderPlanet()
 							auto end = it + count;
 							while(begin != end)
 								*begin++ = &item.second;
-							dirty.insert(planet);
+							SetDirty();
 						}
 
 						if(selected)
@@ -370,7 +356,7 @@ void PlanetEditor::RenderPlanet()
 				if(ImGui::InputInt("fleet", &count))
 				{
 					modify[*it] = count - oldCount;
-					dirty.insert(planet);
+					SetDirty();
 				}
 
 				++index;
@@ -381,11 +367,11 @@ void PlanetEditor::RenderPlanet()
 			// Now update any fleets entries.
 			for(auto &&pair : modify)
 			{
-				auto first = find(planet->defenseFleets.begin(), planet->defenseFleets.end(), pair.first);
+				auto first = find(object->defenseFleets.begin(), object->defenseFleets.end(), pair.first);
 				if(pair.second <= 0)
-					planet->defenseFleets.erase(first, first + (-pair.second));
+					object->defenseFleets.erase(first, first + (-pair.second));
 				else
-					planet->defenseFleets.insert(first, pair.second, pair.first);
+					object->defenseFleets.insert(first, pair.second, pair.first);
 			}
 
 			// Now add the ability to add fleets.
@@ -394,8 +380,8 @@ void PlanetEditor::RenderPlanet()
 				for(const auto &item : GameData::Fleets())
 					if(ImGui::Selectable(item.first.c_str()))
 					{
-						planet->defenseFleets.emplace_back(&item.second);
-						dirty.insert(planet);
+						object->defenseFleets.emplace_back(&item.second);
+						SetDirty();
 					}
 				ImGui::EndCombo();
 			}
@@ -407,40 +393,40 @@ void PlanetEditor::RenderPlanet()
 
 
 	static string landscape;
-	if(planet->landscape)
-		landscape = planet->landscape->Name();
+	if(object->landscape)
+		landscape = object->landscape->Name();
 	if(ImGui::InputText("landscape", &landscape, ImGuiInputTextFlags_EnterReturnsTrue))
 	{
-		planet->landscape = SpriteSet::Get(landscape);
-		GameData::Preload(planet->landscape);
-		dirty.insert(planet);
+		object->landscape = SpriteSet::Get(landscape);
+		GameData::Preload(object->landscape);
+		SetDirty();
 	}
-	if(ImGui::InputText("music", &planet->music, ImGuiInputTextFlags_EnterReturnsTrue))
-		dirty.insert(planet);
+	if(ImGui::InputText("music", &object->music, ImGuiInputTextFlags_EnterReturnsTrue))
+		SetDirty();
 
-	if(ImGui::InputTextMultiline("description", &planet->description, ImVec2(), ImGuiInputTextFlags_EnterReturnsTrue))
-		dirty.insert(planet);
-	if(ImGui::InputTextMultiline("spaceport", &planet->spaceport, ImVec2(), ImGuiInputTextFlags_EnterReturnsTrue))
+	if(ImGui::InputTextMultiline("description", &object->description, ImVec2(), ImGuiInputTextFlags_EnterReturnsTrue))
+		SetDirty();
+	if(ImGui::InputTextMultiline("spaceport", &object->spaceport, ImVec2(), ImGuiInputTextFlags_EnterReturnsTrue))
 	{
-		dirty.insert(planet);
+		SetDirty();
 
-		if(planet->spaceport.empty())
-			planet->attributes.erase("spaceport");
+		if(object->spaceport.empty())
+			object->attributes.erase("spaceport");
 		else
-			planet->attributes.insert("spaceport");
+			object->attributes.insert("spaceport");
 	}
 
 	{
-		if(ImGui::BeginCombo("governments", planet->government ? planet->government->GetName().c_str() : ""))
+		if(ImGui::BeginCombo("governments", object->government ? object->government->GetName().c_str() : ""))
 		{
 			int index = 0;
 			for(const auto &government : GameData::Governments())
 			{
-				const bool selected = &government.second == planet->government;
+				const bool selected = &government.second == object->government;
 				if(ImGui::Selectable(government.first.c_str(), selected))
 				{
-					planet->government = &government.second;
-					dirty.insert(planet);
+					object->government = &government.second;
+					SetDirty();
 				}
 				++index;
 
@@ -451,33 +437,15 @@ void PlanetEditor::RenderPlanet()
 		}
 	}
 
-	if(ImGui::InputDoubleEx("required reputation", &planet->requiredReputation))
-		dirty.insert(planet);
-	if(ImGui::InputDoubleEx("bribe", &planet->bribe))
-		dirty.insert(planet);
-	if(ImGui::InputDoubleEx("security", &planet->security))
-		dirty.insert(planet);
-	planet->customSecurity = planet->security != .25;
+	if(ImGui::InputDoubleEx("required reputation", &object->requiredReputation))
+		SetDirty();
+	if(ImGui::InputDoubleEx("bribe", &object->bribe))
+		SetDirty();
+	if(ImGui::InputDoubleEx("security", &object->security))
+		SetDirty();
+	object->customSecurity = object->security != .25;
 
-	planet->inhabited = (!planet->spaceport.empty() || planet->requiredReputation || !planet->defenseFleets.empty()) && !planet->attributes.count("uninhabited");
-}
-
-
-
-void PlanetEditor::WriteToPlugin(const Planet *planet)
-{
-	if(!editor.HasPlugin())
-		return;
-
-	dirty.erase(planet);
-	for(auto &&p : planets)
-		if(p.name == planet->name)
-		{
-			p = *planet;
-			return;
-		}
-
-	planets.push_back(*planet);
+	object->inhabited = (!object->spaceport.empty() || object->requiredReputation || !object->defenseFleets.empty()) && !object->attributes.count("uninhabited");
 }
 
 
@@ -563,13 +531,4 @@ void PlanetEditor::WriteToFile(DataWriter &writer, const Planet *planet)
 	}
 
 	writer.EndChild();
-}
-
-
-
-void PlanetEditor::WriteAll()
-{
-	auto copy = dirty;
-	for(auto &&p : copy)
-		WriteToPlugin(p);
 }
