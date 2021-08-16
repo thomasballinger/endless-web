@@ -77,7 +77,7 @@ void PlanetEditor::Render()
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
-	if(!ImGui::Begin("Planet Editor", &showPlanetMenu, ImGuiWindowFlags_MenuBar))
+	if(!ImGui::Begin("Planet Editor", &showPlanetMenu))
 	{
 		ImGui::End();
 		return;

@@ -66,7 +66,7 @@ void SystemEditor::Render()
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
-	if(!ImGui::Begin("System Editor", &showSystemMenu, ImGuiWindowFlags_MenuBar))
+	if(!ImGui::Begin("System Editor", &showSystemMenu))
 	{
 		ImGui::End();
 		return;
