@@ -176,7 +176,7 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 	// game loading and game saving.
 	UI menuPanels;
 
-	Editor editor(player, gamePanels);
+	Editor editor(player, menuPanels, gamePanels);
 	
 	menuPanels.Push(new MenuPanel(player, gamePanels));
 	if(!conversation.IsEmpty())
@@ -232,7 +232,7 @@ void GameLoop(PlayerInfo &player, const Conversation &conversation, const string
 			}
 			else if(event.type == SDL_QUIT)
 			{
-				menuPanels.Quit();
+				editor.ShowConfirmationDialog();
 			}
 			else if(event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
 			{

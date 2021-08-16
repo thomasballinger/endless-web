@@ -46,14 +46,22 @@ using namespace std;
 
 
 
-Editor::Editor(PlayerInfo &player, UI &ui) noexcept
-	: player(player), ui(ui), planetEditor(*this, showPlanetMenu),
+Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
+	: player(player), menu(menu), ui(ui), planetEditor(*this, showPlanetMenu),
 	shipEditor(*this, showShipMenu), systemEditor(*this, showSystemMenu)
 {
 }
 
 
 
+Editor::~Editor()
+{
+	WriteAll();
+}
+
+
+
+// Saves every unsaved changes to the current plugin if any.
 void Editor::SaveAll()
 {
 	if(!HasPlugin())
@@ -63,6 +71,15 @@ void Editor::SaveAll()
 	shipEditor.WriteAll();
 	planetEditor.WriteAll();
 	systemEditor.WriteAll();
+}
+
+
+
+// Writes the plugin to a file.
+void Editor::WriteAll()
+{
+	if(!HasPlugin())
+		return;
 
 	const auto &planets = planetEditor.Planets();
 	const auto &ships = shipEditor.Ships();
@@ -164,6 +181,15 @@ bool Editor::HasPlugin() const
 
 
 
+bool Editor::HasUnsavedChanges() const
+{
+	return !planetEditor.Dirty().empty()
+		|| !shipEditor.Dirty().empty()
+		|| !systemEditor.Dirty().empty();
+}
+
+
+
 const std::string &Editor::GetPluginPath() const
 {
 	return currentPlugin;
@@ -204,8 +230,13 @@ void Editor::RenderMain()
 			ImGui::MenuItem("Open Plugin", nullptr, &openPluginDialog);
 			if(!currentPlugin.empty())
 				ImGui::MenuItem(("\"" + currentPluginName + "\" loaded").c_str(), nullptr, false, false);
-			if(ImGui::MenuItem("Save All"))
+			if(ImGui::MenuItem("Save All", nullptr, false, HasPlugin()))
+			{
 				SaveAll();
+				WriteAll();
+			}
+			if(ImGui::MenuItem("Quit"))
+				menu.Quit();
 			ImGui::EndMenu();
 		}
 		if(ImGui::BeginMenu("Editors"))
@@ -219,9 +250,7 @@ void Editor::RenderMain()
 		const auto &dirtyPlanets = planetEditor.Dirty();
 		const auto &dirtyShips = shipEditor.Dirty();
 		const auto &dirtySystems = systemEditor.Dirty();
-		const bool hasChanges = !dirtyPlanets.empty()
-			|| !dirtyShips.empty()
-			|| !dirtySystems.empty();
+		const bool hasChanges = HasUnsavedChanges();
 
 		if(hasChanges)
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
@@ -260,6 +289,8 @@ void Editor::RenderMain()
 		ImGui::OpenPopup("New Plugin");
 	if(openPluginDialog)
 		ImGui::OpenPopup("Open Plugin");
+	if(showConfirmationDialog)
+		ImGui::OpenPopup("Confirmation Dialog");
 
 	if(ImGui::BeginPopupModal("New Plugin", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
@@ -312,6 +343,50 @@ void Editor::RenderMain()
 			ImGui::PopDisabled();
 		ImGui::EndPopup();
 	}
+	if(ImGui::BeginPopupModal("Confirmation Dialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("You have unsaved changes. Are you sure you want to quit?");
+		if(ImGui::Button("No"))
+		{
+			showConfirmationDialog = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if(ImGui::Button("Yes"))
+		{
+			menu.Quit();
+			showConfirmationDialog = false;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if(!HasPlugin())
+			ImGui::PushDisabled();
+		if(ImGui::Button("Save All and Quit"))
+		{
+			menu.Quit();
+			showConfirmationDialog = false;
+			SaveAll();
+			ImGui::CloseCurrentPopup();
+		}
+		if(!HasPlugin())
+		{
+			ImGui::PopDisabled();
+			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				ImGui::SetTooltip("You don't have a plugin loaded to save the changes to.");
+		}
+		ImGui::EndPopup();
+	}
+}
+
+
+
+void Editor::ShowConfirmationDialog()
+{
+	if(HasUnsavedChanges())
+		showConfirmationDialog = true;
+	else
+		// No unsaved changes, so just quit.
+		menu.Quit();
 }
 
 

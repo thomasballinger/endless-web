@@ -35,14 +35,22 @@ class UI;
 // Class representing the editor UI.
 class Editor {
 public:
-	Editor(PlayerInfo &player, UI &ui) noexcept;
+	Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept;
 	Editor(const Editor &) = delete;
 	Editor& operator=(const Editor &) = delete;
+	~Editor();
 
+	// Saves every unsaved changes to the current plugin if any.
 	void SaveAll();
+	// Writes the plugin to a file.
+	void WriteAll();
+
 	void RenderMain();
 
+	void ShowConfirmationDialog();
+
 	bool HasPlugin() const;
+	bool HasUnsavedChanges() const;
 	const std::string &GetPluginPath() const;
 	PlayerInfo &Player();
 	UI &GetUI();
@@ -55,6 +63,7 @@ private:
 
 private:
 	PlayerInfo &player;
+	UI &menu;
 	UI &ui;
 
 	PlanetEditor planetEditor;
@@ -64,6 +73,7 @@ private:
 	std::string currentPlugin;
 	std::string currentPluginName;
 
+	bool showConfirmationDialog = false;
 	bool showShipMenu = false;
 	bool showSystemMenu = false;
 	bool showPlanetMenu = false;
