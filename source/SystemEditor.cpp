@@ -727,14 +727,17 @@ void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, b
 		if(dirty.count(system))
 			system->SetDate(editor.Player().GetDate());
 
-		if(index + 1 < system->objects.size() && system->objects[index + 1].Parent() == index)
-			return (void)++nested; // If the next object is a child, don't close this tree node just yet.
+		if(index + 1 < static_cast<int>(system->objects.size()) && system->objects[index + 1].Parent() == index)
+		{
+			++nested; // If the next object is a child, don't close this tree node just yet.
+			return;
+		}
 		else
 			ImGui::TreePop();
 	}
 
 	// If are nested, then we need to remove this nesting until we are at the next desired level.
-	if(nested && index + 1 >= system->objects.size())
+	if(nested && index + 1 >= static_cast<int>(system->objects.size()))
 		while(nested--)
 			ImGui::TreePop();
 	else if(nested)

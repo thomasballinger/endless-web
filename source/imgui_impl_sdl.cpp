@@ -82,7 +82,7 @@ struct ImGui_ImplSDL2_Data
 // FIXME: some shared resources (mouse cursor shape, gamepad) are mishandled when using multi-context.
 static ImGui_ImplSDL2_Data* ImGui_ImplSDL2_GetBackendData()
 {
-    return ImGui::GetCurrentContext() ? (ImGui_ImplSDL2_Data*)ImGui::GetIO().BackendPlatformUserData : NULL;
+    return ImGui::GetCurrentContext() ? static_cast<ImGui_ImplSDL2_Data*>(ImGui::GetIO().BackendPlatformUserData) : NULL;
 }
 
 // Functions
@@ -170,7 +170,7 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window)
 
     // Setup backend capabilities flags
     ImGui_ImplSDL2_Data* bd = IM_NEW(ImGui_ImplSDL2_Data)();
-    io.BackendPlatformUserData = (void*)bd;
+    io.BackendPlatformUserData = static_cast<void*>(bd);
     io.BackendPlatformName = "imgui_impl_sdl";
     io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;       // We can honor GetMouseCursor() values (optional)
     io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;        // We can honor io.WantSetMousePos requests (optional, rarely used)
@@ -318,7 +318,7 @@ static void ImGui_ImplSDL2_UpdateMousePosAndButtons()
 
     // Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
     if (io.WantSetMousePos)
-        SDL_WarpMouseInWindow(bd->Window, (int)mouse_pos_prev.x, (int)mouse_pos_prev.y);
+        SDL_WarpMouseInWindow(bd->Window, static_cast<int>(mouse_pos_prev.x), static_cast<int>(mouse_pos_prev.y));
 
     // Set Dear ImGui mouse position from OS position + get buttons. (this is the common behavior)
     if (bd->MouseCanUseGlobalState)
@@ -329,11 +329,11 @@ static void ImGui_ImplSDL2_UpdateMousePosAndButtons()
         SDL_GetGlobalMouseState(&mouse_x_global, &mouse_y_global);
         int window_x, window_y;
         SDL_GetWindowPosition(mouse_window, &window_x, &window_y);
-        io.MousePos = ImVec2((float)(mouse_x_global - window_x), (float)(mouse_y_global - window_y));
+        io.MousePos = ImVec2(static_cast<float>(mouse_x_global - window_x), static_cast<float>(mouse_y_global - window_y));
     }
     else
     {
-        io.MousePos = ImVec2((float)mouse_x_local, (float)mouse_y_local);
+        io.MousePos = ImVec2(static_cast<float>(mouse_x_local), static_cast<float>(mouse_y_local));
     }
 }
 
@@ -375,7 +375,7 @@ static void ImGui_ImplSDL2_UpdateGamepads()
 
     // Update gamepad inputs
     #define MAP_BUTTON(NAV_NO, BUTTON_NO)       { io.NavInputs[NAV_NO] = (SDL_GameControllerGetButton(game_controller, BUTTON_NO) != 0) ? 1.0f : 0.0f; }
-    #define MAP_ANALOG(NAV_NO, AXIS_NO, V0, V1) { float vn = (float)(SDL_GameControllerGetAxis(game_controller, AXIS_NO) - V0) / (float)(V1 - V0); if (vn > 1.0f) vn = 1.0f; if (vn > 0.0f && io.NavInputs[NAV_NO] < vn) io.NavInputs[NAV_NO] = vn; }
+    #define MAP_ANALOG(NAV_NO, AXIS_NO, V0, V1) { float vn = static_cast<float>(SDL_GameControllerGetAxis(game_controller, AXIS_NO) - V0) / static_cast<float>(V1 - V0); if (vn > 1.0f) vn = 1.0f; if (vn > 0.0f && io.NavInputs[NAV_NO] < vn) io.NavInputs[NAV_NO] = vn; }
     const int thumb_dead_zone = 8000;           // SDL_gamecontroller.h suggests using this value.
     MAP_BUTTON(ImGuiNavInput_Activate,      SDL_CONTROLLER_BUTTON_A);               // Cross / A
     MAP_BUTTON(ImGuiNavInput_Cancel,        SDL_CONTROLLER_BUTTON_B);               // Circle / B
@@ -412,14 +412,14 @@ void ImGui_ImplSDL2_NewFrame()
     if (SDL_GetWindowFlags(bd->Window) & SDL_WINDOW_MINIMIZED)
         w = h = 0;
     SDL_GL_GetDrawableSize(bd->Window, &display_w, &display_h);
-    io.DisplaySize = ImVec2((float)w, (float)h);
+    io.DisplaySize = ImVec2(static_cast<float>(w), static_cast<float>(h));
     if (w > 0 && h > 0)
-        io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
+        io.DisplayFramebufferScale = ImVec2(static_cast<float>(display_w) / w, static_cast<float>(display_h) / h);
 
     // Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
     static Uint64 frequency = SDL_GetPerformanceFrequency();
     Uint64 current_time = SDL_GetPerformanceCounter();
-    io.DeltaTime = bd->Time > 0 ? (float)((double)(current_time - bd->Time) / frequency) : (float)(1.0f / 60.0f);
+    io.DeltaTime = bd->Time > 0 ? static_cast<float>(static_cast<double>(current_time - bd->Time) / frequency) : static_cast<float>(1.0f / 60.0f);
     bd->Time = current_time;
 
     ImGui_ImplSDL2_UpdateMousePosAndButtons();

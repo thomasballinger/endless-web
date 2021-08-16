@@ -65,8 +65,6 @@ void Editor::SaveAll()
 	const auto &planets = planetEditor.Planets();
 	const auto &ships = shipEditor.Ships();
 	const auto &systems = systemEditor.Systems();
-	string toSearch;
-	const auto searchForName = [&toSearch](const auto &obj) { return toSearch == obj.Name(); };
 
 	// Which object we have saved to file.
 	set<string> planetsSaved;
@@ -84,10 +82,11 @@ void Editor::SaveAll()
 
 		for(auto &&objects : file.second)
 		{
-			toSearch = objects.substr(1);
+			string toSearch = objects.substr(1);
 			if(objects[0] == '0')
 			{
-				auto it = find_if(planets.begin(), planets.end(), searchForName);
+				auto it = find_if(planets.begin(), planets.end(),
+						[&toSearch](const Planet &p) { return p.Name() == toSearch; });
 				if(it != planets.end())
 				{
 					planetEditor.WriteToFile(writer, &*it);
@@ -98,7 +97,8 @@ void Editor::SaveAll()
 			}
 			else if(objects[0] == '1')
 			{
-				auto it = find_if(ships.begin(), ships.end(), searchForName);
+				auto it = find_if(ships.begin(), ships.end(),
+						[&toSearch](const Ship &s) { return s.Name() == toSearch; });
 				if(it != ships.end())
 				{
 					shipEditor.WriteToFile(writer, &*it);
@@ -109,7 +109,8 @@ void Editor::SaveAll()
 			}
 			else if(objects[0] == '2')
 			{
-				auto it = find_if(systems.begin(), systems.end(), searchForName);
+				auto it = find_if(systems.begin(), systems.end(),
+						[&toSearch](const System &sys) { return sys.Name() == toSearch; });
 				if(it != systems.end())
 				{
 					systemEditor.WriteToFile(writer, &*it);

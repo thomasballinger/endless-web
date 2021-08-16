@@ -20,7 +20,7 @@ struct InputTextCallback_UserData
 
 static int InputTextCallback(ImGuiInputTextCallbackData* data)
 {
-    InputTextCallback_UserData* user_data = (InputTextCallback_UserData*)data->UserData;
+    InputTextCallback_UserData* user_data = static_cast<InputTextCallback_UserData*>(data->UserData);
     if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
     {
         // Resize string callback
@@ -28,7 +28,7 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
         std::string* str = user_data->Str;
         IM_ASSERT(data->Buf == str->c_str());
         str->resize(data->BufTextLen);
-        data->Buf = (char*)str->c_str();
+        data->Buf = const_cast<char*>(str->c_str());
     }
     else if (user_data->ChainCallback)
     {
@@ -48,7 +48,7 @@ bool ImGui::InputText(const char* label, std::string* str, ImGuiInputTextFlags f
     cb_user_data.Str = str;
     cb_user_data.ChainCallback = callback;
     cb_user_data.ChainCallbackUserData = user_data;
-    return InputText(label, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
+    return InputText(label, const_cast<char*>(str->c_str()), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
 }
 
 bool ImGui::InputTextMultiline(const char* label, std::string* str, const ImVec2& size, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data)
@@ -60,7 +60,7 @@ bool ImGui::InputTextMultiline(const char* label, std::string* str, const ImVec2
     cb_user_data.Str = str;
     cb_user_data.ChainCallback = callback;
     cb_user_data.ChainCallbackUserData = user_data;
-    return InputTextMultiline(label, (char*)str->c_str(), str->capacity() + 1, size, flags, InputTextCallback, &cb_user_data);
+    return InputTextMultiline(label, const_cast<char*>(str->c_str()), str->capacity() + 1, size, flags, InputTextCallback, &cb_user_data);
 }
 
 bool ImGui::InputTextWithHint(const char* label, const char* hint, std::string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data)
@@ -72,5 +72,5 @@ bool ImGui::InputTextWithHint(const char* label, const char* hint, std::string* 
     cb_user_data.Str = str;
     cb_user_data.ChainCallback = callback;
     cb_user_data.ChainCallbackUserData = user_data;
-    return InputTextWithHint(label, hint, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
+    return InputTextWithHint(label, hint, const_cast<char*>(str->c_str()), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
 }

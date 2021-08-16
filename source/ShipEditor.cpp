@@ -378,7 +378,7 @@ void ShipEditor::RenderShip()
 			bay.side = ivalue;
 
 			static string launchEffect;
-			for(int i = 0; i < bay.launchEffects.size(); ++i)
+			for(size_t i = 0; i < bay.launchEffects.size(); ++i)
 			{
 				launchEffect = bay.launchEffects[i]->Name();
 				if(ImGui::InputText("launch effect", &launchEffect, ImGuiInputTextFlags_EnterReturnsTrue))
