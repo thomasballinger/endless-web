@@ -496,8 +496,10 @@ void PlanetEditor::WriteToFile(DataWriter &writer, const Planet *planet)
 		writer.Write();
 	}
 
+	writer.Write("remove", "shipyard");
 	for(auto &&shipyard : planet->shipSales)
 		writer.Write("shipyard", shipyard->name);
+	writer.Write("remove", "outfitter");
 	for(auto &&outfitter : planet->outfitSales)
 		writer.Write("outfitter", outfitter->name);
 	if(planet->landscape)
