@@ -13,7 +13,7 @@ Checklist:
 
 - [x] Systems can be fully edited
 	- [ ] Better visual editing in the map panel
-- [ ] Planets can be fully edited
+- [x] Planets can be fully edited
 - [ ] Outfits can be fully edited
 - [ ] Ships can be fully edited
 - [ ] Governments can be fully edited

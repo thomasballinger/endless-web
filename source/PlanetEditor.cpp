@@ -227,25 +227,184 @@ void PlanetEditor::RenderPlanet()
 	if(ImGui::TreeNode("shipyards"))
 	{
 		index = 0;
-		for(const auto &shipyard : planet->shipSales)
+		const Sale<Ship> *toAdd = nullptr;
+		const Sale<Ship> *toRemove = nullptr;
+		for(auto it = planet->shipSales.begin(); it != planet->shipSales.end(); ++it)
 		{
 			ImGui::PushID(index++);
-			ImGui::Text("shipyard: %s", shipyard->name.c_str());
+			if(ImGui::BeginCombo("shipyard", (*it)->name.c_str()))
+			{
+				for(const auto &item : GameData::Shipyards())
+				{
+					const bool selected = &item.second == *it;
+					if(ImGui::Selectable(item.first.c_str(), selected))
+					{
+						toAdd = &item.second;
+						toRemove = *it;
+						dirty.insert(planet);
+					}
+					if(selected)
+						ImGui::SetItemDefaultFocus();
+				}
+
+				if(ImGui::Selectable("[remove]"))
+				{
+					toRemove = *it;
+					dirty.insert(planet);
+				}
+				ImGui::EndCombo();
+			}
 			ImGui::PopID();
+		}
+		if(toAdd)
+			planet->shipSales.insert(toAdd);
+		if(toRemove)
+			planet->shipSales.erase(toRemove);
+		if(ImGui::BeginCombo("add shipyard", ""))
+		{
+			for(const auto &item : GameData::Shipyards())
+				if(ImGui::Selectable(item.first.c_str()))
+				{
+					planet->shipSales.insert(&item.second);
+					dirty.insert(planet);
+				}
+			ImGui::EndCombo();
 		}
 		ImGui::TreePop();
 	}
 	if(ImGui::TreeNode("outfitters"))
 	{
 		index = 0;
-		for(const auto &outfitter : planet->outfitSales)
+		const Sale<Outfit> *toAdd = nullptr;
+		const Sale<Outfit> *toRemove = nullptr;
+		for(auto it = planet->outfitSales.begin(); it != planet->outfitSales.end(); ++it)
 		{
 			ImGui::PushID(index++);
-			ImGui::Text("outfitter: %s", outfitter->name.c_str());
+			if(ImGui::BeginCombo("outfitter", (*it)->name.c_str()))
+			{
+				for(const auto &item : GameData::Outfitters())
+				{
+					const bool selected = &item.second == *it;
+					if(ImGui::Selectable(item.first.c_str(), selected))
+					{
+						toAdd = &item.second;
+						toRemove = *it;
+						dirty.insert(planet);
+					}
+					if(selected)
+						ImGui::SetItemDefaultFocus();
+				}
+
+				if(ImGui::Selectable("[remove]"))
+				{
+					toRemove = *it;
+					dirty.insert(planet);
+				}
+				ImGui::EndCombo();
+			}
 			ImGui::PopID();
+		}
+		if(toAdd)
+			planet->outfitSales.insert(toAdd);
+		if(toRemove)
+			planet->outfitSales.erase(toRemove);
+		if(ImGui::BeginCombo("add outfitter", ""))
+		{
+			for(const auto &item : GameData::Outfitters())
+				if(ImGui::Selectable(item.first.c_str()))
+				{
+					planet->outfitSales.insert(&item.second);
+					dirty.insert(planet);
+				}
+			ImGui::EndCombo();
 		}
 		ImGui::TreePop();
 	}
+
+	if(ImGui::TreeNode("tribute"))
+	{
+		if(ImGui::InputInt("tribute", &planet->tribute))
+			dirty.insert(planet);
+		if(ImGui::InputInt("threshold", &planet->defenseThreshold))
+			dirty.insert(planet);
+
+		if(ImGui::TreeNode("fleets"))
+		{
+			index = 0;
+			map<const Fleet *, int> modify;
+			for(auto it = planet->defenseFleets.begin(); it != planet->defenseFleets.end();)
+			{
+				int count = 1;
+				auto counter = it;
+				while(next(counter) != planet->defenseFleets.end()
+						&& (*next(counter))->Name() == (*counter)->Name())
+				{
+					++counter;
+					++count;
+				}
+
+				ImGui::PushID(index);
+				if(ImGui::BeginCombo("##fleets", (*it)->Name().c_str()))
+				{
+					for(const auto &item : GameData::Fleets())
+					{
+						const bool selected = &item.second == *it;
+						if(ImGui::Selectable(item.first.c_str(), selected))
+						{
+							// We need to update every entry.
+							auto begin = it;
+							auto end = it + count;
+							while(begin != end)
+								*begin++ = &item.second;
+							dirty.insert(planet);
+						}
+
+						if(selected)
+							ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+
+				ImGui::SameLine();
+				int oldCount = count;
+				if(ImGui::InputInt("fleet", &count))
+				{
+					modify[*it] = count - oldCount;
+					dirty.insert(planet);
+				}
+
+				++index;
+				it += oldCount;
+				ImGui::PopID();
+			}
+
+			// Now update any fleets entries.
+			for(auto &&pair : modify)
+			{
+				auto first = find(planet->defenseFleets.begin(), planet->defenseFleets.end(), pair.first);
+				if(pair.second <= 0)
+					planet->defenseFleets.erase(first, first + (-pair.second));
+				else
+					planet->defenseFleets.insert(first, pair.second, pair.first);
+			}
+
+			// Now add the ability to add fleets.
+			if(ImGui::BeginCombo("##fleets", ""))
+			{
+				for(const auto &item : GameData::Fleets())
+					if(ImGui::Selectable(item.first.c_str()))
+					{
+						planet->defenseFleets.emplace_back(&item.second);
+						dirty.insert(planet);
+					}
+				ImGui::EndCombo();
+			}
+
+			ImGui::TreePop();
+		}
+		ImGui::TreePop();
+	}
+
 
 	static string landscape;
 	if(planet->landscape)
@@ -292,34 +451,13 @@ void PlanetEditor::RenderPlanet()
 		}
 	}
 
-	ImGui::InputDoubleEx("required reputation", &planet->requiredReputation);
-	ImGui::InputDoubleEx("bribe", &planet->bribe);
-	ImGui::InputDoubleEx("security", &planet->security);
+	if(ImGui::InputDoubleEx("required reputation", &planet->requiredReputation))
+		dirty.insert(planet);
+	if(ImGui::InputDoubleEx("bribe", &planet->bribe))
+		dirty.insert(planet);
+	if(ImGui::InputDoubleEx("security", &planet->security))
+		dirty.insert(planet);
 	planet->customSecurity = planet->security != .25;
-
-	if(ImGui::TreeNode("tribute", "tribute: %d", planet->tribute))
-	{
-		ImGui::InputInt("threshold", &planet->defenseThreshold);
-		if(ImGui::TreeNode("fleets"))
-		{
-			for(size_t i = 0; i < planet->defenseFleets.size(); ++i)
-			{
-				size_t count = 1;
-				while(i + 1 < planet->defenseFleets.size()
-						&& planet->defenseFleets[i + 1]->Name() == planet->defenseFleets[i]->Name())
-				{
-					++i;
-					++count;
-				}
-				ImGui::PushID(i);
-				ImGui::Text("fleet: %s %zu", planet->defenseFleets[i]->Name().c_str(), count);
-				ImGui::PopID();
-			}
-
-			ImGui::TreePop();
-		}
-		ImGui::TreePop();
-	}
 
 	planet->inhabited = (!planet->spaceport.empty() || planet->requiredReputation || !planet->defenseFleets.empty()) && !planet->attributes.count("uninhabited");
 }
