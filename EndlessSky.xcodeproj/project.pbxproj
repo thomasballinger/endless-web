@@ -164,6 +164,7 @@
 		B55C239D2303CE8B005C1A14 /* GameWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B55C239B2303CE8A005C1A14 /* GameWindow.cpp */; };
 		B590161321ED4A0F00799178 /* Utf8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B590161121ED4A0E00799178 /* Utf8.cpp */; };
 		B5DDA6942001B7F600DBA76A /* News.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B5DDA6922001B7F600DBA76A /* News.cpp */; };
+		BE924F4D8F547947A58744DF /* imgui_ex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */; };
 		C4264774A89C0001B6FFC60E /* Hazard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C49D4EA08DF168A83B1C7B07 /* Hazard.cpp */; };
 		C7354A3E9C53D6C5E3CC352F /* TestData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 02D34A71AE3BC4C93FC6865B /* TestData.cpp */; };
 		CA284CAAAAEF2DEAB734E42B /* imgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A38947BDBF490A5EC61A7EE3 /* imgui.cpp */; };
@@ -227,6 +228,7 @@
 		48C94A54918068EBCF00D639 /* Editor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Editor.cpp; path = source/Editor.cpp; sourceTree = "<group>"; };
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
 		5155CD721DBB9FF900EF090B /* Depreciation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depreciation.h; path = source/Depreciation.h; sourceTree = "<group>"; };
+		594F45D387676610FE522103 /* imgui_ex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_ex.h; path = source/imgui_ex.h; sourceTree = "<group>"; };
 		5CE3475B85CE8C48D98664B7 /* Test.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Test.h; path = source/Test.h; sourceTree = "<group>"; };
 		6245F8231D301C7400A7A094 /* Body.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Body.cpp; path = source/Body.cpp; sourceTree = "<group>"; };
 		6245F8241D301C7400A7A094 /* Body.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Body.h; path = source/Body.h; sourceTree = "<group>"; };
@@ -509,6 +511,7 @@
 		B5DDA6922001B7F600DBA76A /* News.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = News.cpp; path = source/News.cpp; sourceTree = "<group>"; };
 		B5DDA6932001B7F600DBA76A /* News.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = News.h; path = source/News.h; sourceTree = "<group>"; };
 		B7F144DDBABD665E2448B406 /* imgui_impl_opengl3.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_impl_opengl3.cpp; path = source/imgui_impl_opengl3.cpp; sourceTree = "<group>"; };
+		BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_ex.cpp; path = source/imgui_ex.cpp; sourceTree = "<group>"; };
 		BF6A488FB58031C23D0DC528 /* imgui_draw.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_draw.cpp; path = source/imgui_draw.cpp; sourceTree = "<group>"; };
 		C49D4EA08DF168A83B1C7B07 /* Hazard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Hazard.cpp; path = source/Hazard.cpp; sourceTree = "<group>"; };
 		C6B14F639EAE38B677E0EFD8 /* imgui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui.h; path = source/imgui.h; sourceTree = "<group>"; };
@@ -854,6 +857,8 @@
 				69234985B8124DD2214BA201 /* imstb_rectpack.h */,
 				0A4E47929FA22D0728DD80DD /* imstb_textedit.h */,
 				B222407EAF19D091B3942183 /* imstb_truetype.h */,
+				BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */,
+				594F45D387676610FE522103 /* imgui_ex.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1211,6 +1216,7 @@
 				55A9455A815286F9AE0E7946 /* imgui_stdlib.cpp in Sources */,
 				16D64D6EB58BC2EFDE8F3065 /* imgui_tables.cpp in Sources */,
 				E7A341F1BA8EA3C621DBDD8A /* imgui_widgets.cpp in Sources */,
+				BE924F4D8F547947A58744DF /* imgui_ex.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
