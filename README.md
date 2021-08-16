@@ -7,7 +7,7 @@ This is a proof of concept map editor for Endless Sky. It is still in alpha. Cur
 - Edit various properties of them (not all are currently supported)
 - Doesn't mess up your plugin structure (if system X is in X.txt and system Y in Y.txt it will respect that).
 
-You can build this editor like the main game, except that you might need a newer version of MinGW because of C++14.
+You can build this editor like the main game or use the CD generated artifacts for your OS.
 
 Checklist:
 
