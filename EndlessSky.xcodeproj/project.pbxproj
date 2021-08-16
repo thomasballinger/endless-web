@@ -229,6 +229,7 @@
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
 		5155CD721DBB9FF900EF090B /* Depreciation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depreciation.h; path = source/Depreciation.h; sourceTree = "<group>"; };
 		594F45D387676610FE522103 /* imgui_ex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_ex.h; path = source/imgui_ex.h; sourceTree = "<group>"; };
+		59EF4423B8B56CCD9AE6D7FB /* TemplateEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TemplateEditor.h; path = source/TemplateEditor.h; sourceTree = "<group>"; };
 		5CE3475B85CE8C48D98664B7 /* Test.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Test.h; path = source/Test.h; sourceTree = "<group>"; };
 		6245F8231D301C7400A7A094 /* Body.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Body.cpp; path = source/Body.cpp; sourceTree = "<group>"; };
 		6245F8241D301C7400A7A094 /* Body.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Body.h; path = source/Body.h; sourceTree = "<group>"; };
@@ -859,6 +860,7 @@
 				B222407EAF19D091B3942183 /* imstb_truetype.h */,
 				BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */,
 				594F45D387676610FE522103 /* imgui_ex.h */,
+				59EF4423B8B56CCD9AE6D7FB /* TemplateEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
