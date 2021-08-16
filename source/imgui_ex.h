@@ -15,7 +15,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 #include "imgui.h"
 
-#include <cstdlib>
+#include <cstdint>
 
 
 
