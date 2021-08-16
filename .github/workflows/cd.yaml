@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Fetch development libraries
         run: |
-          Invoke-WebRequest https://endless-sky.github.io/win64-dev.zip -OutFile win64-dev.zip
+          Invoke-WebRequest https://quyykk.github.io/endless-sky.github.io/win64-dev.zip -OutFile win64-dev.zip
           Expand-Archive win64-dev.zip -DestinationPath . -Force
           Remove-Item win64-dev.zip
       - name: Adjust version strings
