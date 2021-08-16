@@ -18,6 +18,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "Dialog.h"
 #include "Imgui.h"
 #include "imgui_internal.h"
+#include "imgui_stdlib.h"
 #include "Editor.h"
 #include "Effect.h"
 #include "EsUuid.h"
