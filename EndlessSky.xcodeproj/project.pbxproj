@@ -26,7 +26,6 @@
 		62C3111A1CE172D000409D91 /* Flotsam.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 62C311181CE172D000409D91 /* Flotsam.cpp */; };
 		6A5716331E25BE6F00585EB2 /* CollisionSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6A5716311E25BE6F00585EB2 /* CollisionSet.cpp */; };
 		6EC347E6A79BA5602BA4D1EA /* StartConditionsPanel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 11EA4AD7A889B6AC1441A198 /* StartConditionsPanel.cpp */; };
-		77E54D8AA5EB89065C2B2B6F /* Imgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3D57494AA3F0E08B04515473 /* Imgui.cpp */; };
 		7A0F4F86A8BD6ADADF4182C0 /* Editor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48C94A54918068EBCF00D639 /* Editor.cpp */; };
 		90CF46CE84794C6186FC6CE2 /* EsUuid.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 950742538F8CECF5D4168FBC /* EsUuid.cpp */; };
 		94DF4B5B8619F6A3715D6168 /* Weather.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E8A4C648B242742B22A34FA /* Weather.cpp */; };
@@ -224,9 +223,7 @@
 		2E644A108BCD762A2A1A899C /* Hazard.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Hazard.h; path = source/Hazard.h; sourceTree = "<group>"; };
 		2E8047A8987DD8EC99FF8E2E /* Test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = source/Test.cpp; sourceTree = "<group>"; };
 		39DA42F383465786C343E30A /* imgui_demo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_demo.cpp; path = source/imgui_demo.cpp; sourceTree = "<group>"; };
-		3D57494AA3F0E08B04515473 /* Imgui.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Imgui.cpp; path = source/Imgui.cpp; sourceTree = "<group>"; };
 		3FB94E8FB97514F79F73FA6B /* imgui_impl_sdl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_impl_sdl.h; path = source/imgui_impl_sdl.h; sourceTree = "<group>"; };
-		41814C82AB889C283CB70582 /* Imgui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Imgui.h; path = source/Imgui.h; sourceTree = "<group>"; };
 		48C94A54918068EBCF00D639 /* Editor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Editor.cpp; path = source/Editor.cpp; sourceTree = "<group>"; };
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
 		5155CD721DBB9FF900EF090B /* Depreciation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depreciation.h; path = source/Depreciation.h; sourceTree = "<group>"; };
@@ -834,8 +831,6 @@
 				86AB4B6E9C4C0490AE7F029B /* EsUuid.h */,
 				48C94A54918068EBCF00D639 /* Editor.cpp */,
 				CDDA4E36A9683BCB7FD21586 /* Editor.h */,
-				3D57494AA3F0E08B04515473 /* Imgui.cpp */,
-				41814C82AB889C283CB70582 /* Imgui.h */,
 				2C9944D589E2BFDE254B0DB6 /* PlanetEditor.cpp */,
 				162541F3840B8F0557D31255 /* PlanetEditor.h */,
 				A4484A25B3920B2841D453EA /* ShipEditor.cpp */,
@@ -1205,7 +1200,6 @@
 				03624EC39EE09C7A786B4A3D /* CoreStartData.cpp in Sources */,
 				90CF46CE84794C6186FC6CE2 /* EsUuid.cpp in Sources */,
 				7A0F4F86A8BD6ADADF4182C0 /* Editor.cpp in Sources */,
-				77E54D8AA5EB89065C2B2B6F /* Imgui.cpp in Sources */,
 				262F4EB5A0E87517383971D7 /* PlanetEditor.cpp in Sources */,
 				287D4FA6B371554567BA7C1B /* ShipEditor.cpp in Sources */,
 				A53F47BAA356C182B377589E /* SystemEditor.cpp in Sources */,

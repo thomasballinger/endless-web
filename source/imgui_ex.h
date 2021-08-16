@@ -1,4 +1,4 @@
-/* Imgui.h
+/* imgui_ex.h
 Copyright (c) 2021 quyykk
 
 Endless Sky is free software: you can redistribute it and/or modify it under the
@@ -10,11 +10,12 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 */
 
-#ifndef IMGUI_CPP_H_
-#define IMGUI_CPP_H_
+#ifndef IMGUI_EX_H_
+#define IMGUI_EX_H_
 
 #include "imgui.h"
-#include "imgui_stdlib.h"
+
+#include <cstdlib>
 
 
 
