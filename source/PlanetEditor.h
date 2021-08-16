@@ -13,14 +13,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #ifndef PLANET_EDITOR_H_
 #define PLANET_EDITOR_H_
 
-#include "DataWriter.h"
 #include "Planet.h"
 
-#include <memory>
 #include <set>
 #include <string>
 #include <list>
 
+class DataWriter;
 class Editor;
 
 

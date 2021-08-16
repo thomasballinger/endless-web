@@ -10,8 +10,8 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 */
 
-#ifndef IMGUI_H_
-#define IMGUI_H_
+#ifndef IMGUI_CPP_H_
+#define IMGUI_CPP_H_
 
 #include "imgui.h"
 #include "imgui_stdlib.h"
