@@ -52,9 +52,16 @@ ShipEditor::ShipEditor(Editor &editor, bool &show) noexcept
 
 
 
-const vector<Ship> &ShipEditor::Ships() const
+const list<Ship> &ShipEditor::Ships() const
 {
 	return ships;
+}
+
+
+
+const set<const Ship *> &ShipEditor::Dirty() const
+{
+	return dirty;
 }
 
 
@@ -454,4 +461,13 @@ void ShipEditor::WriteToPlugin(const Ship *ship)
 void ShipEditor::WriteToFile(DataWriter &writer, const Ship *ship)
 {
 	ship->Save(writer);
+}
+
+
+
+void ShipEditor::WriteAll()
+{
+	auto copy = dirty;
+	for(auto &&s : copy)
+		WriteToPlugin(s);
 }

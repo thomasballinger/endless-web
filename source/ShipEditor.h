@@ -18,7 +18,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <memory>
 #include <set>
 #include <string>
-#include <vector>
+#include <list>
 
 class DataWriter;
 class Editor;
@@ -32,10 +32,13 @@ public:
 	ShipEditor(const ShipEditor &) = delete;
 	ShipEditor& operator=(const ShipEditor &) = delete;
 
-	const std::vector<Ship> &Ships() const;
+	const std::list<Ship> &Ships() const;
+	const std::set<const Ship *> &Dirty() const;
+
 	void Render();
 	void WriteToFile(DataWriter &writer, const Ship *ship);
 	void WriteToPlugin(const Ship *ship);
+	void WriteAll();
 
 
 private:
@@ -52,7 +55,7 @@ private:
 	std::unique_ptr<Ship> ship;
 
 	std::set<const Ship *> dirty;
-	std::vector<Ship> ships;
+	std::list<Ship> ships;
 	std::vector<std::string> originalShips;
 };
 

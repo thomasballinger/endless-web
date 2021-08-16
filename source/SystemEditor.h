@@ -20,7 +20,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <memory>
 #include <set>
 #include <string>
-#include <vector>
+#include <list>
 
 class Editor;
 class StellarObject;
@@ -34,10 +34,13 @@ public:
 	SystemEditor(const SystemEditor &) = delete;
 	SystemEditor& operator=(const SystemEditor &) = delete;
 
-	const std::vector<System> &Systems() const;
+	const std::list<System> &Systems() const;
+	const std::set<const System *> &Dirty() const;
+
 	void Render();
 	void WriteToFile(DataWriter &writer, const System *system);
 	void WriteToPlugin(const System *system);
+	void WriteAll();
 
 
 private:
@@ -57,7 +60,7 @@ private:
 	System *system = nullptr;
 
 	std::set<const System *> dirty;
-	std::vector<System> systems;
+	std::list<System> systems;
 	std::vector<std::string> originalSystems;
 };
 

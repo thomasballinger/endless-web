@@ -40,9 +40,16 @@ SystemEditor::SystemEditor(Editor &editor, bool &show) noexcept
 
 
 
-const vector<System> &SystemEditor::Systems() const
+const list<System> &SystemEditor::Systems() const
 {
 	return systems;
+}
+
+
+
+const set<const System *> &SystemEditor::Dirty() const
+{
+	return dirty;
 }
 
 
@@ -72,14 +79,25 @@ void SystemEditor::Render()
 			system = const_cast<System *>(ptr);
 			searchBox.clear();
 		}
-	if(!system)
+	if(!system || !dirty.count(system))
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
+	if(!system || !dirty.count(system))
+	{
+		ImGui::PopDisabled();
+		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		{
+			if(!system)
+				ImGui::SetTooltip("Select a system first.");
+			else if(!dirty.count(system))
+				ImGui::SetTooltip("No changes to reset.");
+		}
+	}
 	ImGui::SameLine();
-	if(system && searchBox.empty())
+	if(!system || searchBox.empty())
 		ImGui::PushDisabled();
 	bool clone = ImGui::Button("Clone");
-	if(searchBox.empty() || !system)
+	if(!system || searchBox.empty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -91,14 +109,21 @@ void SystemEditor::Render()
 		}
 	}
 	ImGui::SameLine();
-	if(!editor.HasPlugin())
+	if(!system || !editor.HasPlugin() || !dirty.count(system))
 		ImGui::PushDisabled();
 	bool save = ImGui::Button("Save");
-	if(!editor.HasPlugin())
+	if(!system || !editor.HasPlugin() || !dirty.count(system))
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("Load a plugin to save to a file.");
+		{
+			if(!system)
+				ImGui::SetTooltip("Select a system first.");
+			else if(!editor.HasPlugin())
+				ImGui::SetTooltip("Load a plugin to save to a file.");
+			else if(!dirty.count(system))
+				ImGui::SetTooltip("No changes to save.");
+		}
 	}
 
 	if(!system)
@@ -215,12 +240,12 @@ void SystemEditor::RenderSystem()
 		for(auto &sys : toAdd)
 		{
 			system->Link(sys);
-			WriteToPlugin(sys);
+			dirty.insert(sys);
 		}
 		for(auto &&sys : toRemove)
 		{
 			system->Unlink(sys);
-			WriteToPlugin(sys);
+			dirty.insert(sys);
 		}
 		if(!toAdd.empty() || !toRemove.empty())
 		{
@@ -842,6 +867,15 @@ void SystemEditor::WriteToFile(DataWriter &writer, const System *system)
 	}
 
 	writer.EndChild();
+}
+
+
+
+void SystemEditor::WriteAll()
+{
+	auto copy = dirty;
+	for(auto &&sys : copy)
+		WriteToPlugin(sys);
 }
 
 

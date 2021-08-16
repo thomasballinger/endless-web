@@ -38,8 +38,8 @@ public:
 	Editor(PlayerInfo &player, UI &ui) noexcept;
 	Editor(const Editor &) = delete;
 	Editor& operator=(const Editor &) = delete;
-	~Editor();
 
+	void SaveAll();
 	void RenderMain();
 
 	bool HasPlugin() const;

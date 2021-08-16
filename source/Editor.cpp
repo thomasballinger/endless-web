@@ -52,10 +52,15 @@ Editor::Editor(PlayerInfo &player, UI &ui) noexcept
 
 
 
-Editor::~Editor()
+void Editor::SaveAll()
 {
 	if(!HasPlugin())
 		return;
+
+	// Commit to any unsaved changes.
+	shipEditor.WriteAll();
+	planetEditor.WriteAll();
+	systemEditor.WriteAll();
 
 	const auto &planets = planetEditor.Planets();
 	const auto &ships = shipEditor.Ships();
@@ -196,15 +201,54 @@ void Editor::RenderMain()
 			ImGui::MenuItem("Open Plugin", nullptr, &openPluginDialog);
 			if(!currentPlugin.empty())
 				ImGui::MenuItem(("\"" + currentPluginName + "\" loaded").c_str(), nullptr, false, false);
+			if(ImGui::MenuItem("Save All"))
+				SaveAll();
 			ImGui::EndMenu();
 		}
-		if(ImGui::BeginMenu("Menus"))
+		if(ImGui::BeginMenu("Editors"))
 		{
 			ImGui::MenuItem("Ship Editor", nullptr, &showShipMenu);
 			ImGui::MenuItem("System Editor", nullptr, &showSystemMenu);
 			ImGui::MenuItem("Planet Editor", nullptr, &showPlanetMenu);
 			ImGui::EndMenu();
 		}
+
+		const auto &dirtyPlanets = planetEditor.Dirty();
+		const auto &dirtyShips = shipEditor.Dirty();
+		const auto &dirtySystems = systemEditor.Dirty();
+		const bool hasChanges = !dirtyPlanets.empty()
+			|| !dirtyShips.empty()
+			|| !dirtySystems.empty();
+
+		if(hasChanges)
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
+		if(ImGui::BeginMenu("Unsaved Changes", hasChanges))
+		{
+			if(!dirtyPlanets.empty() && ImGui::BeginMenu("Planets"))
+			{
+				for(auto &&p : dirtyPlanets)
+					ImGui::MenuItem(p->TrueName().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
+			if(!dirtyShips.empty() && ImGui::BeginMenu("Ships"))
+			{
+				for(auto &&s : dirtyShips)
+					ImGui::MenuItem(s->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
+			if(!dirtySystems.empty() && ImGui::BeginMenu("Systems"))
+			{
+				for(auto &&sys : dirtySystems)
+					ImGui::MenuItem(sys->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMenu();
+		}
+		if(hasChanges)
+			ImGui::PopStyleColor();
 
 		ImGui::EndMainMenuBar();
 	}

@@ -14,21 +14,14 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #define PLANET_EDITOR_H_
 
 #include "DataWriter.h"
-#include "Ship.h"
-#include "System.h"
+#include "Planet.h"
 
 #include <memory>
 #include <set>
 #include <string>
-#include <vector>
+#include <list>
 
-class Body;
-class Engine;
 class Editor;
-class PlayerInfo;
-class Sprite;
-class StellarObject;
-class UI;
 
 
 
@@ -39,10 +32,13 @@ public:
 	PlanetEditor(const PlanetEditor &) = delete;
 	PlanetEditor& operator=(const PlanetEditor &) = delete;
 
-	const std::vector<Planet> &Planets() const;
+	const std::list<Planet> &Planets() const;
+	const std::set<const Planet *> &Dirty() const;
+
 	void Render();
 	void WriteToFile(DataWriter &writer, const Planet *planet);
 	void WriteToPlugin(const Planet *planet);
+	void WriteAll();
 
 private:
 	void RenderPlanetMenu();
@@ -59,7 +55,7 @@ private:
 	Planet *planet = nullptr;
 
 	std::set<const Planet *> dirty;
-	std::vector<Planet> planets;
+	std::list<Planet> planets;
 	std::vector<std::string> originalPlanets;
 };
 

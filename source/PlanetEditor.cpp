@@ -51,9 +51,16 @@ PlanetEditor::PlanetEditor(Editor &editor, bool &show) noexcept
 
 
 
-const std::vector<Planet> &PlanetEditor::Planets() const
+const list<Planet> &PlanetEditor::Planets() const
 {
 	return planets;
+}
+
+
+
+const set<const Planet *> &PlanetEditor::Dirty() const
+{
+	return dirty;
 }
 
 
@@ -85,14 +92,25 @@ void PlanetEditor::Render()
 			searchBox.clear();
 		}
 	}
-	if(!planet)
+	if(!planet || !dirty.count(planet))
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
+	if(!planet || !dirty.count(planet))
+	{
+		ImGui::PopDisabled();
+		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		{
+			if(!planet)
+				ImGui::SetTooltip("Select a planet first.");
+			else if(!dirty.count(planet))
+				ImGui::SetTooltip("No changes to reset.");
+		}
+	}
 	ImGui::SameLine();
-	if(planet && searchBox.empty())
+	if(!planet || searchBox.empty())
 		ImGui::PushDisabled();
 	bool clone = ImGui::Button("Clone");
-	if(searchBox.empty() || !planet)
+	if(!planet || searchBox.empty())
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -104,14 +122,21 @@ void PlanetEditor::Render()
 		}
 	}
 	ImGui::SameLine();
-	if(!editor.HasPlugin())
+	if(!planet || !editor.HasPlugin() || !dirty.count(planet))
 		ImGui::PushDisabled();
 	bool save = ImGui::Button("Save");
-	if(!editor.HasPlugin())
+	if(!planet || !editor.HasPlugin() || !dirty.count(planet))
 	{
 		ImGui::PopDisabled();
 		if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("Load a plugin to save to a file.");
+		{
+			if(!planet)
+				ImGui::SetTooltip("Select a planet first.");
+			else if(!editor.HasPlugin())
+				ImGui::SetTooltip("Load a plugin to save to a file.");
+			else if(!dirty.count(planet))
+				ImGui::SetTooltip("No changes to save.");
+		}
 	}
 
 	if(!planet)
@@ -396,4 +421,13 @@ void PlanetEditor::WriteToFile(DataWriter &writer, const Planet *planet)
 	}
 
 	writer.EndChild();
+}
+
+
+
+void PlanetEditor::WriteAll()
+{
+	auto copy = dirty;
+	for(auto &&p : copy)
+		WriteToPlugin(p);
 }
