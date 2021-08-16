@@ -216,13 +216,11 @@ void SystemEditor::RenderSystem()
 		{
 			system->Link(sys);
 			WriteToPlugin(sys);
-			dirty.insert(sys);
 		}
 		for(auto &&sys : toRemove)
 		{
 			system->Unlink(sys);
 			WriteToPlugin(sys);
-			dirty.insert(sys);
 		}
 		if(!toAdd.empty() || !toRemove.empty())
 		{
@@ -797,6 +795,9 @@ void SystemEditor::WriteToFile(DataWriter &writer, const System *system)
 		writer.Write("government", system->government->GetName());
 	if(!system->music.empty())
 		writer.Write("music", system->music);
+	if(system->links.empty())
+		// If there are no links make sure that no other node adds some.
+		writer.Write("remove", "link");
 	for(auto &&link : system->links)
 		writer.Write("link", link->Name());
 	if(system->hidden)
