@@ -461,6 +461,18 @@ string Files::Name(const string &path)
 
 
 
+void Files::CreateDirectory(const string &path)
+{
+#if defined _WINN32
+	if(!CreateDirectoryW(Utf8::ToUTF16(path).c_str(), nullptr))
+		LogError("Failed to create directory at '" + path + "'.");
+#else
+	mkdir(path.c_str(), 0755);
+#endif
+}
+
+
+
 FILE *Files::Open(const string &path, bool write)
 {
 #if defined _WIN32

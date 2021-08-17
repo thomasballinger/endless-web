@@ -336,7 +336,6 @@ void Editor::RenderMain()
 	{
 		static string newPlugin;
 		ImGui::Text("Create new plugin:");
-		ImGui::Text("Note: This doesn't work right now, but you can do this manually. Just create a folder in plugins/ with your plugin name and inside it a data/ folder.");
 		bool create = ImGui::InputText("", &newPlugin, ImGuiInputTextFlags_EnterReturnsTrue);
 		if(ImGui::Button("Cancel"))
 		{
@@ -434,12 +433,15 @@ void Editor::ShowConfirmationDialog()
 void Editor::NewPlugin(const string &plugin)
 {
 	// Don't create a new plugin it if already exists.
-	auto plugins = Files::ListDirectories(Files::Config() + "plugins/");
+	auto pluginsPath = Files::Config() + "plugins/";
+	auto plugins = Files::ListDirectories(pluginsPath);
 	for(const auto &existing : plugins)
 		if(existing == plugin)
-			return;
+			return OpenPlugin(plugin);
 
-	// FIXME: clang crashes when using boost::filesystem.
+	Files::CreateDirectory(pluginsPath + plugin);
+	Files::CreateDirectory(pluginsPath + plugin + "/data");
+	OpenPlugin(plugin);
 }
 
 
