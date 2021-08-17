@@ -439,8 +439,8 @@ void Editor::NewPlugin(const string &plugin)
 		if(existing == plugin)
 			return OpenPlugin(plugin);
 
-	Files::CreateDirectory(pluginsPath + plugin);
-	Files::CreateDirectory(pluginsPath + plugin + "/data");
+	Files::CreateNewDirectory(pluginsPath + plugin);
+	Files::CreateNewDirectory(pluginsPath + plugin + "/data");
 	OpenPlugin(plugin);
 }
 
