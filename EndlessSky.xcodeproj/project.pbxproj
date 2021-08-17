@@ -26,6 +26,7 @@
 		62C3111A1CE172D000409D91 /* Flotsam.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 62C311181CE172D000409D91 /* Flotsam.cpp */; };
 		6A5716331E25BE6F00585EB2 /* CollisionSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6A5716311E25BE6F00585EB2 /* CollisionSet.cpp */; };
 		6EC347E6A79BA5602BA4D1EA /* StartConditionsPanel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 11EA4AD7A889B6AC1441A198 /* StartConditionsPanel.cpp */; };
+		6FBC456187922A5E05E51D1B /* OutfitEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C7A14327AD92EC7673D20A5E /* OutfitEditor.cpp */; };
 		7A0F4F86A8BD6ADADF4182C0 /* Editor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48C94A54918068EBCF00D639 /* Editor.cpp */; };
 		90CF46CE84794C6186FC6CE2 /* EsUuid.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 950742538F8CECF5D4168FBC /* EsUuid.cpp */; };
 		94DF4B5B8619F6A3715D6168 /* Weather.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E8A4C648B242742B22A34FA /* Weather.cpp */; };
@@ -516,6 +517,7 @@
 		BF6A488FB58031C23D0DC528 /* imgui_draw.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_draw.cpp; path = source/imgui_draw.cpp; sourceTree = "<group>"; };
 		C49D4EA08DF168A83B1C7B07 /* Hazard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Hazard.cpp; path = source/Hazard.cpp; sourceTree = "<group>"; };
 		C6B14F639EAE38B677E0EFD8 /* imgui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui.h; path = source/imgui.h; sourceTree = "<group>"; };
+		C7A14327AD92EC7673D20A5E /* OutfitEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OutfitEditor.cpp; path = source/OutfitEditor.cpp; sourceTree = "<group>"; };
 		CDDA4E36A9683BCB7FD21586 /* Editor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Editor.h; path = source/Editor.h; sourceTree = "<group>"; };
 		DF8D57DF1FC25842001525DA /* Dictionary.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Dictionary.cpp; path = source/Dictionary.cpp; sourceTree = "<group>"; };
 		DF8D57E01FC25842001525DA /* Dictionary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Dictionary.h; path = source/Dictionary.h; sourceTree = "<group>"; };
@@ -528,6 +530,7 @@
 		DFAAE2A81FD4A27B0072C0A8 /* ImageSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ImageSet.cpp; path = source/ImageSet.cpp; sourceTree = "<group>"; };
 		DFAAE2A91FD4A27B0072C0A8 /* ImageSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ImageSet.h; path = source/ImageSet.h; sourceTree = "<group>"; };
 		E6844C1D8915DCB4462C421B /* imconfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imconfig.h; path = source/imconfig.h; sourceTree = "<group>"; };
+		EE314D08918B0B943ADA0D29 /* OutfitEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OutfitEditor.h; path = source/OutfitEditor.h; sourceTree = "<group>"; };
 		F434470BA8F3DE8B46D475C5 /* StartConditionsPanel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = StartConditionsPanel.h; path = source/StartConditionsPanel.h; sourceTree = "<group>"; };
 		F5B14602AD85F449CBE4A191 /* ShipEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ShipEditor.h; path = source/ShipEditor.h; sourceTree = "<group>"; };
 		F6A64A1DAFC5A01A5CC7D70A /* SystemEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SystemEditor.h; path = source/SystemEditor.h; sourceTree = "<group>"; };
@@ -861,6 +864,8 @@
 				BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */,
 				594F45D387676610FE522103 /* imgui_ex.h */,
 				59EF4423B8B56CCD9AE6D7FB /* TemplateEditor.h */,
+				C7A14327AD92EC7673D20A5E /* OutfitEditor.cpp */,
+				EE314D08918B0B943ADA0D29 /* OutfitEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1219,6 +1224,7 @@
 				16D64D6EB58BC2EFDE8F3065 /* imgui_tables.cpp in Sources */,
 				E7A341F1BA8EA3C621DBDD8A /* imgui_widgets.cpp in Sources */,
 				BE924F4D8F547947A58744DF /* imgui_ex.cpp in Sources */,
+				6FBC456187922A5E05E51D1B /* OutfitEditor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

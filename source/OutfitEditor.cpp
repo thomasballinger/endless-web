@@ -199,6 +199,7 @@ void OutfitEditor::RenderOutfit()
 		SetDirty();
 	}
 
+	str.clear();
 	if(object->thumbnail)
 		str = object->thumbnail->Name();
 	if(ImGui::InputText("thumbnail", &str, ImGuiInputTextFlags_EnterReturnsTrue))
