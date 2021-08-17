@@ -343,10 +343,14 @@ void ShipEditor::RenderShip()
 		int ivalue = 0;
 		if(ImGui::InputInt("add amount", &ivalue, 1, 1, ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			auto *outfit = GameData::Outfits().Find(addOutfit);
-			object->AddOutfit(outfit, ivalue);
+			if(GameData::Outfits().Has(addOutfit))
+			{
+				auto *outfit = GameData::Outfits().Find(addOutfit);
+				object->AddOutfit(outfit, ivalue);
+				addOutfit.clear();
+				SetDirty();
+			}
 			addOutfit.clear();
-			SetDirty();
 		}
 		ImGui::TreePop();
 	}
