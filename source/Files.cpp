@@ -463,7 +463,7 @@ string Files::Name(const string &path)
 
 void Files::CreateNewDirectory(const string &path)
 {
-#if defined _WINN32
+#if defined _WIN32
 	if(!CreateDirectoryW(Utf8::ToUTF16(path).c_str(), nullptr))
 		LogError("Failed to create directory at '" + path + "'.");
 #else
