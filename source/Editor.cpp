@@ -463,7 +463,7 @@ void Editor::OpenPlugin(const string &plugin)
 		for(const auto &node : data)
 		{
 			const string &key = node.Token(0);
-			if(node.Size() < 2 || (key != "system" && key != "ship" && key != "planet"))
+			if(node.Size() < 3 || (key != "system" && key != "ship" && key != "planet" && key != "outfit"))
 			{
 				node.PrintTrace("node will get pruned when saving!");
 				continue;
