@@ -14,6 +14,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #define SHIP_EDITOR_H_
 
 #include "Ship.h"
+#include "TemplateEditor.h"
 
 #include <memory>
 #include <set>
@@ -26,37 +27,17 @@ class Editor;
 
 
 // Class representing the ship editor window.
-class ShipEditor {
+class ShipEditor : public TemplateEditor<Ship> {
 public:
 	ShipEditor(Editor &editor, bool &show) noexcept;
-	ShipEditor(const ShipEditor &) = delete;
-	ShipEditor& operator=(const ShipEditor &) = delete;
-
-	const std::list<Ship> &Ships() const;
-	const std::set<const Ship *> &Dirty() const;
 
 	void Render();
 	void WriteToFile(DataWriter &writer, const Ship *ship);
-	void WriteToPlugin(const Ship *ship);
-	void WriteAll();
 
 
 private:
 	void RenderShip();
-	void RenderElement(Body *sprite, const std::string &name = "sprite") const;
-
-
-private:
-	Editor &editor;
-	bool &showShipMenu;
-
-	std::string searchBox;
-	// Poor man's std::optional.
-	std::unique_ptr<Ship> ship;
-
-	std::set<const Ship *> dirty;
-	std::list<Ship> ships;
-	std::vector<std::string> originalShips;
+	void RenderHardpoint();
 };
 
 

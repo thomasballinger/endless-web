@@ -297,6 +297,7 @@ private:
 	mutable double totalLifetime = -1.;
 
 	friend class OutfitEditor;
+	friend class ShipEditor;
 };
 
 

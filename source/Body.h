@@ -23,7 +23,10 @@ class DataNode;
 class DataWriter;
 class Government;
 class Mask;
+class Outfit;
+class Ship;
 class Sprite;
+template <typename T> class TemplateEditor;
 
 
 
@@ -131,6 +134,8 @@ private:
 	friend class OutfitEditor;
 	friend class ShipEditor;
 	friend class SystemEditor;
+	friend class TemplateEditor<Outfit>;
+	friend class TemplateEditor<Ship>;
 };
 
 

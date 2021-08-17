@@ -767,8 +767,7 @@ void Ship::Save(DataWriter &out) const
 	out.Write("ship", modelName);
 	out.BeginChild();
 	{
-		if(!name.empty())
-			out.Write("name", name);
+		out.Write("name", name);
 		if(pluralModelName != modelName + 's')
 			out.Write("plural", pluralModelName);
 		if(!noun.empty())
@@ -784,8 +783,7 @@ void Ship::Save(DataWriter &out) const
 		if(customSwizzle >= 0)
 			out.Write("swizzle", customSwizzle);
 		
-		if(!uuid.IsNil())
-			out.Write("uuid", uuid.ToString());
+		out.Write("uuid", uuid.ToString());
 		
 		out.Write("attributes");
 		out.BeginChild();

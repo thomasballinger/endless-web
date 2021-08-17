@@ -85,7 +85,7 @@ void Editor::WriteAll()
 
 	const auto &outfits = outfitEditor.Changes();
 	const auto &planets = planetEditor.Changes();
-	const auto &ships = shipEditor.Ships();
+	const auto &ships = shipEditor.Changes();
 	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.

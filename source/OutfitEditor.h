@@ -36,13 +36,6 @@ public:
 private:
 	void RenderOutfitMenu();
 	void RenderOutfit();
-
-	// Returns whether this element is to be removed.
-	bool RenderElement(Body *sprite, const std::string &name);
-
-	void RenderSprites(const std::string &name, std::vector<std::pair<Body, int>> &map);
-	void RenderSound(const std::string &name, std::map<const Sound *, int> &map);
-	void RenderEffect(const std::string &name, std::map<const Effect *, int> &map);
 };
 
 
