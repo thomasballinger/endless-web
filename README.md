@@ -14,7 +14,7 @@ Checklist:
 	- [x] Better visual editing in the map panel
 - [x] Planets can be fully edited
 - [x] Outfits can be fully edited
-- [ ] Ships can be fully edited
+- [x] Ships can be fully edited
 - [ ] Governments can be fully edited
 - [ ] Hazards can be fully edited
 - [ ] Fleets can be fully edited
