@@ -753,7 +753,7 @@ void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, b
 
 
 
-void SystemEditor::WriteObject(DataWriter &writer, const StellarObject *object)
+void SystemEditor::WriteObject(DataWriter &writer, const System *system, const StellarObject *object)
 {
 	// Calculate the nesting of this object. We follow parent indices until we reach
 	// the root node.
@@ -761,7 +761,7 @@ void SystemEditor::WriteObject(DataWriter &writer, const StellarObject *object)
 	int nested = 0;
 	while(i != -1)
 	{
-		i = this->object->objects[i].Parent();
+		i = system->objects[i].Parent();
 		++nested;
 	}
 
@@ -810,7 +810,7 @@ void SystemEditor::WriteToFile(DataWriter &writer, const System *system)
 	if(system->hidden)
 		writer.Write("hidden");
 	for(auto &&object : system->objects)
-		WriteObject(writer, &object);
+		WriteObject(writer, system, &object);
 	for(auto &&asteroid : system->asteroids)
 		writer.Write(asteroid.Type() ? "minables" : "asteroids", asteroid.Type() ? asteroid.Type()->Name() : asteroid.Name(), asteroid.Count(), asteroid.Energy());
 	if(system->haze)
