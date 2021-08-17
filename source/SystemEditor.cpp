@@ -839,7 +839,7 @@ void SystemEditor::WriteToFile(DataWriter &writer, const System *system)
 	for(auto &&trade : system->trade)
 		writer.Write("trade", trade.first, trade.second.base);
 
-	if(!system->attributes.empty() && *system->attributes.begin() != "uninhabited")
+	if(!system->attributes.empty() && (system->attributes.size() > 1 || *system->attributes.begin() != "uninhabited"))
 	{
 		writer.WriteToken("attributes");
 		for(auto &&attribute : system->attributes)
