@@ -16,12 +16,14 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "System.h"
 #include "TemplateEditor.h"
 
+#include <memory>
 #include <set>
 #include <string>
 #include <list>
 
 class DataWriter;
 class Editor;
+class MapEditorPanel;
 class StellarObject;
 
 
@@ -34,6 +36,9 @@ public:
 	void Render();
 	void WriteToFile(DataWriter &writer, const System *system);
 
+	// Updates the given system's position by the given delta.
+	void UpdateSystemPosition(const System *system, Point dp);
+
 
 private:
 	void RenderSystem();
@@ -42,6 +47,10 @@ private:
 	void WriteObject(DataWriter &writer, const StellarObject *object);
 
 	void UpdateMap(bool updateSystem = true) const;
+
+
+private:
+	std::weak_ptr<MapEditorPanel> mapEditor;
 };
 
 

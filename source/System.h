@@ -280,6 +280,7 @@ private:
 	std::set<std::string> attributes;
 
 	friend class SystemEditor;
+	friend class MapEditorPanel;
 };
 
 

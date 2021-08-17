@@ -240,6 +240,13 @@ UI &Editor::GetUI()
 
 
 
+UI &Editor::GetMenu()
+{
+	return menu;
+}
+
+
+
 void Editor::RenderMain()
 {
 	if(showOutfitMenu)

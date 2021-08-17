@@ -23,6 +23,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "Government.h"
 #include "Hazard.h"
 #include "MapPanel.h"
+#include "MapEditorPanel.h"
 #include "Minable.h"
 #include "Planet.h"
 #include "PlayerInfo.h"
@@ -42,6 +43,14 @@ SystemEditor::SystemEditor(Editor &editor, bool &show) noexcept
 
 
 
+void SystemEditor::UpdateSystemPosition(const System *system, Point dp)
+{
+	const_cast<System *>(system)->position += dp;
+	SetDirty(system);
+}
+
+
+
 void SystemEditor::Render()
 {
 	if(IsDirty())
@@ -52,7 +61,7 @@ void SystemEditor::Render()
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
-	if(!ImGui::Begin("System Editor", &show))
+	if(!ImGui::Begin("System Editor", &show, ImGuiWindowFlags_MenuBar))
 	{
 		ImGui::End();
 		return;
@@ -61,11 +70,31 @@ void SystemEditor::Render()
 	if(IsDirty())
 		ImGui::PopStyleColor(3);
 
+	if(ImGui::BeginMenuBar())
+	{
+		if(ImGui::BeginMenu("Tools"))
+		{
+			if(ImGui::MenuItem("Open Editing Panel"))
+			{
+				shared_ptr<MapEditorPanel> panel(new MapEditorPanel(editor.Player(), this));
+				editor.GetMenu().Push(panel);
+				mapEditor = panel;
+			}
+			ImGui::EndMenu();
+		}
+		ImGui::EndMenuBar();
+	}
+
+	if(!mapEditor.expired())
+		object = const_cast<System *>(mapEditor.lock()->Selected());
+
 	if(ImGui::InputText("system", &searchBox))
 		if(auto *ptr = GameData::Systems().Find(searchBox))
 		{
 			object = const_cast<System *>(ptr);
 			searchBox.clear();
+			if(auto map = mapEditor.lock())
+				map->Select(object);
 		}
 	if(!object || !IsDirty())
 		ImGui::PushDisabled();

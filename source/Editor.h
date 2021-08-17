@@ -55,6 +55,7 @@ public:
 	const std::string &GetPluginPath() const;
 	PlayerInfo &Player();
 	UI &GetUI();
+	UI &GetMenu();
 
 
 private:

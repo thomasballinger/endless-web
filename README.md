@@ -11,7 +11,7 @@ You can build this editor like the main game or use the CD generated artifacts f
 Checklist:
 
 - [x] Systems can be fully edited
-	- [ ] Better visual editing in the map panel
+	- [x] Better visual editing in the map panel
 - [x] Planets can be fully edited
 - [x] Outfits can be fully edited
 - [ ] Ships can be fully edited
