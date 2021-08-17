@@ -44,6 +44,7 @@ public:
 	// "sound/" folder, and without ~ if it's on the end, or the extension.
 	// Do not call this function until Progress() is 100%.
 	static const Sound *Get(const std::string &name);
+	static bool Has(const std::string &name);
 	
 	// Set the listener's position, and also update any sounds that have been
 	// added but deferred because they were added from a thread other than the

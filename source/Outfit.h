@@ -128,6 +128,7 @@ private:
 	const Sprite *flotsamSprite = nullptr;
 
 	friend class ShipEditor;
+	friend class OutfitEditor;
 };
 
 

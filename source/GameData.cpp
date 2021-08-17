@@ -157,6 +157,7 @@ namespace {
 
 
 
+Set<Outfit> GameData::defaultOutfits;
 Set<Ship> GameData::defaultShips;
 Set<System> GameData::defaultSystems;
 Set<Planet> GameData::defaultPlanets;
@@ -250,9 +251,10 @@ bool GameData::BeginLoad(const char * const *argv)
 	defaultPlanets = planets;
 	defaultSystems = systems;
 	defaultGalaxies = galaxies;
-	defaultShipSales = shipSales;
-	defaultOutfitSales = outfitSales;
 	defaultShips = ships;
+	defaultShipSales = shipSales;
+	defaultOutfits = outfits;
+	defaultOutfitSales = outfitSales;
 	playerGovernment = governments.Get("Escort");
 	
 	politics.Reset();

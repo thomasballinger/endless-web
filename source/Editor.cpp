@@ -47,7 +47,8 @@ using namespace std;
 
 
 Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
-	: player(player), menu(menu), ui(ui), planetEditor(*this, showPlanetMenu),
+	: player(player), menu(menu), ui(ui),
+	outfitEditor(*this, showOutfitMenu), planetEditor(*this, showPlanetMenu),
 	shipEditor(*this, showShipMenu), systemEditor(*this, showSystemMenu)
 {
 }
@@ -68,6 +69,7 @@ void Editor::SaveAll()
 		return;
 
 	// Commit to any unsaved changes.
+	outfitEditor.WriteAll();
 	shipEditor.WriteAll();
 	planetEditor.WriteAll();
 	systemEditor.WriteAll();
@@ -81,11 +83,13 @@ void Editor::WriteAll()
 	if(!HasPlugin())
 		return;
 
+	const auto &outfits = outfitEditor.Changes();
 	const auto &planets = planetEditor.Changes();
 	const auto &ships = shipEditor.Ships();
 	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.
+	set<string> outfitsSaved;
 	set<string> planetsSaved;
 	set<string> shipsSaved;
 	set<string> systemsSaved;
@@ -94,7 +98,8 @@ void Editor::WriteAll()
 	for(auto &&file : pluginPaths)
 	{
 		// Special case: default paths are saved later.
-		if(Files::Name(file.first) == "map.txt" || Files::Name(file.first) == "ships.txt")
+		const auto &fileName = Files::Name(file.first);
+		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt")
 			continue;
 
 		DataWriter writer(file.first);
@@ -138,6 +143,18 @@ void Editor::WriteAll()
 					continue;
 				}
 			}
+			else if(objects[0] == '3')
+			{
+				auto it = find_if(outfits.begin(), outfits.end(),
+						[&toSearch](const Outfit &o) { return o.Name() == toSearch; });
+				if(it != outfits.end())
+				{
+					outfitEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					outfitsSaved.insert(it->Name());
+					continue;
+				}
+			}
 			else
 				assert(!"Invalid object type to write to file! Please report this.");
 		}
@@ -170,6 +187,16 @@ void Editor::WriteAll()
 				shipsTxt.Write();
 			}
 	}
+	if(!outfits.empty())
+	{
+		DataWriter outfitsTxt(currentPlugin + "data/outfits.txt");
+		for(auto &&outfit : outfits)
+			if(!shipsSaved.count(outfit.Name()))
+			{
+				outfitEditor.WriteToFile(outfitsTxt, &outfit);
+				outfitsTxt.Write();
+			}
+	}
 }
 
 
@@ -183,7 +210,9 @@ bool Editor::HasPlugin() const
 
 bool Editor::HasUnsavedChanges() const
 {
-	return !planetEditor.Dirty().empty()
+	return
+		!outfitEditor.Dirty().empty()
+		|| !planetEditor.Dirty().empty()
 		|| !shipEditor.Dirty().empty()
 		|| !systemEditor.Dirty().empty();
 }
@@ -213,6 +242,8 @@ UI &Editor::GetUI()
 
 void Editor::RenderMain()
 {
+	if(showOutfitMenu)
+		outfitEditor.Render();
 	if(showShipMenu)
 		shipEditor.Render();
 	if(showSystemMenu)
@@ -241,12 +272,14 @@ void Editor::RenderMain()
 		}
 		if(ImGui::BeginMenu("Editors"))
 		{
+			ImGui::MenuItem("Outfit Editor", nullptr, &showOutfitMenu);
 			ImGui::MenuItem("Ship Editor", nullptr, &showShipMenu);
 			ImGui::MenuItem("System Editor", nullptr, &showSystemMenu);
 			ImGui::MenuItem("Planet Editor", nullptr, &showPlanetMenu);
 			ImGui::EndMenu();
 		}
 
+		const auto &dirtyOutfits = planetEditor.Dirty();
 		const auto &dirtyPlanets = planetEditor.Dirty();
 		const auto &dirtyShips = shipEditor.Dirty();
 		const auto &dirtySystems = systemEditor.Dirty();
@@ -256,6 +289,13 @@ void Editor::RenderMain()
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
 		if(ImGui::BeginMenu("Unsaved Changes", hasChanges))
 		{
+			if(!dirtyOutfits.empty() && ImGui::BeginMenu("Outfits"))
+			{
+				for(auto &&o : dirtyOutfits)
+					ImGui::MenuItem(o->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
 			if(!dirtyPlanets.empty() && ImGui::BeginMenu("Planets"))
 			{
 				for(auto &&p : dirtyPlanets)
@@ -443,6 +483,11 @@ void Editor::OpenPlugin(const string &plugin)
 			{
 				num = '2';
 				systemEditor.WriteToPlugin(GameData::Systems().Get(value));
+			}
+			else if(key == "outfit")
+			{
+				num = '3';
+				outfitEditor.WriteToPlugin(GameData::Outfits().Get(value));
 			}
 			else
 				assert(!"Invalid key");

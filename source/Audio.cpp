@@ -224,6 +224,14 @@ const Sound *Audio::Get(const string &name)
 
 
 
+bool Audio::Has(const string &name)
+{
+	unique_lock<mutex> lock(audioMutex);
+	return sounds.find(name) != sounds.end();
+}
+
+
+
 // Set the listener's position, and also update any sounds that have been
 // added but deferred because they were added from a thread other than the
 // main one (the one that called Init()).

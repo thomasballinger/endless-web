@@ -128,6 +128,7 @@ private:
 	mutable int currentStep = -1;
 	mutable float frame = 0.f;
 
+	friend class OutfitEditor;
 	friend class ShipEditor;
 	friend class SystemEditor;
 };

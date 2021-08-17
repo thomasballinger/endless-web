@@ -25,6 +25,7 @@ namespace ImGui
 	IMGUI_API bool InputFloatEx(const char *label, float *v, ImGuiInputTextFlags flags = 0);
 	IMGUI_API bool InputDouble2Ex(const char *label, double *v, ImGuiInputTextFlags flags = 0);
 	IMGUI_API bool InputInt64Ex(const char *label, int64_t *v, ImGuiInputTextFlags flags = 0);
+	IMGUI_API bool InputSizeTEx(const char *label, size_t *v, ImGuiInputTextFlags flags = 0);
 }
 
 

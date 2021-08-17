@@ -12,6 +12,9 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 #include "imgui_ex.h"
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
+
 
 
 namespace ImGui
@@ -39,6 +42,13 @@ namespace ImGui
 
 	IMGUI_API bool InputInt64Ex(const char *label, int64_t *v, ImGuiInputTextFlags flags)
 	{
-		return InputScalar(label, ImGuiDataType_S64, &v, nullptr, nullptr, nullptr, flags);
+		return InputScalar(label, ImGuiDataType_S64, v, nullptr, nullptr, "%" PRId64, flags);
+	}
+
+
+
+	IMGUI_API bool InputSizeTEx(const char *label, size_t *v, ImGuiInputTextFlags flags)
+	{
+		return InputScalar(label, ImGuiDataType_U64, v, nullptr, nullptr, "%zu", flags);
 	}
 }

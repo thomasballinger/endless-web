@@ -39,10 +39,10 @@ class Weapon {
 public:
 	struct Submunition{
 		Submunition() noexcept = default;
-		explicit Submunition(const Weapon *weapon, std::size_t count) noexcept
+		explicit Submunition(const Outfit *weapon, std::size_t count) noexcept
 			: weapon(weapon), count(count) {};
 		
-		const Weapon *weapon = nullptr;
+		const Outfit *weapon = nullptr;
 		std::size_t count = 0;
 		// The angular offset from the source projectile, relative to its current facing.
 		Angle facing;
@@ -295,6 +295,8 @@ private:
 	mutable bool calculatedDamage = true;
 	mutable bool doesDamage = false;
 	mutable double totalLifetime = -1.;
+
+	friend class OutfitEditor;
 };
 
 
