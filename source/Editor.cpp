@@ -274,7 +274,7 @@ void Editor::RenderMain()
 				WriteAll();
 			}
 			if(ImGui::MenuItem("Quit"))
-				menu.Quit();
+				ShowConfirmationDialog();
 			ImGui::EndMenu();
 		}
 		if(ImGui::BeginMenu("Editors"))
