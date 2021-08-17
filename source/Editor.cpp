@@ -463,11 +463,8 @@ void Editor::OpenPlugin(const string &plugin)
 		for(const auto &node : data)
 		{
 			const string &key = node.Token(0);
-			if(node.Size() < 2 || (key != "system" && key != "ship" && key != "planet" && key != "outfit"))
-			{
-				node.PrintTrace("node will get pruned when saving!");
+			if(node.Size() < 2)
 				continue;
-			}
 			const string &value = node.Token(1);
 
 			char num;
@@ -492,7 +489,10 @@ void Editor::OpenPlugin(const string &plugin)
 				outfitEditor.WriteToPlugin(GameData::Outfits().Get(value));
 			}
 			else
-				assert(!"Invalid key");
+			{
+				node.PrintTrace("node will get pruned when saving!");
+				continue;
+			}
 			pluginPaths[file].emplace_back(num + value);
 		}
 	}
