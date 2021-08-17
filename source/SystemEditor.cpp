@@ -862,4 +862,6 @@ void SystemEditor::UpdateMap(bool updateSystem) const
 		mapPanel->UpdateCache();
 		mapPanel->distance = DistanceMap(editor.Player());
 	}
+	if(auto map = mapEditor.lock())
+		map->UpdateCache();
 }
