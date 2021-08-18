@@ -15,7 +15,7 @@ Checklist:
 - [x] Planets can be fully edited
 - [x] Outfits can be fully edited
 - [x] Ships can be fully edited
-- [ ] Governments can be fully edited
+- [x] Governments can be fully edited
 - [x] Hazards can be fully edited
 - [ ] Fleets can be fully edited
 - [ ] Outfitter can be fully edited
