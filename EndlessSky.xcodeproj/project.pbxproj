@@ -15,6 +15,7 @@
 		262F4EB5A0E87517383971D7 /* PlanetEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2C9944D589E2BFDE254B0DB6 /* PlanetEditor.cpp */; };
 		287D4FA6B371554567BA7C1B /* ShipEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A4484A25B3920B2841D453EA /* ShipEditor.cpp */; };
 		36C94646B22D5BD2E57C86FA /* MapEditorPanel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0F5D4495BF3B59468DAA5036 /* MapEditorPanel.cpp */; };
+		3F71492FB2DCBA6887653D35 /* GovernmentEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E1BB4D18A3606498E7C94DAA /* GovernmentEditor.cpp */; };
 		48E44426B19056A61C3554B2 /* imgui_draw.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BF6A488FB58031C23D0DC528 /* imgui_draw.cpp */; };
 		5155CD731DBB9FF900EF090B /* Depreciation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5155CD711DBB9FF900EF090B /* Depreciation.cpp */; };
 		55A9455A815286F9AE0E7946 /* imgui_stdlib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 07814314B4CEDE090FB90DEF /* imgui_stdlib.cpp */; };
@@ -228,6 +229,7 @@
 		2E644A108BCD762A2A1A899C /* Hazard.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Hazard.h; path = source/Hazard.h; sourceTree = "<group>"; };
 		2E8047A8987DD8EC99FF8E2E /* Test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = source/Test.cpp; sourceTree = "<group>"; };
 		39DA42F383465786C343E30A /* imgui_demo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_demo.cpp; path = source/imgui_demo.cpp; sourceTree = "<group>"; };
+		3DA345D69ABF34BD53827AC4 /* GovernmentEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GovernmentEditor.h; path = source/GovernmentEditor.h; sourceTree = "<group>"; };
 		3FB94E8FB97514F79F73FA6B /* imgui_impl_sdl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_impl_sdl.h; path = source/imgui_impl_sdl.h; sourceTree = "<group>"; };
 		48C94A54918068EBCF00D639 /* Editor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Editor.cpp; path = source/Editor.cpp; sourceTree = "<group>"; };
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
@@ -533,6 +535,7 @@
 		DFAAE2A51FD4A25C0072C0A8 /* BatchShader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BatchShader.h; path = source/BatchShader.h; sourceTree = "<group>"; };
 		DFAAE2A81FD4A27B0072C0A8 /* ImageSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ImageSet.cpp; path = source/ImageSet.cpp; sourceTree = "<group>"; };
 		DFAAE2A91FD4A27B0072C0A8 /* ImageSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ImageSet.h; path = source/ImageSet.h; sourceTree = "<group>"; };
+		E1BB4D18A3606498E7C94DAA /* GovernmentEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = GovernmentEditor.cpp; path = source/GovernmentEditor.cpp; sourceTree = "<group>"; };
 		E6844C1D8915DCB4462C421B /* imconfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imconfig.h; path = source/imconfig.h; sourceTree = "<group>"; };
 		E6FB44109AFBC4AE69D02B5E /* MapEditorPanel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MapEditorPanel.h; path = source/MapEditorPanel.h; sourceTree = "<group>"; };
 		EE314D08918B0B943ADA0D29 /* OutfitEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OutfitEditor.h; path = source/OutfitEditor.h; sourceTree = "<group>"; };
@@ -876,6 +879,8 @@
 				E6FB44109AFBC4AE69D02B5E /* MapEditorPanel.h */,
 				525C41C886218280F1C6496F /* HazardEditor.cpp */,
 				FCD14D16926B0D742003B951 /* HazardEditor.h */,
+				E1BB4D18A3606498E7C94DAA /* GovernmentEditor.cpp */,
+				3DA345D69ABF34BD53827AC4 /* GovernmentEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1237,6 +1242,7 @@
 				6FBC456187922A5E05E51D1B /* OutfitEditor.cpp in Sources */,
 				36C94646B22D5BD2E57C86FA /* MapEditorPanel.cpp in Sources */,
 				EFDC4ED1B4FCABA5385C8BC4 /* HazardEditor.cpp in Sources */,
+				3F71492FB2DCBA6887653D35 /* GovernmentEditor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
