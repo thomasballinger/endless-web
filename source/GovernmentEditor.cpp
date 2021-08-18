@@ -321,6 +321,10 @@ void GovernmentEditor::RenderGovernment()
 			object->raidFleet = GameData::Fleets().Get(raidName);
 			SetDirty();
 		}
+
+	static string enforcements;
+	if(ImGui::InputTextMultiline("enforces", &enforcements))
+		SetDirty();
 }
 
 
@@ -390,5 +394,11 @@ void GovernmentEditor::WriteToFile(DataWriter &writer, const Government *governm
 		writer.Write("language", government->language);
 	if(government->raidFleet)
 		writer.Write("raid", government->raidFleet->Name());
+	if(!government->enforcementZones.empty())
+	{
+		writer.Write("enforces");
+		for(auto &&filter : government->enforcementZones)
+			filter.Save(writer);
+	}
 	writer.EndChild();
 }
