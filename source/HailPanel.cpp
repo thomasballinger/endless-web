@@ -47,9 +47,9 @@ HailPanel::HailPanel(PlayerInfo &player, const shared_ptr<Ship> &ship)
 	
 	const Government *gov = ship->GetGovernment();
 	if(!ship->Name().empty())
-		header = gov->GetName() + " " + ship->Noun() + " \"" + ship->Name() + "\":";
+		header = gov->Name() + " " + ship->Noun() + " \"" + ship->Name() + "\":";
 	else
-		header = ship->ModelName() + " (" + gov->GetName() + "): ";
+		header = ship->ModelName() + " (" + gov->Name() + "): ";
 	// Drones are always unpiloted, so they never respond to hails.
 	bool isMute = ship->GetPersonality().IsMute() || (ship->Attributes().Category() == "Drone");
 	hasLanguage = !isMute && (gov->Language().empty() || player.GetCondition("language: " + gov->Language()));
@@ -126,7 +126,7 @@ HailPanel::HailPanel(PlayerInfo &player, const StellarObject *object)
 	
 	const Government *gov = planet ? planet->GetGovernment() : player.GetSystem()->GetGovernment();
 	if(planet)
-		header = gov->GetName() + " " + planet->Noun() + " \"" + planet->Name() + "\":";
+		header = gov->Name() + " " + planet->Noun() + " \"" + planet->Name() + "\":";
 	hasLanguage = (gov->Language().empty() || player.GetCondition("language: " + gov->Language()));
 	
 	if(!hasLanguage)
@@ -287,7 +287,7 @@ bool HailPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command, boo
 			if(ship)
 			{
 				ship->GetGovernment()->Bribe();
-				Messages::Add("You bribed a " + ship->GetGovernment()->GetName() + " ship "
+				Messages::Add("You bribed a " + ship->GetGovernment()->Name() + " ship "
 					+ Format::Credits(bribe) + " credits to refrain from attacking you today."
 						, Messages::Importance::High);
 			}

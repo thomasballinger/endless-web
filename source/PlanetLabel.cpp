@@ -49,7 +49,7 @@ PlanetLabel::PlanetLabel(const Point &position, const StellarObject &object, con
 		color = Color(.8f, .3f, 1.f, 1.f);
 	else if(planet.GetGovernment())
 	{
-		government = "(" + planet.GetGovernment()->GetName() + ")";
+		government = "(" + planet.GetGovernment()->Name() + ")";
 		color = planet.GetGovernment()->GetColor();
 		color = Color(color.Get()[0] * .5f + .3f, color.Get()[1] * .5f + .3f, color.Get()[2] * .5f + .3f);
 		if(!planet.CanLand())

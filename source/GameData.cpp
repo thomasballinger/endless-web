@@ -94,7 +94,6 @@ namespace {
 	Set<Sale<Outfit>> outfitSales;
 	
 	Set<Fleet> defaultFleets;
-	Set<Government> defaultGovernments;
 	Set<Galaxy> defaultGalaxies;
 	Set<Sale<Ship>> defaultShipSales;
 	Set<Sale<Outfit>> defaultOutfitSales;
@@ -158,6 +157,7 @@ namespace {
 
 
 Set<Hazard> GameData::defaultHazards;
+Set<Government> GameData::defaultGovernments;
 Set<Outfit> GameData::defaultOutfits;
 Set<Ship> GameData::defaultShips;
 Set<System> GameData::defaultSystems;
@@ -315,7 +315,7 @@ void GameData::CheckReferences()
 	}
 	// Government names are used in mission NPC blocks and LocationFilters.
 	for(auto &&it : governments)
-		if(it.second.GetTrueName().empty() && !NameIfDeferred(deferred["government"], it))
+		if(it.second.TrueName().empty() && !NameIfDeferred(deferred["government"], it))
 			NameAndWarn("government", it);
 	// Minables are not serialized.
 	for(const auto &it : minables)

@@ -48,7 +48,7 @@ using namespace std;
 
 Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
 	: player(player), menu(menu), ui(ui), hazardEditor(*this, showHazardMenu),
-	outfitEditor(*this, showOutfitMenu), planetEditor(*this, showPlanetMenu),
+	governmentEditor(*this, showGovernmentMenu), outfitEditor(*this, showOutfitMenu), planetEditor(*this, showPlanetMenu),
 	shipEditor(*this, showShipMenu), systemEditor(*this, showSystemMenu)
 {
 }
@@ -70,6 +70,7 @@ void Editor::SaveAll()
 
 	// Commit to any unsaved changes.
 	hazardEditor.WriteAll();
+	governmentEditor.WriteAll();
 	outfitEditor.WriteAll();
 	shipEditor.WriteAll();
 	planetEditor.WriteAll();
@@ -85,6 +86,7 @@ void Editor::WriteAll()
 		return;
 
 	const auto &hazards = hazardEditor.Changes();
+	const auto &governments = governmentEditor.Changes();
 	const auto &outfits = outfitEditor.Changes();
 	const auto &planets = planetEditor.Changes();
 	const auto &ships = shipEditor.Changes();
@@ -92,6 +94,7 @@ void Editor::WriteAll()
 
 	// Which object we have saved to file.
 	set<string> hazardsSaved;
+	set<string> governmentsSaved;
 	set<string> outfitsSaved;
 	set<string> planetsSaved;
 	set<string> shipsSaved;
@@ -103,7 +106,7 @@ void Editor::WriteAll()
 		// Special case: default paths are saved later.
 		const auto &fileName = Files::Name(file.first);
 		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt"
-				|| fileName == "hazards.txt")
+				|| fileName == "hazards.txt" || fileName == "governments.txt")
 			continue;
 
 		DataWriter writer(file.first);
@@ -162,12 +165,24 @@ void Editor::WriteAll()
 			else if(objects[0] == '4')
 			{
 				auto it = find_if(hazards.begin(), hazards.end(),
-						[&toSearch](const Hazard &o) { return o.Name() == toSearch; });
+						[&toSearch](const Hazard &h) { return h.Name() == toSearch; });
 				if(it != hazards.end())
 				{
 					hazardEditor.WriteToFile(writer, &*it);
 					writer.Write();
 					hazardsSaved.insert(it->Name());
+					continue;
+				}
+			}
+			else if(objects[0] == '5')
+			{
+				auto it = find_if(governments.begin(), governments.end(),
+						[&toSearch](const Government &g) { return g.Name() == toSearch; });
+				if(it != governments.end())
+				{
+					governmentEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					governmentsSaved.insert(it->Name());
 					continue;
 				}
 			}
@@ -223,6 +238,16 @@ void Editor::WriteAll()
 				hazardsTxt.Write();
 			}
 	}
+	if(!governments.empty())
+	{
+		DataWriter governmentsTxt(currentPlugin + "data/governments.txt");
+		for(auto &&gov : governments)
+			if(!governmentsSaved.count(gov.Name()))
+			{
+				governmentEditor.WriteToFile(governmentsTxt, &gov);
+				governmentsTxt.Write();
+			}
+	}
 }
 
 
@@ -238,6 +263,7 @@ bool Editor::HasUnsavedChanges() const
 {
 	return
 		!hazardEditor.Dirty().empty()
+		|| !governmentEditor.Dirty().empty()
 		|| !outfitEditor.Dirty().empty()
 		|| !planetEditor.Dirty().empty()
 		|| !shipEditor.Dirty().empty()
@@ -278,6 +304,8 @@ void Editor::RenderMain()
 {
 	if(showHazardMenu)
 		hazardEditor.Render();
+	if(showGovernmentMenu)
+		governmentEditor.Render();
 	if(showOutfitMenu)
 		outfitEditor.Render();
 	if(showShipMenu)
@@ -309,6 +337,7 @@ void Editor::RenderMain()
 		if(ImGui::BeginMenu("Editors"))
 		{
 			ImGui::MenuItem("Hazard Editor", nullptr, &showHazardMenu);
+			ImGui::MenuItem("Government Editor", nullptr, &showGovernmentMenu);
 			ImGui::MenuItem("Outfit Editor", nullptr, &showOutfitMenu);
 			ImGui::MenuItem("Ship Editor", nullptr, &showShipMenu);
 			ImGui::MenuItem("System Editor", nullptr, &showSystemMenu);
@@ -317,6 +346,7 @@ void Editor::RenderMain()
 		}
 
 		const auto &dirtyHazards = hazardEditor.Dirty();
+		const auto &dirtyGovernments = governmentEditor.Dirty();
 		const auto &dirtyOutfits = outfitEditor.Dirty();
 		const auto &dirtyPlanets = planetEditor.Dirty();
 		const auto &dirtyShips = shipEditor.Dirty();
@@ -331,6 +361,13 @@ void Editor::RenderMain()
 			{
 				for(auto &&h : dirtyHazards)
 					ImGui::MenuItem(h->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
+			if(!dirtyGovernments.empty() && ImGui::BeginMenu("Governments"))
+			{
+				for(auto &&g : dirtyGovernments)
+					ImGui::MenuItem(g->TrueName().c_str(), nullptr, false, false);
 				ImGui::EndMenu();
 			}
 
@@ -537,6 +574,11 @@ void Editor::OpenPlugin(const string &plugin)
 			{
 				num = '4';
 				hazardEditor.WriteToPlugin(GameData::Hazards().Get(value));
+			}
+			else if(key == "government")
+			{
+				num = '5';
+				governmentEditor.WriteToPlugin(GameData::Governments().Get(value));
 			}
 			else
 			{

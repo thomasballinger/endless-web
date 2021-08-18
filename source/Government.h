@@ -46,10 +46,10 @@ public:
 	void Load(const DataNode &node);
 	
 	// Get the display name of this government.
-	const std::string &GetName() const;
+	const std::string &Name() const;
 	// Set / Get the name used for this government in the data files.
 	void SetName(const std::string &trueName);
-	const std::string &GetTrueName() const;
+	const std::string &TrueName() const;
 	// Get the color swizzle to use for ships of this government.
 	int GetSwizzle() const;
 	// Get the color to use for displaying this government on the map.
@@ -118,13 +118,12 @@ public:
 	
 	
 private:
-	unsigned id;
 	std::string name;
 	std::string displayName;
 	int swizzle = 0;
 	Color color;
 	
-	std::vector<double> attitudeToward;
+	std::map<const Government *, double> attitudeToward;
 	double initialPlayerReputation = 0.;
 	std::map<int, double> penaltyFor;
 	double bribe = 0.;
@@ -139,6 +138,8 @@ private:
 	const Fleet *raidFleet = nullptr;
 	double crewAttack = 1.;
 	double crewDefense = 2.;
+
+	friend class GovernmentEditor;
 };
 
 

@@ -2308,16 +2308,16 @@ int Ship::Scan()
 				, Messages::Importance::Low);
 	}
 	else if(startedScanning && target->isYours)
-		Messages::Add("The " + government->GetName() + " " + Noun() + " \""
+		Messages::Add("The " + government->Name() + " " + Noun() + " \""
 			+ Name() + "\" is attempting to scan you.", Messages::Importance::Low);
 	
 	if(target->isYours && !isYours)
 	{
 		if(result & ShipEvent::SCAN_CARGO)
-			Messages::Add("The " + government->GetName() + " " + Noun() + " \""
+			Messages::Add("The " + government->Name() + " " + Noun() + " \""
 					+ Name() + "\" completed its scan of your cargo.", Messages::Importance::High);
 		if(result & ShipEvent::SCAN_OUTFITS)
-			Messages::Add("The " + government->GetName() + " " + Noun() + " \""
+			Messages::Add("The " + government->Name() + " " + Noun() + " \""
 					+ Name() + "\" completed its scan of your outfits.", Messages::Importance::High);
 	}
 	

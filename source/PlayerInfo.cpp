@@ -3057,7 +3057,7 @@ void PlayerInfo::Fine(UI *ui)
 				ui->Push(new ConversationPanel(*this, *conversation));
 			else
 			{
-				message = "Before you can leave your ship, the " + gov->GetName()
+				message = "Before you can leave your ship, the " + gov->Name()
 					+ " authorities show up and begin scanning it. They say, \"Captain "
 					+ LastName()
 					+ ", we detect highly illegal material on your ship.\""

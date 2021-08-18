@@ -281,7 +281,7 @@ string Politics::Fine(PlayerInfo &player, const Government *gov, int scan, const
 		if(!scan)
 			reason = "atrocity";
 		else
-			reason = "After scanning your ship, the " + gov->GetName()
+			reason = "After scanning your ship, the " + gov->Name()
 				+ " captain hails you with a grim expression on his face. He says, "
 				"\"I'm afraid we're going to have to put you to death " + reason + " Goodbye.\"";
 	}
@@ -289,7 +289,7 @@ string Politics::Fine(PlayerInfo &player, const Government *gov, int scan, const
 	{
 		// Scale the fine based on how lenient this government is.
 		maxFine = lround(maxFine * gov->GetFineFraction());
-		reason = "The " + gov->GetName() + " authorities fine you "
+		reason = "The " + gov->Name() + " authorities fine you "
 			+ Format::Credits(maxFine) + " credits" + reason;
 		player.Accounts().AddFine(maxFine);
 		fined.insert(gov);

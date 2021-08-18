@@ -417,7 +417,7 @@ void PlanetEditor::RenderPlanet()
 	}
 
 	{
-		if(ImGui::BeginCombo("governments", object->government ? object->government->GetName().c_str() : ""))
+		if(ImGui::BeginCombo("governments", object->government ? object->government->TrueName().c_str() : ""))
 		{
 			int index = 0;
 			for(const auto &government : GameData::Governments())
@@ -503,7 +503,7 @@ void PlanetEditor::WriteToFile(DataWriter &writer, const Planet *planet)
 		} while(marker != string::npos);
 	}
 	if(planet->government)
-		writer.Write("government", planet->government->GetName());
+		writer.Write("government", planet->government->TrueName());
 	if(planet->requiredReputation)
 		writer.Write("required reputation", planet->requiredReputation);
 	if(planet->bribe)

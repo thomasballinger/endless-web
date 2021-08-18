@@ -664,7 +664,7 @@ void AI::Step(const PlayerInfo &player, Command &activeCommands)
 							it->Jettison(commodity.first, dumped, true);
 							toDump -= dumped;
 						}
-					Messages::Add(gov->GetName() + " " + it->Noun() + " \"" + it->Name()
+					Messages::Add(gov->Name() + " " + it->Noun() + " \"" + it->Name()
 						+ "\": Please, just take my cargo and leave me alone.", Messages::Importance::High);
 					threshold = (1. - health) + .1;
 				}

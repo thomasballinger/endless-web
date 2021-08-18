@@ -161,6 +161,7 @@ private:
 	static void PrintWeaponTable();
 
 	static Set<Hazard> defaultHazards;
+	static Set<Government> defaultGovernments;
 	static Set<Outfit> defaultOutfits;
 	static Set<Ship> defaultShips;
 	static Set<System> defaultSystems;
@@ -168,6 +169,7 @@ private:
 
 	friend class Editor;
 	friend class HazardEditor;
+	friend class GovernmentEditor;
 	friend class OutfitEditor;
 	friend class SystemEditor;
 	friend class PlanetEditor;

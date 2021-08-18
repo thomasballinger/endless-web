@@ -159,7 +159,7 @@ namespace {
 		
 		// If this ship has no name, show its model name instead.
 		string tag;
-		const string &gov = ship->GetGovernment()->GetName();
+		const string &gov = ship->GetGovernment()->Name();
 		if(!ship->Name().empty())
 			tag = gov + " " + ship->Noun() + " \"" + ship->Name() + "\": ";
 		else
@@ -729,7 +729,7 @@ void Engine::Step(bool isActive)
 		if(!target->GetGovernment())
 			info.SetString("target government", "No Government");
 		else
-			info.SetString("target government", target->GetGovernment()->GetName());
+			info.SetString("target government", target->GetGovernment()->Name());
 		targetSwizzle = target->GetSwizzle();
 		info.SetString("mission target", target->GetPersonality().IsTarget() ? "(mission target)" : "");
 		
@@ -1232,7 +1232,7 @@ void Engine::EnterSystem()
 				{
 					raidFleet->Place(*system, newShips);
 					Messages::Add("Your fleet has attracted the interest of a "
-							+ raidGovernment->GetName() + " raiding party.", Messages::Importance::High);
+							+ raidGovernment->Name() + " raiding party.", Messages::Importance::High);
 				}
 	}
 	
@@ -2359,7 +2359,7 @@ void Engine::DoGrudge(const shared_ptr<Ship> &target, const Government *attacker
 	{
 		message = "Please assist us in destroying ";
 		message += (attackerCount == 1 ? "this " : "these ");
-		message += attacker->GetName();
+		message += attacker->Name();
 		message += (attackerCount == 1 ? " ship." : " ships.");
 	}
 	else
@@ -2367,7 +2367,7 @@ void Engine::DoGrudge(const shared_ptr<Ship> &target, const Government *attacker
 		message = "We are under attack by ";
 		if(attackerCount == 1)
 			message += "a ";
-		message += attacker->GetName();
+		message += attacker->Name();
 		message += (attackerCount == 1 ? " ship" : " ships");
 		message += ". Please assist us!";
 	}

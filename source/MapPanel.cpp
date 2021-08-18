@@ -1081,7 +1081,7 @@ void MapPanel::DrawSystems()
 		Point pos = zoom * (node.position + center);
 		RingShader::Draw(pos, OUTER, INNER, node.color);
 		
-		if(commodity == SHOW_GOVERNMENT && node.government && node.government->GetName() != "Uninhabited")
+		if(commodity == SHOW_GOVERNMENT && node.government && node.government->Name() != "Uninhabited")
 		{
 			// For every government that is drawn, keep track of how close it
 			// is to the center of the view. The four closest governments

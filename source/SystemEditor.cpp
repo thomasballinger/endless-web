@@ -519,7 +519,7 @@ void SystemEditor::RenderSystem()
 	}
 
 	{
-		if(ImGui::BeginCombo("governments", object->government ? object->government->GetName().c_str() : ""))
+		if(ImGui::BeginCombo("governments", object->government ? object->government->TrueName().c_str() : ""))
 		{
 			for(const auto &government : GameData::Governments())
 			{
@@ -799,7 +799,7 @@ void SystemEditor::WriteToFile(DataWriter &writer, const System *system)
 
 	writer.Write("pos", system->position.X(), system->position.Y());
 	if(system->government)
-		writer.Write("government", system->government->GetName());
+		writer.Write("government", system->government->TrueName());
 	if(!system->music.empty())
 		writer.Write("music", system->music);
 	if(system->links.empty())

@@ -14,6 +14,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #define EDITOR_H_
 
 #include "HazardEditor.h"
+#include "GovernmentEditor.h"
 #include "OutfitEditor.h"
 #include "PlanetEditor.h"
 #include "ShipEditor.h"
@@ -70,6 +71,7 @@ private:
 	UI &ui;
 
 	HazardEditor hazardEditor;
+	GovernmentEditor governmentEditor;
 	OutfitEditor outfitEditor;
 	PlanetEditor planetEditor;
 	ShipEditor shipEditor;
@@ -80,6 +82,7 @@ private:
 
 	bool showConfirmationDialog = false;
 	bool showHazardMenu = false;
+	bool showGovernmentMenu = false;
 	bool showOutfitMenu = false;
 	bool showShipMenu = false;
 	bool showSystemMenu = false;
