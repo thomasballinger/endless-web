@@ -271,6 +271,8 @@ void HazardEditor::RenderHazard()
 			SetDirty();
 		if(ImGui::InputDoubleEx("heat damage", &object->damage[Weapon::HEAT_DAMAGE]))
 			SetDirty();
+		if(ImGui::InputDoubleEx("energy damage", &object->damage[Weapon::ENERGY_DAMAGE]))
+			SetDirty();
 		if(ImGui::InputDoubleEx("ion damage", &object->damage[Weapon::ION_DAMAGE]))
 			SetDirty();
 		if(ImGui::InputDoubleEx("disruption damage", &object->damage[Weapon::DISRUPTION_DAMAGE]))
@@ -371,6 +373,8 @@ void HazardEditor::WriteToFile(DataWriter &writer, const Hazard *hazard)
 	if(hazard->damage[Weapon::HEAT_DAMAGE])
 		writer.Write("heat damage", hazard->damage[Weapon::HEAT_DAMAGE]);
 	if(hazard->damage[Weapon::ENERGY_DAMAGE])
+		writer.Write("energy damage", hazard->damage[Weapon::ENERGY_DAMAGE]);
+	if(hazard->damage[Weapon::ION_DAMAGE])
 		writer.Write("ion damage", hazard->damage[Weapon::ION_DAMAGE]);
 	if(hazard->damage[Weapon::DISRUPTION_DAMAGE])
 		writer.Write("disruption damage", hazard->damage[Weapon::DISRUPTION_DAMAGE]);
