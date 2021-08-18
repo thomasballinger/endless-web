@@ -34,6 +34,7 @@
 		94DF4B5B8619F6A3715D6168 /* Weather.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8E8A4C648B242742B22A34FA /* Weather.cpp */; };
 		99FC46F2AC42DEC65AE33A30 /* imgui_impl_sdl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A617493A883D3AD87CB42830 /* imgui_impl_sdl.cpp */; };
 		9E1F4BF78F9E1FC4C96F76B5 /* Test.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E8047A8987DD8EC99FF8E2E /* Test.cpp */; };
+		A0C840E18C9D2B2169716D57 /* FleetEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9E549858A1C461AD420E379 /* FleetEditor.cpp */; };
 		A53F47BAA356C182B377589E /* SystemEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7B9F429F8D5401D20D11FAE5 /* SystemEditor.cpp */; };
 		A90633FF1EE602FD000DA6C0 /* LogbookPanel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A90633FD1EE602FD000DA6C0 /* LogbookPanel.cpp */; };
 		A90C15D91D5BD55700708F3A /* Minable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A90C15D71D5BD55700708F3A /* Minable.cpp */; };
@@ -253,6 +254,7 @@
 		6A5716321E25BE6F00585EB2 /* CollisionSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CollisionSet.h; path = source/CollisionSet.h; sourceTree = "<group>"; };
 		6DCF4CF2972F569E6DBB8578 /* CategoryTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CategoryTypes.h; path = source/CategoryTypes.h; sourceTree = "<group>"; };
 		7B9F429F8D5401D20D11FAE5 /* SystemEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemEditor.cpp; path = source/SystemEditor.cpp; sourceTree = "<group>"; };
+		7C2D45B0A7B93B05C4118EDB /* FleetEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FleetEditor.h; path = source/FleetEditor.h; sourceTree = "<group>"; };
 		86AB4B6E9C4C0490AE7F029B /* EsUuid.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EsUuid.h; path = source/EsUuid.h; sourceTree = "<group>"; };
 		8E8A4C648B242742B22A34FA /* Weather.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Weather.cpp; path = source/Weather.cpp; sourceTree = "<group>"; };
 		939F4358A5CA8F9EF43AB336 /* imgui_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_internal.h; path = source/imgui_internal.h; sourceTree = "<group>"; };
@@ -510,6 +512,7 @@
 		A9CC52701950C9F6004E4E22 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
 		A9CC52711950C9F6004E4E22 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		A9D40D19195DFAA60086EE52 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		A9E549858A1C461AD420E379 /* FleetEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = FleetEditor.cpp; path = source/FleetEditor.cpp; sourceTree = "<group>"; };
 		B222407EAF19D091B3942183 /* imstb_truetype.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imstb_truetype.h; path = source/imstb_truetype.h; sourceTree = "<group>"; };
 		B55C239B2303CE8A005C1A14 /* GameWindow.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = GameWindow.cpp; path = source/GameWindow.cpp; sourceTree = "<group>"; };
 		B55C239C2303CE8A005C1A14 /* GameWindow.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GameWindow.h; path = source/GameWindow.h; sourceTree = "<group>"; };
@@ -881,6 +884,8 @@
 				FCD14D16926B0D742003B951 /* HazardEditor.h */,
 				E1BB4D18A3606498E7C94DAA /* GovernmentEditor.cpp */,
 				3DA345D69ABF34BD53827AC4 /* GovernmentEditor.h */,
+				A9E549858A1C461AD420E379 /* FleetEditor.cpp */,
+				7C2D45B0A7B93B05C4118EDB /* FleetEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1243,6 +1248,7 @@
 				36C94646B22D5BD2E57C86FA /* MapEditorPanel.cpp in Sources */,
 				EFDC4ED1B4FCABA5385C8BC4 /* HazardEditor.cpp in Sources */,
 				3F71492FB2DCBA6887653D35 /* GovernmentEditor.cpp in Sources */,
+				A0C840E18C9D2B2169716D57 /* FleetEditor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
