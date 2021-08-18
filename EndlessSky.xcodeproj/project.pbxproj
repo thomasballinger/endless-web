@@ -177,6 +177,7 @@
 		DFAAE2A71FD4A25C0072C0A8 /* BatchShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DFAAE2A41FD4A25C0072C0A8 /* BatchShader.cpp */; };
 		DFAAE2AA1FD4A27B0072C0A8 /* ImageSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DFAAE2A81FD4A27B0072C0A8 /* ImageSet.cpp */; };
 		E7A341F1BA8EA3C621DBDD8A /* imgui_widgets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A6CA462F875959D20742EE32 /* imgui_widgets.cpp */; };
+		EFDC4ED1B4FCABA5385C8BC4 /* HazardEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 525C41C886218280F1C6496F /* HazardEditor.cpp */; };
 		F55745BDBC50E15DCEB2ED5B /* layout.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 9BCF4321AF819E944EC02FB9 /* layout.hpp */; settings = {ATTRIBUTES = (Project, ); }; };
 /* End PBXBuildFile section */
 
@@ -231,6 +232,7 @@
 		48C94A54918068EBCF00D639 /* Editor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Editor.cpp; path = source/Editor.cpp; sourceTree = "<group>"; };
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
 		5155CD721DBB9FF900EF090B /* Depreciation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depreciation.h; path = source/Depreciation.h; sourceTree = "<group>"; };
+		525C41C886218280F1C6496F /* HazardEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = HazardEditor.cpp; path = source/HazardEditor.cpp; sourceTree = "<group>"; };
 		594F45D387676610FE522103 /* imgui_ex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_ex.h; path = source/imgui_ex.h; sourceTree = "<group>"; };
 		59EF4423B8B56CCD9AE6D7FB /* TemplateEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TemplateEditor.h; path = source/TemplateEditor.h; sourceTree = "<group>"; };
 		5CE3475B85CE8C48D98664B7 /* Test.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Test.h; path = source/Test.h; sourceTree = "<group>"; };
@@ -538,6 +540,7 @@
 		F5B14602AD85F449CBE4A191 /* ShipEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ShipEditor.h; path = source/ShipEditor.h; sourceTree = "<group>"; };
 		F6A64A1DAFC5A01A5CC7D70A /* SystemEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SystemEditor.h; path = source/SystemEditor.h; sourceTree = "<group>"; };
 		F8C14CFB89472482F77C051D /* Weather.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Weather.h; path = source/Weather.h; sourceTree = "<group>"; };
+		FCD14D16926B0D742003B951 /* HazardEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HazardEditor.h; path = source/HazardEditor.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -871,6 +874,8 @@
 				EE314D08918B0B943ADA0D29 /* OutfitEditor.h */,
 				0F5D4495BF3B59468DAA5036 /* MapEditorPanel.cpp */,
 				E6FB44109AFBC4AE69D02B5E /* MapEditorPanel.h */,
+				525C41C886218280F1C6496F /* HazardEditor.cpp */,
+				FCD14D16926B0D742003B951 /* HazardEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1231,6 +1236,7 @@
 				BE924F4D8F547947A58744DF /* imgui_ex.cpp in Sources */,
 				6FBC456187922A5E05E51D1B /* OutfitEditor.cpp in Sources */,
 				36C94646B22D5BD2E57C86FA /* MapEditorPanel.cpp in Sources */,
+				EFDC4ED1B4FCABA5385C8BC4 /* HazardEditor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
