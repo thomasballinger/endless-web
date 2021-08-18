@@ -47,7 +47,7 @@ using namespace std;
 
 
 Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
-	: player(player), menu(menu), ui(ui),
+	: player(player), menu(menu), ui(ui), hazardEditor(*this, showHazardMenu),
 	outfitEditor(*this, showOutfitMenu), planetEditor(*this, showPlanetMenu),
 	shipEditor(*this, showShipMenu), systemEditor(*this, showSystemMenu)
 {
@@ -69,6 +69,7 @@ void Editor::SaveAll()
 		return;
 
 	// Commit to any unsaved changes.
+	hazardEditor.WriteAll();
 	outfitEditor.WriteAll();
 	shipEditor.WriteAll();
 	planetEditor.WriteAll();
@@ -83,12 +84,14 @@ void Editor::WriteAll()
 	if(!HasPlugin())
 		return;
 
+	const auto &hazards = hazardEditor.Changes();
 	const auto &outfits = outfitEditor.Changes();
 	const auto &planets = planetEditor.Changes();
 	const auto &ships = shipEditor.Changes();
 	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.
+	set<string> hazardsSaved;
 	set<string> outfitsSaved;
 	set<string> planetsSaved;
 	set<string> shipsSaved;
@@ -99,7 +102,8 @@ void Editor::WriteAll()
 	{
 		// Special case: default paths are saved later.
 		const auto &fileName = Files::Name(file.first);
-		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt")
+		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt"
+				|| fileName == "hazards.txt")
 			continue;
 
 		DataWriter writer(file.first);
@@ -155,6 +159,18 @@ void Editor::WriteAll()
 					continue;
 				}
 			}
+			else if(objects[0] == '4')
+			{
+				auto it = find_if(hazards.begin(), hazards.end(),
+						[&toSearch](const Hazard &o) { return o.Name() == toSearch; });
+				if(it != hazards.end())
+				{
+					hazardEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					hazardsSaved.insert(it->Name());
+					continue;
+				}
+			}
 			else
 				assert(!"Invalid object type to write to file! Please report this.");
 		}
@@ -197,6 +213,16 @@ void Editor::WriteAll()
 				outfitsTxt.Write();
 			}
 	}
+	if(!hazards.empty())
+	{
+		DataWriter hazardsTxt(currentPlugin + "data/hazards.txt");
+		for(auto &&hazard : hazards)
+			if(!hazardsSaved.count(hazard.Name()))
+			{
+				hazardEditor.WriteToFile(hazardsTxt, &hazard);
+				hazardsTxt.Write();
+			}
+	}
 }
 
 
@@ -211,7 +237,8 @@ bool Editor::HasPlugin() const
 bool Editor::HasUnsavedChanges() const
 {
 	return
-		!outfitEditor.Dirty().empty()
+		!hazardEditor.Dirty().empty()
+		|| !outfitEditor.Dirty().empty()
 		|| !planetEditor.Dirty().empty()
 		|| !shipEditor.Dirty().empty()
 		|| !systemEditor.Dirty().empty();
@@ -249,6 +276,8 @@ UI &Editor::GetMenu()
 
 void Editor::RenderMain()
 {
+	if(showHazardMenu)
+		hazardEditor.Render();
 	if(showOutfitMenu)
 		outfitEditor.Render();
 	if(showShipMenu)
@@ -279,6 +308,7 @@ void Editor::RenderMain()
 		}
 		if(ImGui::BeginMenu("Editors"))
 		{
+			ImGui::MenuItem("Hazard Editor", nullptr, &showHazardMenu);
 			ImGui::MenuItem("Outfit Editor", nullptr, &showOutfitMenu);
 			ImGui::MenuItem("Ship Editor", nullptr, &showShipMenu);
 			ImGui::MenuItem("System Editor", nullptr, &showSystemMenu);
@@ -286,7 +316,8 @@ void Editor::RenderMain()
 			ImGui::EndMenu();
 		}
 
-		const auto &dirtyOutfits = planetEditor.Dirty();
+		const auto &dirtyHazards = hazardEditor.Dirty();
+		const auto &dirtyOutfits = outfitEditor.Dirty();
 		const auto &dirtyPlanets = planetEditor.Dirty();
 		const auto &dirtyShips = shipEditor.Dirty();
 		const auto &dirtySystems = systemEditor.Dirty();
@@ -296,6 +327,13 @@ void Editor::RenderMain()
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
 		if(ImGui::BeginMenu("Unsaved Changes", hasChanges))
 		{
+			if(!dirtyHazards.empty() && ImGui::BeginMenu("Hazards"))
+			{
+				for(auto &&h : dirtyHazards)
+					ImGui::MenuItem(h->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
 			if(!dirtyOutfits.empty() && ImGui::BeginMenu("Outfits"))
 			{
 				for(auto &&o : dirtyOutfits)
@@ -494,6 +532,11 @@ void Editor::OpenPlugin(const string &plugin)
 			{
 				num = '3';
 				outfitEditor.WriteToPlugin(GameData::Outfits().Get(value));
+			}
+			else if(key == "hazard")
+			{
+				num = '4';
+				hazardEditor.WriteToPlugin(GameData::Hazards().Get(value));
 			}
 			else
 			{

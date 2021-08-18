@@ -157,6 +157,7 @@ namespace {
 
 
 
+Set<Hazard> GameData::defaultHazards;
 Set<Outfit> GameData::defaultOutfits;
 Set<Ship> GameData::defaultShips;
 Set<System> GameData::defaultSystems;
@@ -248,6 +249,7 @@ bool GameData::BeginLoad(const char * const *argv)
 	// Store the current state, to revert back to later.
 	defaultFleets = fleets;
 	defaultGovernments = governments;
+	defaultHazards = hazards;
 	defaultPlanets = planets;
 	defaultSystems = systems;
 	defaultGalaxies = galaxies;

@@ -296,6 +296,7 @@ private:
 	mutable bool doesDamage = false;
 	mutable double totalLifetime = -1.;
 
+	friend class HazardEditor;
 	friend class OutfitEditor;
 	friend class ShipEditor;
 };

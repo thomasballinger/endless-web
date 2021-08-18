@@ -13,6 +13,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #ifndef EDITOR_H_
 #define EDITOR_H_
 
+#include "HazardEditor.h"
 #include "OutfitEditor.h"
 #include "PlanetEditor.h"
 #include "ShipEditor.h"
@@ -68,6 +69,7 @@ private:
 	UI &menu;
 	UI &ui;
 
+	HazardEditor hazardEditor;
 	OutfitEditor outfitEditor;
 	PlanetEditor planetEditor;
 	ShipEditor shipEditor;
@@ -77,6 +79,7 @@ private:
 	std::string currentPluginName;
 
 	bool showConfirmationDialog = false;
+	bool showHazardMenu = false;
 	bool showOutfitMenu = false;
 	bool showShipMenu = false;
 	bool showSystemMenu = false;

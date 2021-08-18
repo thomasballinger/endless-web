@@ -53,6 +53,8 @@ private:
 	bool deviates = true;
 	
 	std::map<const Effect *, int> environmentalEffects;
+
+	friend class HazardEditor;
 };
 
 #endif

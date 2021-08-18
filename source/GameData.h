@@ -160,12 +160,14 @@ private:
 	static void PrintTestsTable();
 	static void PrintWeaponTable();
 
+	static Set<Hazard> defaultHazards;
 	static Set<Outfit> defaultOutfits;
 	static Set<Ship> defaultShips;
 	static Set<System> defaultSystems;
 	static Set<Planet> defaultPlanets;
 
 	friend class Editor;
+	friend class HazardEditor;
 	friend class OutfitEditor;
 	friend class SystemEditor;
 	friend class PlanetEditor;

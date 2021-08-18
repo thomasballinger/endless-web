@@ -16,7 +16,7 @@ Checklist:
 - [x] Outfits can be fully edited
 - [x] Ships can be fully edited
 - [ ] Governments can be fully edited
-- [ ] Hazards can be fully edited
+- [x] Hazards can be fully edited
 - [ ] Fleets can be fully edited
 - [ ] Outfitter can be fully edited
 - [ ] Shipyards can be fully edited
