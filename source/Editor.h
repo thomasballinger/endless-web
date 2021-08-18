@@ -65,6 +65,9 @@ private:
 	void NewPlugin(const std::string &plugin);
 	void OpenPlugin(const std::string &plugin);
 
+	void StyleColorsYellow();
+	void StyleColorsDarkGray();
+
 
 private:
 	PlayerInfo &player;
