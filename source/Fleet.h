@@ -74,6 +74,7 @@ public:
 private:
 	class Variant {
 	public:
+		Variant() = default;
 		explicit Variant(const DataNode &node);
 		
 		int weight;
@@ -103,6 +104,8 @@ private:
 	std::set<const Sale<Outfit> *> outfitters;
 	
 	Personality personality;
+
+	friend class FleetEditor;
 };
 
 

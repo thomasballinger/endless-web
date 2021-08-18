@@ -93,7 +93,6 @@ namespace {
 	Set<Sale<Ship>> shipSales;
 	Set<Sale<Outfit>> outfitSales;
 	
-	Set<Fleet> defaultFleets;
 	Set<Galaxy> defaultGalaxies;
 	Set<Sale<Ship>> defaultShipSales;
 	Set<Sale<Outfit>> defaultOutfitSales;
@@ -156,6 +155,7 @@ namespace {
 
 
 
+Set<Fleet> GameData::defaultFleets;
 Set<Hazard> GameData::defaultHazards;
 Set<Government> GameData::defaultGovernments;
 Set<Outfit> GameData::defaultOutfits;

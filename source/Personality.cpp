@@ -21,68 +21,70 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 using namespace std;
 
 namespace {
-	const int PACIFIST = (1 << 0);
-	const int FORBEARING = (1 << 1);
-	const int TIMID = (1 << 2);
-	const int DISABLES = (1 << 3);
-	const int PLUNDERS = (1 << 4);
-	const int HEROIC = (1 << 5);
-	const int STAYING = (1 << 6);
-	const int ENTERING = (1 << 7);
-	const int NEMESIS = (1 << 8);
-	const int SURVEILLANCE = (1 << 9);
-	const int UNINTERESTED = (1 << 10);
-	const int WAITING = (1 << 11);
-	const int DERELICT = (1 << 12);
-	const int FLEEING = (1 << 13);
-	const int ESCORT = (1 << 14);
-	const int FRUGAL = (1 << 15);
-	const int COWARD = (1 << 16);
-	const int VINDICTIVE = (1 << 17);
-	const int SWARMING = (1 << 18);
-	const int UNCONSTRAINED = (1 << 19);
-	const int MINING = (1 << 20);
-	const int HARVESTS = (1 << 21);
-	const int APPEASING = (1 << 22);
-	const int MUTE = (1 << 23);
-	const int OPPORTUNISTIC = (1 << 24);
-	const int TARGET = (1 << 25);
-	const int MARKED = (1 << 26);
-	const int LAUNCHING = (1 << 27);
-	
 	const map<string, int> TOKEN = {
-		{"pacifist", PACIFIST},
-		{"forbearing", FORBEARING},
-		{"timid", TIMID},
-		{"disables", DISABLES},
-		{"plunders", PLUNDERS},
-		{"heroic", HEROIC},
-		{"staying", STAYING},
-		{"entering", ENTERING},
-		{"nemesis", NEMESIS},
-		{"surveillance", SURVEILLANCE},
-		{"uninterested", UNINTERESTED},
-		{"waiting", WAITING},
-		{"derelict", DERELICT},
-		{"fleeing", FLEEING},
-		{"escort", ESCORT},
-		{"frugal", FRUGAL},
-		{"coward", COWARD},
-		{"vindictive", VINDICTIVE},
-		{"swarming", SWARMING},
-		{"unconstrained", UNCONSTRAINED},
-		{"mining", MINING},
-		{"harvests", HARVESTS},
-		{"appeasing", APPEASING},
-		{"mute", MUTE},
-		{"opportunistic", OPPORTUNISTIC},
-		{"target", TARGET},
-		{"marked", MARKED},
-		{"launching", LAUNCHING}
+		{"pacifist", Personality::PACIFIST},
+		{"forbearing", Personality::FORBEARING},
+		{"timid", Personality::TIMID},
+		{"disables", Personality::DISABLES},
+		{"plunders", Personality::PLUNDERS},
+		{"heroic", Personality::HEROIC},
+		{"staying", Personality::STAYING},
+		{"entering", Personality::ENTERING},
+		{"nemesis", Personality::NEMESIS},
+		{"surveillance", Personality::SURVEILLANCE},
+		{"uninterested", Personality::UNINTERESTED},
+		{"waiting", Personality::WAITING},
+		{"derelict", Personality::DERELICT},
+		{"fleeing", Personality::FLEEING},
+		{"escort", Personality::ESCORT},
+		{"frugal", Personality::FRUGAL},
+		{"coward", Personality::COWARD},
+		{"vindictive", Personality::VINDICTIVE},
+		{"swarming", Personality::SWARMING},
+		{"unconstrained", Personality::UNCONSTRAINED},
+		{"mining", Personality::MINING},
+		{"harvests", Personality::HARVESTS},
+		{"appeasing", Personality::APPEASING},
+		{"mute", Personality::MUTE},
+		{"opportunistic", Personality::OPPORTUNISTIC},
+		{"target", Personality::TARGET},
+		{"marked", Personality::MARKED},
+		{"launching", Personality::LAUNCHING}
 	};
 	
 	const double DEFAULT_CONFUSION = 10.;
 }
+
+
+
+constexpr int Personality::PACIFIST;
+constexpr int Personality::FORBEARING;
+constexpr int Personality::TIMID;
+constexpr int Personality::DISABLES;
+constexpr int Personality::PLUNDERS;
+constexpr int Personality::HEROIC;
+constexpr int Personality::STAYING;
+constexpr int Personality::ENTERING;
+constexpr int Personality::NEMESIS;
+constexpr int Personality::SURVEILLANCE;
+constexpr int Personality::UNINTERESTED;
+constexpr int Personality::WAITING;
+constexpr int Personality::DERELICT;
+constexpr int Personality::FLEEING;
+constexpr int Personality::ESCORT;
+constexpr int Personality::FRUGAL;
+constexpr int Personality::COWARD;
+constexpr int Personality::VINDICTIVE;
+constexpr int Personality::SWARMING;
+constexpr int Personality::UNCONSTRAINED;
+constexpr int Personality::MINING;
+constexpr int Personality::HARVESTS;
+constexpr int Personality::APPEASING;
+constexpr int Personality::MUTE;
+constexpr int Personality::OPPORTUNISTIC;
+constexpr int Personality::TARGET;
+constexpr int Personality::MARKED;
+constexpr int Personality::LAUNCHING;
 
 
 

@@ -26,6 +26,37 @@ class DataWriter;
 // behaviors, like plundering ships or launching surveillance drones, that are
 // used to make some fleets noticeably different from others.
 class Personality {
+public :
+	static constexpr int PACIFIST = (1 << 0);
+	static constexpr int FORBEARING = (1 << 1);
+	static constexpr int TIMID = (1 << 2);
+	static constexpr int DISABLES = (1 << 3);
+	static constexpr int PLUNDERS = (1 << 4);
+	static constexpr int HEROIC = (1 << 5);
+	static constexpr int STAYING = (1 << 6);
+	static constexpr int ENTERING = (1 << 7);
+	static constexpr int NEMESIS = (1 << 8);
+	static constexpr int SURVEILLANCE = (1 << 9);
+	static constexpr int UNINTERESTED = (1 << 10);
+	static constexpr int WAITING = (1 << 11);
+	static constexpr int DERELICT = (1 << 12);
+	static constexpr int FLEEING = (1 << 13);
+	static constexpr int ESCORT = (1 << 14);
+	static constexpr int FRUGAL = (1 << 15);
+	static constexpr int COWARD = (1 << 16);
+	static constexpr int VINDICTIVE = (1 << 17);
+	static constexpr int SWARMING = (1 << 18);
+	static constexpr int UNCONSTRAINED = (1 << 19);
+	static constexpr int MINING = (1 << 20);
+	static constexpr int HARVESTS = (1 << 21);
+	static constexpr int APPEASING = (1 << 22);
+	static constexpr int MUTE = (1 << 23);
+	static constexpr int OPPORTUNISTIC = (1 << 24);
+	static constexpr int TARGET = (1 << 25);
+	static constexpr int MARKED = (1 << 26);
+	static constexpr int LAUNCHING = (1 << 27);
+
+
 public:
 	Personality() noexcept;
 	
@@ -88,6 +119,8 @@ private:
 	double aimMultiplier;
 	Point confusion;
 	Point confusionVelocity;
+
+	friend class FleetEditor;
 };
 
 

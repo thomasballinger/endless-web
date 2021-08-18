@@ -47,7 +47,7 @@ using namespace std;
 
 
 Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
-	: player(player), menu(menu), ui(ui), hazardEditor(*this, showHazardMenu),
+	: player(player), menu(menu), ui(ui), fleetEditor(*this, showFleetMenu), hazardEditor(*this, showHazardMenu),
 	governmentEditor(*this, showGovernmentMenu), outfitEditor(*this, showOutfitMenu), planetEditor(*this, showPlanetMenu),
 	shipEditor(*this, showShipMenu), systemEditor(*this, showSystemMenu)
 {
@@ -69,6 +69,7 @@ void Editor::SaveAll()
 		return;
 
 	// Commit to any unsaved changes.
+	fleetEditor.WriteAll();
 	hazardEditor.WriteAll();
 	governmentEditor.WriteAll();
 	outfitEditor.WriteAll();
@@ -85,6 +86,7 @@ void Editor::WriteAll()
 	if(!HasPlugin())
 		return;
 
+	const auto &fleets = fleetEditor.Changes();
 	const auto &hazards = hazardEditor.Changes();
 	const auto &governments = governmentEditor.Changes();
 	const auto &outfits = outfitEditor.Changes();
@@ -93,6 +95,7 @@ void Editor::WriteAll()
 	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.
+	set<string> fleetsSaved;
 	set<string> hazardsSaved;
 	set<string> governmentsSaved;
 	set<string> outfitsSaved;
@@ -106,7 +109,8 @@ void Editor::WriteAll()
 		// Special case: default paths are saved later.
 		const auto &fileName = Files::Name(file.first);
 		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt"
-				|| fileName == "hazards.txt" || fileName == "governments.txt")
+				|| fileName == "hazards.txt" || fileName == "governments.txt"
+				|| fileName == "fleets.txt")
 			continue;
 
 		DataWriter writer(file.first);
@@ -122,7 +126,7 @@ void Editor::WriteAll()
 				{
 					planetEditor.WriteToFile(writer, &*it);
 					writer.Write();
-					planetsSaved.insert(it->Name());
+					planetsSaved.insert(it->TrueName());
 					continue;
 				}
 			}
@@ -182,7 +186,19 @@ void Editor::WriteAll()
 				{
 					governmentEditor.WriteToFile(writer, &*it);
 					writer.Write();
-					governmentsSaved.insert(it->Name());
+					governmentsSaved.insert(it->TrueName());
+					continue;
+				}
+			}
+			else if(objects[0] == '6')
+			{
+				auto it = find_if(fleets.begin(), fleets.end(),
+						[&toSearch](const Fleet &f) { return f.Name() == toSearch; });
+				if(it != fleets.end())
+				{
+					fleetEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					fleetsSaved.insert(it->Name());
 					continue;
 				}
 			}
@@ -196,7 +212,7 @@ void Editor::WriteAll()
 	{
 		DataWriter mapTxt(currentPlugin + "data/map.txt");
 		for(auto &&planet : planets)
-			if(!planetsSaved.count(planet.Name()))
+			if(!planetsSaved.count(planet.TrueName()))
 			{
 				planetEditor.WriteToFile(mapTxt, &planet);
 				mapTxt.Write();
@@ -242,10 +258,20 @@ void Editor::WriteAll()
 	{
 		DataWriter governmentsTxt(currentPlugin + "data/governments.txt");
 		for(auto &&gov : governments)
-			if(!governmentsSaved.count(gov.Name()))
+			if(!governmentsSaved.count(gov.TrueName()))
 			{
 				governmentEditor.WriteToFile(governmentsTxt, &gov);
 				governmentsTxt.Write();
+			}
+	}
+	if(!fleets.empty())
+	{
+		DataWriter fleetsTxt(currentPlugin + "data/fleets.txt");
+		for(auto &&fleet : fleets)
+			if(!fleetsSaved.count(fleet.Name()))
+			{
+				fleetEditor.WriteToFile(fleetsTxt, &fleet);
+				fleetsTxt.Write();
 			}
 	}
 }
@@ -263,6 +289,7 @@ bool Editor::HasUnsavedChanges() const
 {
 	return
 		!hazardEditor.Dirty().empty()
+		|| !fleetEditor.Dirty().empty()
 		|| !governmentEditor.Dirty().empty()
 		|| !outfitEditor.Dirty().empty()
 		|| !planetEditor.Dirty().empty()
@@ -302,6 +329,8 @@ UI &Editor::GetMenu()
 
 void Editor::RenderMain()
 {
+	if(showFleetMenu)
+		fleetEditor.Render();
 	if(showHazardMenu)
 		hazardEditor.Render();
 	if(showGovernmentMenu)
@@ -336,6 +365,7 @@ void Editor::RenderMain()
 		}
 		if(ImGui::BeginMenu("Editors"))
 		{
+			ImGui::MenuItem("Fleet Editor", nullptr, &showFleetMenu);
 			ImGui::MenuItem("Hazard Editor", nullptr, &showHazardMenu);
 			ImGui::MenuItem("Government Editor", nullptr, &showGovernmentMenu);
 			ImGui::MenuItem("Outfit Editor", nullptr, &showOutfitMenu);
@@ -345,6 +375,7 @@ void Editor::RenderMain()
 			ImGui::EndMenu();
 		}
 
+		const auto &dirtyFleets = fleetEditor.Dirty();
 		const auto &dirtyHazards = hazardEditor.Dirty();
 		const auto &dirtyGovernments = governmentEditor.Dirty();
 		const auto &dirtyOutfits = outfitEditor.Dirty();
@@ -357,6 +388,13 @@ void Editor::RenderMain()
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
 		if(ImGui::BeginMenu("Unsaved Changes", hasChanges))
 		{
+			if(!dirtyFleets.empty() && ImGui::BeginMenu("Fleets"))
+			{
+				for(auto &&f : dirtyFleets)
+					ImGui::MenuItem(f->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
 			if(!dirtyHazards.empty() && ImGui::BeginMenu("Hazards"))
 			{
 				for(auto &&h : dirtyHazards)
@@ -579,6 +617,11 @@ void Editor::OpenPlugin(const string &plugin)
 			{
 				num = '5';
 				governmentEditor.WriteToPlugin(GameData::Governments().Get(value));
+			}
+			else if(key == "fleet")
+			{
+				num = '6';
+				fleetEditor.WriteToPlugin(GameData::Fleets().Get(value));
 			}
 			else
 			{
