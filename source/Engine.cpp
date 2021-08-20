@@ -1232,7 +1232,7 @@ void Engine::EnterSystem()
 				{
 					raidFleet->Place(*system, newShips);
 					Messages::Add("Your fleet has attracted the interest of a "
-							+ raidGovernment->Name() + " raiding party.", Messages::Importance::High);
+							+ raidGovernment->Name() + " raiding party.", Messages::Importance::Highest);
 				}
 	}
 	
