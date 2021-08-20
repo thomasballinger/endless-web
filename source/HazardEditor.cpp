@@ -65,6 +65,8 @@ void HazardEditor::Render()
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
 	if(!ImGui::Begin("Hazard Editor", &show))
 	{
+		if(IsDirty())
+			ImGui::PopStyleColor(3);
 		ImGui::End();
 		return;
 	}

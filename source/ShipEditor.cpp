@@ -66,6 +66,8 @@ void ShipEditor::Render()
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
 	if(!ImGui::Begin("Ship Editor", &show, ImGuiWindowFlags_MenuBar))
 	{
+		if(IsDirty())
+			ImGui::PopStyleColor(3);
 		ImGui::End();
 		return;
 	}

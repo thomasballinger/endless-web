@@ -85,6 +85,8 @@ void SystemEditor::Render()
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
 	if(!ImGui::Begin("System Editor", &show, ImGuiWindowFlags_MenuBar))
 	{
+		if(IsDirty())
+			ImGui::PopStyleColor(3);
 		ImGui::End();
 		return;
 	}

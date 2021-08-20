@@ -65,6 +65,8 @@ void PlanetEditor::Render()
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
 	if(!ImGui::Begin("Planet Editor", &show))
 	{
+		if(IsDirty())
+			ImGui::PopStyleColor(3);
 		ImGui::End();
 		return;
 	}
