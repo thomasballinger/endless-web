@@ -22,6 +22,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "GameData.h"
 #include "Government.h"
 #include "Hazard.h"
+#include "MainEditorPanel.h"
 #include "MapPanel.h"
 #include "MapEditorPanel.h"
 #include "Minable.h"
@@ -31,6 +32,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "Sprite.h"
 #include "System.h"
 #include "UI.h"
+#include "Visual.h"
 
 using namespace std;
 
@@ -47,6 +49,26 @@ void SystemEditor::UpdateSystemPosition(const System *system, Point dp)
 {
 	const_cast<System *>(system)->position += dp;
 	SetDirty(system);
+}
+
+
+
+void SystemEditor::UpdateStellarPosition(const StellarObject &object, Point dp)
+{
+	auto &obj = const_cast<StellarObject &>(object);
+	double now = editor.Player().GetDate().DaysSinceEpoch();
+
+	auto newPos = obj.position + dp;
+	if(obj.parent != -1)
+		newPos -= this->object->objects[obj.parent].position;
+
+	obj.distance = newPos.Length();
+	Angle newAngle(newPos);
+
+	obj.speed = (newAngle.Degrees() - obj.offset) / now;
+	this->object->SetDate(editor.Player().GetDate());
+
+	SetDirty(this->object);
 }
 
 
@@ -80,6 +102,12 @@ void SystemEditor::Render()
 				editor.GetMenu().Push(panel);
 				mapEditor = panel;
 			}
+			if(ImGui::MenuItem("Open In-System Editor"))
+			{
+				shared_ptr<MainEditorPanel> panel(new MainEditorPanel(editor.Player(), this));
+				editor.GetMenu().Push(panel);
+				stellarEditor = panel;
+			}
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenuBar();
@@ -87,6 +115,8 @@ void SystemEditor::Render()
 
 	if(!mapEditor.expired())
 		object = const_cast<System *>(mapEditor.lock()->Selected());
+	if(!stellarEditor.expired())
+		object = const_cast<System *>(stellarEditor.lock()->Selected());
 
 	if(ImGui::InputText("system", &searchBox))
 		if(auto *ptr = GameData::Systems().Find(searchBox))
@@ -94,6 +124,8 @@ void SystemEditor::Render()
 			object = const_cast<System *>(ptr);
 			searchBox.clear();
 			if(auto map = mapEditor.lock())
+				map->Select(object);
+			if(auto map = stellarEditor.lock())
 				map->Select(object);
 		}
 	if(!object || !IsDirty())
@@ -278,11 +310,15 @@ void SystemEditor::RenderSystem()
 		if(ImGui::Selectable("Add Asteroid"))
 		{
 			object->asteroids.emplace_back("small rock", 1, 1.);
+			if(auto stellars = stellarEditor.lock())
+				stellars->UpdateCache();
 			SetDirty();
 		}
 		if(ImGui::Selectable("Add Mineable"))
 		{
 			object->asteroids.emplace_back(&GameData::Minables().begin()->second, 1, 1.);
+			if(auto stellars = stellarEditor.lock())
+				stellars->UpdateCache();
 			SetDirty();
 		}
 		ImGui::EndPopup();
@@ -317,6 +353,8 @@ void SystemEditor::RenderSystem()
 							if(ImGui::Selectable(item.first.c_str(), selected))
 							{
 								asteroid.type = &item.second;
+								if(auto stellars = stellarEditor.lock())
+									stellars->UpdateCache();
 								SetDirty();
 							}
 							++index;
@@ -329,11 +367,19 @@ void SystemEditor::RenderSystem()
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputInt("##count", &asteroid.count))
+					{
+						if(auto stellars = stellarEditor.lock())
+							stellars->UpdateCache();
 						SetDirty();
+					}
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
+					{
+						if(auto stellars = stellarEditor.lock())
+							stellars->UpdateCache();
 						SetDirty();
+					}
 					ImGui::TreePop();
 				}
 			}
@@ -343,7 +389,11 @@ void SystemEditor::RenderSystem()
 				if(ImGui::BeginPopupContextItem())
 				{
 					if(ImGui::Selectable("Remove"))
+					{
+						if(auto stellars = stellarEditor.lock())
+							stellars->UpdateCache();
 						toRemove = index;
+					}
 					ImGui::EndPopup();
 				}
 
@@ -351,15 +401,27 @@ void SystemEditor::RenderSystem()
 				{
 					ImGui::SetNextItemWidth(300.f);
 					if(ImGui::InputText("##asteroids", &asteroid.name))
+					{
+						if(auto stellars = stellarEditor.lock())
+							stellars->UpdateCache();
 						SetDirty();
+					}
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputInt("##count", &asteroid.count))
+					{
+						if(auto stellars = stellarEditor.lock())
+							stellars->UpdateCache();
 						SetDirty();
+					}
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(100.f);
 					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
+					{
+						if(auto stellars = stellarEditor.lock())
+							stellars->UpdateCache();
 						SetDirty();
+					}
 					ImGui::TreePop();
 				}
 			}
@@ -370,6 +432,8 @@ void SystemEditor::RenderSystem()
 		if(toRemove != -1)
 		{
 			object->asteroids.erase(object->asteroids.begin() + toRemove);
+			if(auto stellars = stellarEditor.lock())
+				stellars->UpdateCache();
 			SetDirty();
 		}
 		ImGui::TreePop();

@@ -23,6 +23,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 class DataWriter;
 class Editor;
+class MainEditorPanel;
 class MapEditorPanel;
 class StellarObject;
 
@@ -38,6 +39,8 @@ public:
 
 	// Updates the given system's position by the given delta.
 	void UpdateSystemPosition(const System *system, Point dp);
+	// Updates the given stellar's position by the given delta.
+	void UpdateStellarPosition(const StellarObject &object, Point dp);
 
 
 private:
@@ -51,6 +54,7 @@ private:
 
 private:
 	std::weak_ptr<MapEditorPanel> mapEditor;
+	std::weak_ptr<MainEditorPanel> stellarEditor;
 };
 
 
