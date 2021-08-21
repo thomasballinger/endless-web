@@ -675,7 +675,7 @@ void SystemEditor::RenderSystem()
 		{
 			object.sprite = SpriteSet::Get(spriteName);
 			object.planet = GameData::Planets().Find(planetName);
-			this->object->objects.insert(this->object->objects.begin() + object.parent + 1, object);
+			auto stellar = this->object->objects.insert(this->object->objects.begin() + object.parent + 1, object);
 
 			this->object->SetDate(editor.Player().GetDate());
 
@@ -683,11 +683,12 @@ void SystemEditor::RenderSystem()
 			spriteName.clear();
 			object = {};
 
-			if(this->object->objects.back().HasValidPlanet())
+			if(stellar->GetPlanet())
 			{
-				const Planet &planet = *this->object->objects.back().GetPlanet();
+				const Planet &planet = *stellar->GetPlanet();
 				if(!planet.IsWormhole() && planet.IsInhabited() && planet.IsAccessible(nullptr))
 					this->object->attributes.erase("uninhabited");
+				const_cast<Planet &>(planet).SetSystem(this->object);
 			}
 			SetDirty();
 			ImGui::CloseCurrentPopup();
@@ -727,6 +728,8 @@ void SystemEditor::RenderSystem()
 
 		if(selected != object->objects.end())
 		{
+			if(auto *planet = selected->GetPlanet())
+				const_cast<Planet *>(planet)->RemoveSystem(object);
 			SetDirty();
 			auto parent = selected->Parent();
 			auto next = object->objects.erase(selected);
@@ -756,7 +759,7 @@ void SystemEditor::RenderSystem()
 
 void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, bool &hovered)
 {
-	bool isOpen = ImGui::TreeNode("object", "object %s", object.GetPlanet() ? object.Name().c_str() : "");
+	bool isOpen = ImGui::TreeNode("object", "object %s", object.GetPlanet() ? object.GetPlanet()->TrueName().c_str() : "");
 
 	ImGui::PushID(index);
 	if(ImGui::BeginPopupContextItem())
@@ -836,7 +839,7 @@ void SystemEditor::WriteObject(DataWriter &writer, const System *system, const S
 
 	writer.WriteToken("object");
 	if(object->GetPlanet())
-		writer.WriteToken(object->Name());
+		writer.WriteToken(object->GetPlanet()->TrueName());
 	writer.Write();
 
 	writer.BeginChild();

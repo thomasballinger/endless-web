@@ -147,6 +147,7 @@ void PlanetEditor::Render()
 		object = clone;
 
 		object->name = searchBox;
+		object->systems.clear();
 		searchBox.clear();
 		SetDirty();
 	}
@@ -178,7 +179,7 @@ void PlanetEditor::RenderPlanet()
 
 			ImGui::PushID(index++);
 			string str = attribute;
-			if(ImGui::InputText("", &str, ImGuiInputTextFlags_EnterReturnsTrue))
+			if(ImGui::InputText("##attribute", &str, ImGuiInputTextFlags_EnterReturnsTrue))
 			{
 				if(!str.empty())
 					toAdd.insert(move(str));
@@ -189,13 +190,13 @@ void PlanetEditor::RenderPlanet()
 		for(auto &&attribute : toAdd)
 		{
 			object->attributes.insert(attribute);
-			if(attribute.compare(0, 10, "requires: "))
+			if(attribute.size() > 10 && attribute.compare(0, 10, "requires: "))
 				object->requiredAttributes.insert(attribute.substr(10));
 		}
 		for(auto &&attribute : toRemove)
 		{
 			object->attributes.erase(attribute);
-			if(attribute.compare(0, 10, "requires: "))
+			if(attribute.size() > 10 && attribute.compare(0, 10, "requires: "))
 				object->requiredAttributes.erase(attribute.substr(10));
 		}
 		if(!toAdd.empty() || !toRemove.empty())
@@ -457,7 +458,9 @@ void PlanetEditor::WriteToFile(DataWriter &writer, const Planet *planet)
 	writer.Write("planet", planet->name);
 	writer.BeginChild();
 
-	if(!planet->attributes.empty())
+	if(!planet->attributes.empty() &&
+			any_of(planet->attributes.begin(), planet->attributes.end(),
+				[](const string &a) { return a != "spaceport" && a != "shipyard" && a != "outfitter"; }))
 	{
 		writer.WriteToken("attributes");
 		for(auto &&attribute : planet->attributes)
