@@ -16,7 +16,6 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "System.h"
 #include "TemplateEditor.h"
 
-#include <memory>
 #include <set>
 #include <string>
 #include <list>
@@ -50,11 +49,6 @@ private:
 	void WriteObject(DataWriter &writer, const System *system, const StellarObject *object);
 
 	void UpdateMap(bool updateSystem = true) const;
-
-
-private:
-	std::weak_ptr<MapEditorPanel> mapEditor;
-	std::weak_ptr<MainEditorPanel> stellarEditor;
 };
 
 

@@ -27,7 +27,9 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "GameData.h"
 #include "Government.h"
 #include "Hazard.h"
+#include "MainEditorPanel.h"
 #include "MainPanel.h"
+#include "MapEditorPanel.h"
 #include "MapPanel.h"
 #include "Minable.h"
 #include "Planet.h"
@@ -38,6 +40,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "Sprite.h"
 #include "System.h"
 #include "UI.h"
+#include "Visual.h"
 
 #include <cassert>
 #include <map>
@@ -370,8 +373,21 @@ void Editor::RenderMain()
 			ImGui::MenuItem("Government Editor", nullptr, &showGovernmentMenu);
 			ImGui::MenuItem("Outfit Editor", nullptr, &showOutfitMenu);
 			ImGui::MenuItem("Ship Editor", nullptr, &showShipMenu);
-			ImGui::MenuItem("System Editor", nullptr, &showSystemMenu);
+			if(ImGui::MenuItem("System Editor", nullptr, &showSystemMenu))
+			{
+				auto *panel = dynamic_cast<MapEditorPanel *>(menu.Top().get());
+				if(!panel)
+					menu.Push(new MapEditorPanel(player, &systemEditor));
+			}
 			ImGui::MenuItem("Planet Editor", nullptr, &showPlanetMenu);
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Tools"))
+		{
+			if(ImGui::MenuItem("Open Map Editor"))
+				menu.Push(new MapEditorPanel(player, &systemEditor));
+			if(ImGui::MenuItem("Open In-System Editor"))
+				menu.Push(new MainEditorPanel(player, &systemEditor));
 			ImGui::EndMenu();
 		}
 
