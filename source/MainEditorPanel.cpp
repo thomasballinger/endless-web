@@ -199,7 +199,7 @@ bool MainEditorPanel::Drag(double dx, double dy)
 {
 	isDragging = true;
 	if(moveStellars && currentObject)
-		systemEditor->UpdateStellarPosition(*currentObject, Point(dx, dy) / zoom);
+		systemEditor->UpdateStellarPosition(*currentObject, Point(dx, dy) / zoom, currentSystem);
 	else
 		center -= Point(dx, dy) / zoom;
 

@@ -53,7 +53,7 @@ void SystemEditor::UpdateSystemPosition(const System *system, Point dp)
 
 
 
-void SystemEditor::UpdateStellarPosition(const StellarObject &object, Point dp)
+void SystemEditor::UpdateStellarPosition(const StellarObject &object, Point dp, const System *system)
 {
 	auto &obj = const_cast<StellarObject &>(object);
 	double now = editor.Player().GetDate().DaysSinceEpoch();
@@ -66,7 +66,7 @@ void SystemEditor::UpdateStellarPosition(const StellarObject &object, Point dp)
 	Angle newAngle(newPos);
 
 	obj.speed = (newAngle.Degrees() - obj.offset) / now;
-	this->object->SetDate(editor.Player().GetDate());
+	const_cast<System *>(system)->SetDate(editor.Player().GetDate());
 
 	SetDirty(this->object);
 }
