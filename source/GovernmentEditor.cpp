@@ -364,6 +364,7 @@ void GovernmentEditor::WriteToFile(DataWriter &writer, const Government *governm
 			|| government->penaltyFor.at(ShipEvent::ATROCITY) != 10.)
 	{
 		writer.Write("penalty for");
+		writer.BeginChild();
 		if(government->penaltyFor.at(ShipEvent::ASSIST) != -.1)
 			writer.Write("assist", government->penaltyFor.at(ShipEvent::ASSIST));
 		if(government->penaltyFor.at(ShipEvent::DISABLE) != .5)
@@ -376,6 +377,7 @@ void GovernmentEditor::WriteToFile(DataWriter &writer, const Government *governm
 			writer.Write("destroy", government->penaltyFor.at(ShipEvent::DESTROY));
 		if(government->penaltyFor.at(ShipEvent::ATROCITY) != 10.)
 			writer.Write("atrocity", government->penaltyFor.at(ShipEvent::ATROCITY));
+		writer.EndChild();
 	}
 
 	if(government->bribe)
