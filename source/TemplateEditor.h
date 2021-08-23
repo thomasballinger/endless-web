@@ -28,6 +28,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include <map>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 class Editor;
@@ -47,11 +48,25 @@ public:
 	const std::set<const T *> &Dirty() const { return dirty; }
 
 	// Saves the specified object.
-	void WriteToPlugin(const T *object)
+	void WriteToPlugin(const T *object) { WriteToPlugin(object, 0); }
+	template<typename U>
+	void WriteToPlugin(const U *object, ...)
 	{
 		dirty.erase(object);
 		for(auto &&obj : changes)
 			if(obj.Name() == object->Name())
+			{
+				obj = *object;
+				return;
+			}
+		changes.push_back(*object);
+	}
+	template <typename U>
+	void WriteToPlugin(const U *object, typename std::decay<decltype(std::declval<U>().TrueName())>::type *)
+	{
+		dirty.erase(object);
+		for(auto &&obj : changes)
+			if(obj.TrueName() == object->TrueName())
 			{
 				obj = *object;
 				return;
