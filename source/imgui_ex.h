@@ -103,8 +103,8 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 			const auto generatePairs = [](const std::string &str)
 			{
 				std::vector<std::pair<char, char>> pair;
-				for(int i = 0; i < str.size(); ++i)
-					pair.emplace_back(str[i], i + 1 < str.size() ? str[i + 1] : '\0');
+				for(int i = 0; i < static_cast<int>(str.size()); ++i)
+					pair.emplace_back(str[i], i + 1 < static_cast<int>(str.size()) ? str[i + 1] : '\0');
 				return pair;
 			};
 			std::vector<std::pair<char, char>> lhsPairs = generatePairs(*input);
