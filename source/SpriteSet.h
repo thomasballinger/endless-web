@@ -13,6 +13,8 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #ifndef SPRITE_SET_H_
 #define SPRITE_SET_H_
 
+#include "Set.h"
+
 #include <set>
 #include <string>
 
@@ -27,6 +29,7 @@ class SpriteSet {
 public:
 	// Get a pointer to the sprite data with the given name.
 	static const Sprite *Get(const std::string &name);
+	static const Set<Sprite> &GetSprites();
 	
 	// Inspect the sprite map and return any paths that loaded no data.
 	static std::set<std::string> CheckReferences();

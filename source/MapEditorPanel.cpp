@@ -413,9 +413,7 @@ void MapEditorPanel::DrawWormholes()
 		const System *from = waypoints.back();
 		for(const System *to : waypoints)
 		{
-			if(player.HasVisited(*from) && player.HasVisited(*to))
-				arrowsToDraw.emplace(from, to);
-
+			arrowsToDraw.emplace(from, to);
 			from = to;
 		}
 	}

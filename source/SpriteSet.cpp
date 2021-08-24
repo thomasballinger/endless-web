@@ -12,6 +12,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 #include "SpriteSet.h"
 
+#include "Set.h"
 #include "Sprite.h"
 
 #include <map>
@@ -19,7 +20,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 using namespace std;
 
 namespace {
-	map<string, Sprite> sprites;
+	Set<Sprite> sprites;
 }
 
 
@@ -27,6 +28,13 @@ namespace {
 const Sprite *SpriteSet::Get(const string &name)
 {
 	return Modify(name);
+}
+
+
+
+const Set<Sprite> &SpriteSet::GetSprites()
+{
+	return sprites;
 }
 
 
@@ -47,8 +55,11 @@ set<string> SpriteSet::CheckReferences()
 
 Sprite *SpriteSet::Modify(const string &name)
 {
-	auto it = sprites.find(name);
-	if(it == sprites.end())
-		it = sprites.emplace(name, Sprite(name)).first;
-	return &it->second;
+	auto it = sprites.Find(name);
+	if(!it)
+	{
+		it = sprites.Get(name);
+		*it = Sprite(name);
+	}
+	return it;
 }

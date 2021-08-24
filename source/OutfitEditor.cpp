@@ -65,7 +65,7 @@ void OutfitEditor::Render()
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
-	if(!ImGui::Begin("Outfit Editor", &show))
+	if(!ImGui::Begin("Outfit Editor", &show, ImGuiWindowFlags_MenuBar))
 	{
 		if(IsDirty())
 			ImGui::PopStyleColor(3);
@@ -76,14 +76,23 @@ void OutfitEditor::Render()
 	if(IsDirty())
 		ImGui::PopStyleColor(3);
 
-	if(ImGui::InputText("outfit", &searchBox))
+	if(ImGui::BeginMenuBar())
 	{
-		if(auto *ptr = GameData::Outfits().Find(searchBox))
+		if(ImGui::BeginMenu("Tools"))
 		{
-			object = const_cast<Outfit *>(ptr);
-			searchBox.clear();
+			if(ImGui::MenuItem("Add to Cargo"))
+			{
+			}
+			if(ImGui::MenuItem("Add to current Ship"))
+			{
+			}
+			ImGui::EndMenu();
 		}
+		ImGui::EndMenuBar();
 	}
+
+	if(ImGui::InputCombo("outfit", &searchBox, &object, GameData::Outfits()))
+		searchBox.clear();
 	if(!object || !IsDirty())
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
@@ -195,18 +204,20 @@ void OutfitEditor::RenderOutfit()
 	str.clear();
 	if(object->flotsamSprite)
 		str = object->flotsamSprite->Name();
-	if(ImGui::InputText("floatsam sprite", &str, ImGuiInputTextFlags_EnterReturnsTrue))
+	static Sprite *floatsamSprite = nullptr;
+	if(ImGui::InputCombo("floatsam sprite", &str, &floatsamSprite, SpriteSet::GetSprites()))
 	{
-		object->flotsamSprite = SpriteSet::Get(str);
+		object->flotsamSprite = floatsamSprite;
 		SetDirty();
 	}
 
 	str.clear();
 	if(object->thumbnail)
 		str = object->thumbnail->Name();
-	if(ImGui::InputText("thumbnail", &str, ImGuiInputTextFlags_EnterReturnsTrue))
+	static Sprite *thumbnailSprite = nullptr;
+	if(ImGui::InputCombo("thumbnail", &str, &thumbnailSprite, SpriteSet::GetSprites()))
 	{
-		object->thumbnail = SpriteSet::Get(str);
+		object->thumbnail = thumbnailSprite;
 		SetDirty();
 	}
 
@@ -359,9 +370,10 @@ void OutfitEditor::RenderOutfit()
 		value.clear();
 		if(object->icon)
 			value = object->icon->Name();
-		if(ImGui::InputText("icon", &value, ImGuiInputTextFlags_EnterReturnsTrue))
+		static Sprite *iconSprite = nullptr;
+		if(ImGui::InputCombo("icon", &value, &iconSprite, SpriteSet::GetSprites()))
 		{
-			object->icon = SpriteSet::Get(value);
+			object->icon = iconSprite;
 			SetDirty();
 		}
 		RenderEffect("fire effect", object->fireEffects);

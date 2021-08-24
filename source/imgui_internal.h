@@ -2449,7 +2449,7 @@ namespace ImGui
     IMGUI_API bool          MenuItemEx(const char* label, const char* icon, const char* shortcut = NULL, bool selected = false, bool enabled = true);
 
     // Combos
-    IMGUI_API bool          BeginComboPopup(ImGuiID popup_id, const ImRect& bb, ImGuiComboFlags flags);
+    IMGUI_API bool          BeginComboPopup(ImGuiID popup_id, const ImRect& bb, ImGuiComboFlags flags, ImGuiWindowFlags window_flags = 0);
     IMGUI_API bool          BeginComboPreview();
     IMGUI_API void          EndComboPreview();
 

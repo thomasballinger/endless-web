@@ -74,14 +74,8 @@ void PlanetEditor::Render()
 	if(IsDirty())
 		ImGui::PopStyleColor(3);
 
-	if(ImGui::InputText("planet", &searchBox))
-	{
-		if(auto *ptr = GameData::Planets().Find(searchBox))
-		{
-			object = const_cast<Planet *>(ptr);
-			searchBox.clear();
-		}
-	}
+	if(ImGui::InputCombo("planet", &searchBox, &object, GameData::Planets()))
+		searchBox.clear();
 	if(!object || !IsDirty())
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");

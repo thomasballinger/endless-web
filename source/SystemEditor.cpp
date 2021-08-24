@@ -99,16 +99,14 @@ void SystemEditor::Render()
 	if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
 		object = const_cast<System *>(panel->Selected());
 
-	if(ImGui::InputText("system", &searchBox))
-		if(auto *ptr = GameData::Systems().Find(searchBox))
-		{
-			object = const_cast<System *>(ptr);
-			searchBox.clear();
-			if(auto *panel = dynamic_cast<MapEditorPanel*>(editor.GetMenu().Top().get()))
-				panel->Select(object);
-			if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
-				panel->Select(object);
-		}
+	if(ImGui::InputCombo("system", &searchBox, &object, GameData::Systems()))
+	{
+		searchBox.clear();
+		if(auto *panel = dynamic_cast<MapEditorPanel*>(editor.GetMenu().Top().get()))
+			panel->Select(object);
+		if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
+			panel->Select(object);
+	}
 	if(!object || !IsDirty())
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
@@ -631,14 +629,16 @@ void SystemEditor::RenderSystem()
 	{
 		static StellarObject object;
 
+		static Planet *planet = nullptr;
 		static string planetName;
-		ImGui::InputText("object", &planetName);
+		ImGui::InputCombo("object", &planetName, &planet, GameData::Planets());
 
 		static string spriteName;
 		if(object.sprite)
 			spriteName = object.sprite->Name();
-		if(ImGui::InputText("sprite", &spriteName, ImGuiInputTextFlags_EnterReturnsTrue))
-			object.sprite = SpriteSet::Get(spriteName);
+
+		static Sprite *sprite = nullptr;
+		ImGui::InputCombo("sprite", &spriteName, &sprite, SpriteSet::GetSprites());
 
 		ImGui::InputInt("parent", &object.parent);
 		ImGui::InputDoubleEx("distance", &object.distance);
@@ -652,8 +652,8 @@ void SystemEditor::RenderSystem()
 
 		if(ImGui::Button("Add"))
 		{
-			object.sprite = SpriteSet::Get(spriteName);
-			object.planet = GameData::Planets().Find(planetName);
+			object.sprite = sprite;
+			object.planet = planet;
 			auto stellar = this->object->objects.insert(this->object->objects.begin() + object.parent + 1, object);
 
 			this->object->SetDate(editor.Player().GetDate());

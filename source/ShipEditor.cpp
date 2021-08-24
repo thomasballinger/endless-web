@@ -94,12 +94,8 @@ void ShipEditor::Render()
 		ImGui::EndMenuBar();
 	}
 
-	if(ImGui::InputText("ship", &searchBox))
-		if(auto *ptr = GameData::Ships().Find(searchBox))
-		{
-			object = const_cast<Ship *>(ptr);
-			searchBox.clear();
-		}
+	if(ImGui::InputCombo("ship", &searchBox, &object, GameData::Ships()))
+		searchBox.clear();
 	if(!object || !IsDirty())
 		ImGui::PushDisabled();
 	bool reset = ImGui::Button("Reset");
@@ -193,9 +189,10 @@ void ShipEditor::RenderShip()
 	static string thumbnail;
 	if(object->thumbnail)
 		thumbnail = object->thumbnail->Name();
-	if(ImGui::InputText("thumbnail", &thumbnail, ImGuiInputTextFlags_EnterReturnsTrue))
+	static Sprite *thumbnailSprite = nullptr;
+	if(ImGui::InputCombo("thumbnail", &thumbnail, &thumbnailSprite, SpriteSet::GetSprites()))
 	{
-		object->thumbnail = SpriteSet::Get(thumbnail);
+		object->thumbnail = thumbnailSprite;
 		SetDirty();
 	}
 	if(ImGui::Checkbox("never disabled", &object->neverDisabled))
@@ -341,17 +338,14 @@ void ShipEditor::RenderShip()
 
 		ImGui::Spacing();
 		static string addOutfit;
-		ImGui::InputText("add outfit", &addOutfit);
+		static Outfit *outfit = nullptr;
+		ImGui::InputCombo("add outfit", &addOutfit, &outfit, GameData::Outfits());
 		int ivalue = 0;
 		if(ImGui::InputInt("add amount", &ivalue, 1, 1, ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			if(GameData::Outfits().Has(addOutfit))
-			{
-				auto *outfit = GameData::Outfits().Find(addOutfit);
-				object->AddOutfit(outfit, ivalue);
-				addOutfit.clear();
-				SetDirty();
-			}
+			object->AddOutfit(outfit, ivalue);
+			addOutfit.clear();
+			SetDirty();
 			addOutfit.clear();
 		}
 		ImGui::TreePop();

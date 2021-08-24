@@ -12,6 +12,9 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
 #include "imgui_ex.h"
 
+#include "imgui_internal.h"
+#include "imgui_stdlib.h"
+
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
