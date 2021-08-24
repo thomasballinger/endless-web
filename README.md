@@ -20,8 +20,8 @@ Checklist:
 - [x] Governments can be fully edited
 - [x] Hazards can be fully edited
 - [x] Fleets can be fully edited
-- [ ] Outfitter can be fully edited
-- [ ] Shipyards can be fully edited
+- [x] Outfitter can be fully edited
+- [x] Shipyards can be fully edited
 - [ ] ...
 
 ------

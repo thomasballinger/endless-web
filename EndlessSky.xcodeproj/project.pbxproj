@@ -169,7 +169,9 @@
 		B55C239D2303CE8B005C1A14 /* GameWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B55C239B2303CE8A005C1A14 /* GameWindow.cpp */; };
 		B590161321ED4A0F00799178 /* Utf8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B590161121ED4A0E00799178 /* Utf8.cpp */; };
 		B5DDA6942001B7F600DBA76A /* News.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B5DDA6922001B7F600DBA76A /* News.cpp */; };
+		BAD444FBAB7E335002466B18 /* ShipyardEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C26F447D9AE6A3AA888FE1AA /* ShipyardEditor.cpp */; };
 		BE924F4D8F547947A58744DF /* imgui_ex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */; };
+		BF4040AA9D23A17D7D057DFF /* OutfitterEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 31434CCFA764679ECD106B7A /* OutfitterEditor.cpp */; };
 		C4264774A89C0001B6FFC60E /* Hazard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C49D4EA08DF168A83B1C7B07 /* Hazard.cpp */; };
 		C7354A3E9C53D6C5E3CC352F /* TestData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 02D34A71AE3BC4C93FC6865B /* TestData.cpp */; };
 		CA284CAAAAEF2DEAB734E42B /* imgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A38947BDBF490A5EC61A7EE3 /* imgui.cpp */; };
@@ -231,9 +233,11 @@
 		2E1E458DB603BF979429117C /* DisplayText.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DisplayText.cpp; path = source/text/DisplayText.cpp; sourceTree = "<group>"; };
 		2E644A108BCD762A2A1A899C /* Hazard.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Hazard.h; path = source/Hazard.h; sourceTree = "<group>"; };
 		2E8047A8987DD8EC99FF8E2E /* Test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Test.cpp; path = source/Test.cpp; sourceTree = "<group>"; };
+		31434CCFA764679ECD106B7A /* OutfitterEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OutfitterEditor.cpp; path = source/OutfitterEditor.cpp; sourceTree = "<group>"; };
 		39DA42F383465786C343E30A /* imgui_demo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_demo.cpp; path = source/imgui_demo.cpp; sourceTree = "<group>"; };
 		3DA345D69ABF34BD53827AC4 /* GovernmentEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GovernmentEditor.h; path = source/GovernmentEditor.h; sourceTree = "<group>"; };
 		3FB94E8FB97514F79F73FA6B /* imgui_impl_sdl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_impl_sdl.h; path = source/imgui_impl_sdl.h; sourceTree = "<group>"; };
+		43C24ABD85EC1A084413CB2C /* ShipyardEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ShipyardEditor.h; path = source/ShipyardEditor.h; sourceTree = "<group>"; };
 		48C94A54918068EBCF00D639 /* Editor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Editor.cpp; path = source/Editor.cpp; sourceTree = "<group>"; };
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
 		5155CD721DBB9FF900EF090B /* Depreciation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depreciation.h; path = source/Depreciation.h; sourceTree = "<group>"; };
@@ -255,6 +259,7 @@
 		6A5716311E25BE6F00585EB2 /* CollisionSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CollisionSet.cpp; path = source/CollisionSet.cpp; sourceTree = "<group>"; };
 		6A5716321E25BE6F00585EB2 /* CollisionSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CollisionSet.h; path = source/CollisionSet.h; sourceTree = "<group>"; };
 		6DCF4CF2972F569E6DBB8578 /* CategoryTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CategoryTypes.h; path = source/CategoryTypes.h; sourceTree = "<group>"; };
+		72A9480498926E2CFEE02872 /* OutfitterEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OutfitterEditor.h; path = source/OutfitterEditor.h; sourceTree = "<group>"; };
 		7B9F429F8D5401D20D11FAE5 /* SystemEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SystemEditor.cpp; path = source/SystemEditor.cpp; sourceTree = "<group>"; };
 		7C2D45B0A7B93B05C4118EDB /* FleetEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FleetEditor.h; path = source/FleetEditor.h; sourceTree = "<group>"; };
 		86AB4B6E9C4C0490AE7F029B /* EsUuid.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EsUuid.h; path = source/EsUuid.h; sourceTree = "<group>"; };
@@ -526,6 +531,7 @@
 		B7F144DDBABD665E2448B406 /* imgui_impl_opengl3.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_impl_opengl3.cpp; path = source/imgui_impl_opengl3.cpp; sourceTree = "<group>"; };
 		BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_ex.cpp; path = source/imgui_ex.cpp; sourceTree = "<group>"; };
 		BF6A488FB58031C23D0DC528 /* imgui_draw.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_draw.cpp; path = source/imgui_draw.cpp; sourceTree = "<group>"; };
+		C26F447D9AE6A3AA888FE1AA /* ShipyardEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ShipyardEditor.cpp; path = source/ShipyardEditor.cpp; sourceTree = "<group>"; };
 		C49D4EA08DF168A83B1C7B07 /* Hazard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Hazard.cpp; path = source/Hazard.cpp; sourceTree = "<group>"; };
 		C58C40B5889F6F0C4B98A400 /* MainEditorPanel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MainEditorPanel.h; path = source/MainEditorPanel.h; sourceTree = "<group>"; };
 		C6B14F639EAE38B677E0EFD8 /* imgui.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui.h; path = source/imgui.h; sourceTree = "<group>"; };
@@ -891,6 +897,10 @@
 				7C2D45B0A7B93B05C4118EDB /* FleetEditor.h */,
 				01064E45AA8B77085B5AC570 /* MainEditorPanel.cpp */,
 				C58C40B5889F6F0C4B98A400 /* MainEditorPanel.h */,
+				31434CCFA764679ECD106B7A /* OutfitterEditor.cpp */,
+				72A9480498926E2CFEE02872 /* OutfitterEditor.h */,
+				C26F447D9AE6A3AA888FE1AA /* ShipyardEditor.cpp */,
+				43C24ABD85EC1A084413CB2C /* ShipyardEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1255,6 +1265,8 @@
 				3F71492FB2DCBA6887653D35 /* GovernmentEditor.cpp in Sources */,
 				A0C840E18C9D2B2169716D57 /* FleetEditor.cpp in Sources */,
 				A22D42BBA5BE658B3A7B05C8 /* MainEditorPanel.cpp in Sources */,
+				BF4040AA9D23A17D7D057DFF /* OutfitterEditor.cpp in Sources */,
+				BAD444FBAB7E335002466B18 /* ShipyardEditor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
