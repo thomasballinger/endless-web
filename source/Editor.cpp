@@ -243,23 +243,31 @@ void Editor::WriteAll()
 	}
 
 	// Save any new object to a default path.
-	if(!planets.empty() || !systems.empty())
+	const bool planetSave = planetsSaved.size() < planets.size();
+	const bool systemSave = systemsSaved.size() < systems.size();
+	if(planetSave || systemSave)
 	{
 		DataWriter mapTxt(currentPlugin + "data/map.txt");
-		for(auto &&planet : planets)
-			if(!planetsSaved.count(planet.TrueName()))
-			{
-				planetEditor.WriteToFile(mapTxt, &planet);
-				mapTxt.Write();
-			}
-		for(auto &&system : systems)
-			if(!systemsSaved.count(system.Name()))
-			{
-				systemEditor.WriteToFile(mapTxt, &system);
-				mapTxt.Write();
-			}
+		if(planetSave)
+		{
+			for(auto &&planet : planets)
+				if(!planetsSaved.count(planet.TrueName()))
+				{
+					planetEditor.WriteToFile(mapTxt, &planet);
+					mapTxt.Write();
+				}
+		}
+		if(systemSave)
+		{
+			for(auto &&system : systems)
+				if(!systemsSaved.count(system.Name()))
+				{
+					systemEditor.WriteToFile(mapTxt, &system);
+					mapTxt.Write();
+				}
+		}
 	}
-	if(!ships.empty())
+	if(shipsSaved.size() < ships.size())
 	{
 		DataWriter shipsTxt(currentPlugin + "data/ships.txt");
 		for(auto &&ship : ships)
@@ -269,7 +277,7 @@ void Editor::WriteAll()
 				shipsTxt.Write();
 			}
 	}
-	if(!outfits.empty())
+	if(outfitsSaved.size() < outfits.size())
 	{
 		DataWriter outfitsTxt(currentPlugin + "data/outfits.txt");
 		for(auto &&outfit : outfits)
@@ -279,7 +287,7 @@ void Editor::WriteAll()
 				outfitsTxt.Write();
 			}
 	}
-	if(!hazards.empty())
+	if(hazardsSaved.size() < hazards.size())
 	{
 		DataWriter hazardsTxt(currentPlugin + "data/hazards.txt");
 		for(auto &&hazard : hazards)
@@ -289,7 +297,7 @@ void Editor::WriteAll()
 				hazardsTxt.Write();
 			}
 	}
-	if(!governments.empty())
+	if(governmentsSaved.size() < governments.size())
 	{
 		DataWriter governmentsTxt(currentPlugin + "data/governments.txt");
 		for(auto &&gov : governments)
@@ -299,7 +307,7 @@ void Editor::WriteAll()
 				governmentsTxt.Write();
 			}
 	}
-	if(!fleets.empty())
+	if(fleetsSaved.size() < fleets.size())
 	{
 		DataWriter fleetsTxt(currentPlugin + "data/fleets.txt");
 		for(auto &&fleet : fleets)
@@ -309,7 +317,7 @@ void Editor::WriteAll()
 				fleetsTxt.Write();
 			}
 	}
-	if(!outfitters.empty())
+	if(outfittersSaved.size() < outfitters.size())
 	{
 		DataWriter outfittersTxt(currentPlugin + "data/outfitters.txt");
 		for(auto &&outfitter : outfitters)
@@ -319,7 +327,7 @@ void Editor::WriteAll()
 				outfittersTxt.Write();
 			}
 	}
-	if(!shipyards.empty())
+	if(shipyardsSaved.size() < shipyards.size())
 	{
 		DataWriter shipyardsTxt(currentPlugin + "data/shipyards.txt");
 		for(auto &&shipyard : shipyards)
