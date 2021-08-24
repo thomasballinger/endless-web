@@ -136,6 +136,7 @@ public:
 	
 	// Get the name of this particular ship.
 	const std::string &Name() const;
+	const std::string &TrueName() const { return ModelName(); }
 	
 	// Set / Get the name of this model of ship.
 	void SetModelName(const std::string &model);
