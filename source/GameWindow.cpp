@@ -232,8 +232,6 @@ bool GameWindow::Init()
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-	ImGui::StyleColorsDark();
-
 	ImGui_ImplSDL2_InitForOpenGL(mainWindow, context);
 	ImGui_ImplOpenGL3_Init("#version 460");
 	

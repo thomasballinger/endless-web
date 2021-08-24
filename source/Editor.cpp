@@ -55,6 +55,7 @@ Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
 	planetEditor(*this, showPlanetMenu), shipEditor(*this, showShipMenu), shipyardEditor(*this, showShipyardMenu),
 	systemEditor(*this, showSystemMenu)
 {
+	StyleColorsDarkGray();
 }
 
 
