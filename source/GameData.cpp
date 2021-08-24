@@ -94,8 +94,6 @@ namespace {
 	Set<Sale<Outfit>> outfitSales;
 	
 	Set<Galaxy> defaultGalaxies;
-	Set<Sale<Ship>> defaultShipSales;
-	Set<Sale<Outfit>> defaultOutfitSales;
 	
 	Politics politics;
 	vector<StartConditions> startConditions;
@@ -159,7 +157,9 @@ Set<Fleet> GameData::defaultFleets;
 Set<Hazard> GameData::defaultHazards;
 Set<Government> GameData::defaultGovernments;
 Set<Outfit> GameData::defaultOutfits;
+Set<Sale<Outfit>> GameData::defaultOutfitSales;
 Set<Ship> GameData::defaultShips;
+Set<Sale<Ship>> GameData::defaultShipSales;
 Set<System> GameData::defaultSystems;
 Set<Planet> GameData::defaultPlanets;
 

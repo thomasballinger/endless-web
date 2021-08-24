@@ -164,7 +164,9 @@ private:
 	static Set<Hazard> defaultHazards;
 	static Set<Government> defaultGovernments;
 	static Set<Outfit> defaultOutfits;
+	static Set<Sale<Outfit>> defaultOutfitSales;
 	static Set<Ship> defaultShips;
+	static Set<Sale<Ship>> defaultShipSales;
 	static Set<System> defaultSystems;
 	static Set<Planet> defaultPlanets;
 
@@ -173,9 +175,11 @@ private:
 	friend class HazardEditor;
 	friend class GovernmentEditor;
 	friend class OutfitEditor;
+	friend class OutfitterEditor;
 	friend class SystemEditor;
 	friend class PlanetEditor;
 	friend class ShipEditor;
+	friend class ShipyardEditor;
 };
 
 

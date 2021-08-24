@@ -51,8 +51,9 @@ using namespace std;
 
 Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
 	: player(player), menu(menu), ui(ui), fleetEditor(*this, showFleetMenu), hazardEditor(*this, showHazardMenu),
-	governmentEditor(*this, showGovernmentMenu), outfitEditor(*this, showOutfitMenu), planetEditor(*this, showPlanetMenu),
-	shipEditor(*this, showShipMenu), systemEditor(*this, showSystemMenu)
+	governmentEditor(*this, showGovernmentMenu), outfitEditor(*this, showOutfitMenu), outfitterEditor(*this, showOutfitterMenu),
+	planetEditor(*this, showPlanetMenu), shipEditor(*this, showShipMenu), shipyardEditor(*this, showShipyardMenu),
+	systemEditor(*this, showSystemMenu)
 {
 }
 
@@ -76,7 +77,9 @@ void Editor::SaveAll()
 	hazardEditor.WriteAll();
 	governmentEditor.WriteAll();
 	outfitEditor.WriteAll();
+	outfitterEditor.WriteAll();
 	shipEditor.WriteAll();
+	shipyardEditor.WriteAll();
 	planetEditor.WriteAll();
 	systemEditor.WriteAll();
 }
@@ -93,8 +96,10 @@ void Editor::WriteAll()
 	const auto &hazards = hazardEditor.Changes();
 	const auto &governments = governmentEditor.Changes();
 	const auto &outfits = outfitEditor.Changes();
+	const auto &outfitters = outfitterEditor.Changes();
 	const auto &planets = planetEditor.Changes();
 	const auto &ships = shipEditor.Changes();
+	const auto &shipyards = shipyardEditor.Changes();
 	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.
@@ -102,8 +107,10 @@ void Editor::WriteAll()
 	set<string> hazardsSaved;
 	set<string> governmentsSaved;
 	set<string> outfitsSaved;
+	set<string> outfittersSaved;
 	set<string> planetsSaved;
 	set<string> shipsSaved;
+	set<string> shipyardsSaved;
 	set<string> systemsSaved;
 
 	// Save every change made to this plugin.
@@ -113,7 +120,8 @@ void Editor::WriteAll()
 		const auto &fileName = Files::Name(file.first);
 		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt"
 				|| fileName == "hazards.txt" || fileName == "governments.txt"
-				|| fileName == "fleets.txt")
+				|| fileName == "fleets.txt" || fileName == "outfitters.txt"
+				|| fileName == "shipyards.txt")
 			continue;
 
 		DataWriter writer(file.first);
@@ -205,6 +213,30 @@ void Editor::WriteAll()
 					continue;
 				}
 			}
+			else if(objects[0] == '7')
+			{
+				auto it = find_if(outfitters.begin(), outfitters.end(),
+						[&toSearch](const Sale<Outfit> &o) { return o.Name() == toSearch; });
+				if(it != outfitters.end())
+				{
+					outfitterEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					outfittersSaved.insert(it->Name());
+					continue;
+				}
+			}
+			else if(objects[0] == '8')
+			{
+				auto it = find_if(shipyards.begin(), shipyards.end(),
+						[&toSearch](const Sale<Ship> &s) { return s.Name() == toSearch; });
+				if(it != shipyards.end())
+				{
+					shipyardEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					shipyardsSaved.insert(it->Name());
+					continue;
+				}
+			}
 			else
 				assert(!"Invalid object type to write to file! Please report this.");
 		}
@@ -277,6 +309,26 @@ void Editor::WriteAll()
 				fleetsTxt.Write();
 			}
 	}
+	if(!outfitters.empty())
+	{
+		DataWriter outfittersTxt(currentPlugin + "data/outfitters.txt");
+		for(auto &&outfitter : outfitters)
+			if(!outfittersSaved.count(outfitter.Name()))
+			{
+				outfitterEditor.WriteToFile(outfittersTxt, &outfitter);
+				outfittersTxt.Write();
+			}
+	}
+	if(!shipyards.empty())
+	{
+		DataWriter shipyardsTxt(currentPlugin + "data/shipyards.txt");
+		for(auto &&shipyard : shipyards)
+			if(!shipyardsSaved.count(shipyard.Name()))
+			{
+				shipyardEditor.WriteToFile(shipyardsTxt, &shipyard);
+				shipyardsTxt.Write();
+			}
+	}
 }
 
 
@@ -295,8 +347,10 @@ bool Editor::HasUnsavedChanges() const
 		|| !fleetEditor.Dirty().empty()
 		|| !governmentEditor.Dirty().empty()
 		|| !outfitEditor.Dirty().empty()
+		|| !outfitterEditor.Dirty().empty()
 		|| !planetEditor.Dirty().empty()
 		|| !shipEditor.Dirty().empty()
+		|| !shipyardEditor.Dirty().empty()
 		|| !systemEditor.Dirty().empty();
 }
 
@@ -340,8 +394,12 @@ void Editor::RenderMain()
 		governmentEditor.Render();
 	if(showOutfitMenu)
 		outfitEditor.Render();
+	if(showOutfitterMenu)
+		outfitterEditor.Render();
 	if(showShipMenu)
 		shipEditor.Render();
+	if(showShipyardMenu)
+		shipyardEditor.Render();
 	if(showSystemMenu)
 		systemEditor.Render();
 	if(showPlanetMenu)
@@ -372,7 +430,9 @@ void Editor::RenderMain()
 			ImGui::MenuItem("Hazard Editor", nullptr, &showHazardMenu);
 			ImGui::MenuItem("Government Editor", nullptr, &showGovernmentMenu);
 			ImGui::MenuItem("Outfit Editor", nullptr, &showOutfitMenu);
+			ImGui::MenuItem("Outfitter Editor", nullptr, &showOutfitterMenu);
 			ImGui::MenuItem("Ship Editor", nullptr, &showShipMenu);
+			ImGui::MenuItem("Shipyard Editor", nullptr, &showShipyardMenu);
 			if(ImGui::MenuItem("System Editor", nullptr, &showSystemMenu))
 			{
 				auto *panel = dynamic_cast<MapEditorPanel *>(menu.Top().get());
@@ -395,8 +455,10 @@ void Editor::RenderMain()
 		const auto &dirtyHazards = hazardEditor.Dirty();
 		const auto &dirtyGovernments = governmentEditor.Dirty();
 		const auto &dirtyOutfits = outfitEditor.Dirty();
+		const auto &dirtyOutfitters = outfitterEditor.Dirty();
 		const auto &dirtyPlanets = planetEditor.Dirty();
 		const auto &dirtyShips = shipEditor.Dirty();
+		const auto &dirtyShipyards = shipyardEditor.Dirty();
 		const auto &dirtySystems = systemEditor.Dirty();
 		const bool hasChanges = HasUnsavedChanges();
 
@@ -432,6 +494,13 @@ void Editor::RenderMain()
 				ImGui::EndMenu();
 			}
 
+			if(!dirtyOutfitters.empty() && ImGui::BeginMenu("Outfitters"))
+			{
+				for(auto &&o : dirtyOutfitters)
+					ImGui::MenuItem(o->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
 			if(!dirtyPlanets.empty() && ImGui::BeginMenu("Planets"))
 			{
 				for(auto &&p : dirtyPlanets)
@@ -442,6 +511,13 @@ void Editor::RenderMain()
 			if(!dirtyShips.empty() && ImGui::BeginMenu("Ships"))
 			{
 				for(auto &&s : dirtyShips)
+					ImGui::MenuItem(s->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
+			if(!dirtyShipyards.empty() && ImGui::BeginMenu("Shipyards"))
+			{
+				for(auto &&s : dirtyShipyards)
 					ImGui::MenuItem(s->Name().c_str(), nullptr, false, false);
 				ImGui::EndMenu();
 			}
@@ -653,6 +729,16 @@ void Editor::OpenPlugin(const string &plugin)
 			{
 				num = '6';
 				fleetEditor.WriteToPlugin(GameData::Fleets().Get(value));
+			}
+			else if(key == "outfitter")
+			{
+				num = '7';
+				outfitterEditor.WriteToPlugin(GameData::Outfitters().Get(value));
+			}
+			else if(key == "shipyard")
+			{
+				num = '8';
+				shipyardEditor.WriteToPlugin(GameData::Shipyards().Get(value));
 			}
 			else
 			{

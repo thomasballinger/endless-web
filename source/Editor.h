@@ -17,8 +17,10 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "HazardEditor.h"
 #include "GovernmentEditor.h"
 #include "OutfitEditor.h"
+#include "OutfitterEditor.h"
 #include "PlanetEditor.h"
 #include "ShipEditor.h"
+#include "ShipyardEditor.h"
 #include "SystemEditor.h"
 
 #include <memory>
@@ -78,8 +80,10 @@ private:
 	HazardEditor hazardEditor;
 	GovernmentEditor governmentEditor;
 	OutfitEditor outfitEditor;
+	OutfitterEditor outfitterEditor;
 	PlanetEditor planetEditor;
 	ShipEditor shipEditor;
+	ShipyardEditor shipyardEditor;
 	SystemEditor systemEditor;
 
 	std::string currentPlugin;
@@ -90,7 +94,9 @@ private:
 	bool showHazardMenu = false;
 	bool showGovernmentMenu = false;
 	bool showOutfitMenu = false;
+	bool showOutfitterMenu = false;
 	bool showShipMenu = false;
+	bool showShipyardMenu = false;
 	bool showSystemMenu = false;
 	bool showPlanetMenu = false;
 

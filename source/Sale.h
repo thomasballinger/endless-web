@@ -32,6 +32,8 @@ public:
 	
 	bool Has(const Item *item) const;
 
+	const std::string &Name() const { return name; }
+
 
 public:
 	std::string name;
