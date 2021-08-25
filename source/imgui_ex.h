@@ -88,6 +88,8 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 		BringWindowToDisplayFront(GetCurrentWindow());
 		if(enter)
 		{
+			if(elements.Find(*input))
+				*element = const_cast<T *>(elements.Get(*input));
 			CloseCurrentPopup();
 			EndCombo();
 			return true;

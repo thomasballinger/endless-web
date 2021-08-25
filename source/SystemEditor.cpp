@@ -260,10 +260,13 @@ void SystemEditor::RenderSystem()
 			}
 			ImGui::PopID();
 		}
+		static System *newLink = nullptr;
 		string addLink;
-		if(ImGui::InputText("add link", &addLink, ImGuiInputTextFlags_EnterReturnsTrue))
-			if(auto *system = const_cast<System *>(GameData::Systems().Find(addLink)))
-				toAdd.insert(system);
+		if(ImGui::InputCombo("add link", &addLink, &newLink, GameData::Systems()))
+		{
+			toAdd.insert(newLink);
+			newLink = nullptr;
+		}
 
 		for(auto &sys : toAdd)
 		{
@@ -312,7 +315,7 @@ void SystemEditor::RenderSystem()
 			ImGui::PushID(index);
 			if(asteroid.Type())
 			{
-				bool open = ImGui::TreeNode("minables");
+				bool open = ImGui::TreeNode("minables", "mineables: %s %d %g", asteroid.Type()->Name().c_str(), asteroid.count, asteroid.energy);
 				if(ImGui::BeginPopupContextItem())
 				{
 					if(ImGui::Selectable("Remove"))
@@ -322,8 +325,7 @@ void SystemEditor::RenderSystem()
 
 				if(open)
 				{
-					ImGui::SetNextItemWidth(300.f);
-					if(ImGui::BeginCombo("##minables", asteroid.Type()->Name().c_str()))
+					if(ImGui::BeginCombo("name", asteroid.Type()->Name().c_str()))
 					{
 						int index = 0;
 						for(const auto &item : GameData::Minables())
@@ -343,17 +345,13 @@ void SystemEditor::RenderSystem()
 						}
 						ImGui::EndCombo();
 					}
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(100.f);
-					if(ImGui::InputInt("##count", &asteroid.count))
+					if(ImGui::InputInt("count", &asteroid.count))
 					{
 						if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
 							panel->UpdateCache();
 						SetDirty();
 					}
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(100.f);
-					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
+					if(ImGui::InputDoubleEx("energy", &asteroid.energy))
 					{
 						if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
 							panel->UpdateCache();
@@ -364,7 +362,7 @@ void SystemEditor::RenderSystem()
 			}
 			else
 			{
-				bool open = ImGui::TreeNode("asteroids");
+				bool open = ImGui::TreeNode("asteroids", "asteroids: %s %d %g", asteroid.name.c_str(), asteroid.count, asteroid.energy);
 				if(ImGui::BeginPopupContextItem())
 				{
 					if(ImGui::Selectable("Remove"))
@@ -378,24 +376,19 @@ void SystemEditor::RenderSystem()
 
 				if(open)
 				{
-					ImGui::SetNextItemWidth(300.f);
-					if(ImGui::InputText("##asteroids", &asteroid.name))
+					if(ImGui::InputText("name", &asteroid.name))
 					{
 						if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
 							panel->UpdateCache();
 						SetDirty();
 					}
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(100.f);
-					if(ImGui::InputInt("##count", &asteroid.count))
+					if(ImGui::InputInt("count", &asteroid.count))
 					{
 						if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
 							panel->UpdateCache();
 						SetDirty();
 					}
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(100.f);
-					if(ImGui::InputDoubleEx("##energy", &asteroid.energy))
+					if(ImGui::InputDoubleEx("energy", &asteroid.energy))
 					{
 						if(auto *panel = dynamic_cast<MainEditorPanel*>(editor.GetMenu().Top().get()))
 							panel->UpdateCache();
@@ -433,7 +426,7 @@ void SystemEditor::RenderSystem()
 		for(auto &fleet : object->fleets)
 		{
 			ImGui::PushID(index);
-			bool open = ImGui::TreeNode("fleet");
+			bool open = ImGui::TreeNode("fleet", "fleet: %s %d", fleet.Get()->Name().c_str(), fleet.period);
 			if(ImGui::BeginPopupContextItem())
 			{
 				if(ImGui::Selectable("Remove"))
@@ -443,7 +436,7 @@ void SystemEditor::RenderSystem()
 
 			if(open)
 			{
-				if(ImGui::BeginCombo("##fleets", fleet.Get()->Name().c_str()))
+				if(ImGui::BeginCombo("fleet", fleet.Get()->Name().c_str()))
 				{
 					int index = 0;
 					for(const auto &item : GameData::Fleets())
@@ -461,8 +454,7 @@ void SystemEditor::RenderSystem()
 					}
 					ImGui::EndCombo();
 				}
-				ImGui::SameLine();
-				if(ImGui::InputInt("##period", &fleet.period))
+				if(ImGui::InputInt("period", &fleet.period))
 					SetDirty();
 				ImGui::TreePop();
 			}
@@ -492,7 +484,7 @@ void SystemEditor::RenderSystem()
 		for(auto &hazard : object->hazards)
 		{
 			ImGui::PushID(index);
-			bool open = ImGui::TreeNode("hazard");
+			bool open = ImGui::TreeNode("hazard", "hazard: %s %d", hazard.Get()->Name().c_str(), hazard.period);
 			if(ImGui::BeginPopupContextItem())
 			{
 				if(ImGui::Selectable("Remove"))
@@ -502,7 +494,7 @@ void SystemEditor::RenderSystem()
 
 			if(open)
 			{
-				if(ImGui::BeginCombo("##hazards", hazard.Get()->Name().c_str()))
+				if(ImGui::BeginCombo("hazard", hazard.Get()->Name().c_str()))
 				{
 					int index = 0;
 					for(const auto &item : GameData::Hazards())
@@ -520,8 +512,7 @@ void SystemEditor::RenderSystem()
 					}
 					ImGui::EndCombo();
 				}
-				ImGui::SameLine();
-				if(ImGui::InputInt("##period", &hazard.period))
+				if(ImGui::InputInt("period", &hazard.period))
 					SetDirty();
 				ImGui::TreePop();
 			}
@@ -592,12 +583,20 @@ void SystemEditor::RenderSystem()
 		SetDirty();
 	if(object->jumpRange < 0.)
 		object->jumpRange = 0.;
+	static Sprite *haze = nullptr;
 	string enterHaze = object->haze ? object->haze->Name() : "";
-	if(ImGui::InputText("haze", &enterHaze, ImGuiInputTextFlags_EnterReturnsTrue))
+	if(ImGui::InputCombo("haze", &enterHaze, &haze, SpriteSet::GetSprites()))
 	{
-		object->haze = SpriteSet::Get(enterHaze);
+		object->haze = haze;
+		haze = nullptr;
 		SetDirty();
 	}
+
+	double arrival[2] = {object->extraHyperArrivalDistance, object->extraJumpArrivalDistance};
+	if(ImGui::InputDouble2Ex("arrival", arrival))
+		SetDirty();
+	object->extraHyperArrivalDistance = arrival[0];
+	object->extraJumpArrivalDistance = fabs(arrival[1]);
 
 	if(ImGui::TreeNode("trades"))
 	{
@@ -660,6 +659,8 @@ void SystemEditor::RenderSystem()
 
 			planetName.clear();
 			spriteName.clear();
+			sprite = nullptr;
+			planet = nullptr;
 			object = {};
 
 			if(stellar->GetPlanet())
@@ -726,18 +727,15 @@ void SystemEditor::RenderSystem()
 					it->parent -= removed;
 		}
 	}
-
-	double arrival[2] = {object->extraHyperArrivalDistance, object->extraJumpArrivalDistance};
-	if(ImGui::InputDouble2Ex("arrival", arrival))
-		SetDirty();
-	object->extraHyperArrivalDistance = arrival[0];
-	object->extraJumpArrivalDistance = fabs(arrival[1]);
 }
 
 
 
 void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, bool &hovered)
 {
+	if(object.parent != -1 && !nested)
+		return;
+
 	bool isOpen = ImGui::TreeNode("object", "object %s", object.GetPlanet() ? object.GetPlanet()->TrueName().c_str() : "");
 
 	ImGui::PushID(index);
@@ -751,12 +749,26 @@ void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, b
 
 	if(isOpen)
 	{
+		static Planet *planet = nullptr;
+		static string planetName;
+		planetName.clear();
+		if(object.planet)
+			planetName = object.planet->TrueName();
+		if(ImGui::InputCombo("planet", &planetName, &planet, GameData::Planets()))
+		{
+			object.planet = planet;
+			planet = nullptr;
+			SetDirty();
+		}
+		static Sprite *sprite = nullptr;
 		static string spriteName;
+		spriteName.clear();
 		if(object.sprite)
 			spriteName = object.sprite->Name();
-		if(ImGui::InputText("sprite", &spriteName, ImGuiInputTextFlags_EnterReturnsTrue))
+		if(ImGui::InputCombo("sprite", &spriteName, &sprite, SpriteSet::GetSprites()))
 		{
 			object.sprite = SpriteSet::Get(spriteName);
+			sprite = nullptr;
 			SetDirty();
 		}
 
