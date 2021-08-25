@@ -54,4 +54,60 @@ namespace ImGui
 	{
 		return InputScalar(label, ImGuiDataType_U64, v, nullptr, nullptr, "%zu", flags);
 	}
+
+
+
+	IMGUI_API bool InputSwizzle(const char *label, int *swizzle)
+	{
+		constexpr int count = 29;
+		constexpr const char *swizzles[count] =
+		{
+			"0 - red + yellow markings",
+			"1 - red + magenta markings",
+			"2 - green + yellow",
+			"3 - green + cyan",
+			"4 - blue + magenta",
+			"5 - blue + cyan",
+			"6 - red + black",
+			"7 - pure red",
+			"8 - faded red",
+			"9 - pure black",
+			"10 - faded black",
+			"11 - pure white",
+			"12 - darkened blue",
+			"13 - pure blue",
+			"14 - faded blue",
+			"15 - darkened cyan",
+			"16 - pure cyan",
+			"17 - faded cyan",
+			"18 - darkened green",
+			"19 - pure green",
+			"20 - faded green",
+			"21 - darkened yellow",
+			"22 - pure yellow",
+			"23 - faded yellow",
+			"24 - darkened magenta",
+			"25 - pure magenta",
+			"26 - faded magenta",
+			"27 - red only (cloaked)",
+			"28 - black only (outline)",
+		};
+		bool changed = false;
+		if(BeginCombo(label, swizzles[*swizzle]))
+		{
+			for(int i = 0; i < count; ++i)
+			{
+				const bool selected = i == *swizzle;
+				if(Selectable(swizzles[i], selected))
+				{
+					*swizzle = i;
+					changed = true;
+				}
+				if(selected)
+					SetItemDefaultFocus();
+			}
+			EndCombo();
+		}
+		return changed;
+	}
 }

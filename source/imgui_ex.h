@@ -37,6 +37,10 @@ namespace ImGui
 
 	template <typename T>
 	IMGUI_API bool InputCombo(const char *label, std::string *input, T **element, const Set<T> &elements);
+	template <typename T>
+	IMGUI_API bool InputCombo(const char *label, std::string *input, const T **element, const Set<T> &elements);
+
+	IMGUI_API bool InputSwizzle(const char *label, int *swizzle);
 }
 
 
@@ -88,8 +92,7 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 		BringWindowToDisplayFront(GetCurrentWindow());
 		if(enter)
 		{
-			if(elements.Find(*input))
-				*element = const_cast<T *>(elements.Get(*input));
+			*element = elements.Find(*input) ? const_cast<T *>(elements.Get(*input)) : nullptr;
 			CloseCurrentPopup();
 			EndCombo();
 			return input->empty();
@@ -153,6 +156,13 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 	}
 
 	return changed;
+}
+
+
+template <typename T>
+IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, const T **element, const Set<T> &elements)
+{
+	return InputCombo(label, input, const_cast<T **>(element), elements);
 }
 
 

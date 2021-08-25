@@ -172,7 +172,7 @@ void GovernmentEditor::RenderGovernment()
 {
 	if(ImGui::InputText("display name", &object->displayName))
 		SetDirty();
-	if(ImGui::InputInt("swizzle", &object->swizzle))
+	if(ImGui::InputSwizzle("swizzle", &object->swizzle))
 		SetDirty();
 	float color[3] = {};
 	color[0] = object->color.Get()[0];
@@ -278,51 +278,39 @@ void GovernmentEditor::RenderGovernment()
 		SetDirty();
 	if(ImGui::InputDoubleEx("fine", &object->fine))
 		SetDirty();
-	string deathSentence = object->deathSentence ? object->deathSentence->Name() : "";
-	if(ImGui::InputText("death sentence", &deathSentence, ImGuiInputTextFlags_EnterReturnsTrue))
-		if(GameData::Conversations().Has(deathSentence))
-		{
-			object->deathSentence = GameData::Conversations().Get(deathSentence);
-			SetDirty();
-		}
+	string deathSentenceName = object->deathSentence ? object->deathSentence->Name() : "";
+	static Conversation *deathSentence;
+	if(ImGui::InputCombo("death sentence", &deathSentenceName, &deathSentence, GameData::Conversations()))
+	{
+		object->deathSentence = deathSentence;
+		SetDirty();
+	}
 	string friendlyHail = object->friendlyHail ? object->friendlyHail->Name() : "";
-	if(ImGui::InputText("friendly hail", &friendlyHail, ImGuiInputTextFlags_EnterReturnsTrue))
-		if(GameData::Phrases().Has(friendlyHail))
-		{
-			object->friendlyHail = GameData::Phrases().Get(friendlyHail);
-			SetDirty();
-		}
+	if(ImGui::InputCombo("friendly hail", &friendlyHail, &object->friendlyHail, GameData::Phrases()))
+		SetDirty();
 	string friendlyDisabledHail = object->friendlyDisabledHail ? object->friendlyDisabledHail->Name() : "";
-	if(ImGui::InputText("friendly disabled hail", &friendlyDisabledHail, ImGuiInputTextFlags_EnterReturnsTrue))
-		if(GameData::Phrases().Has(friendlyDisabledHail))
-		{
-			object->friendlyDisabledHail = GameData::Phrases().Get(friendlyDisabledHail);
-			SetDirty();
-		}
+	if(ImGui::InputCombo("friendly disabled hail", &friendlyDisabledHail, &object->friendlyDisabledHail, GameData::Phrases()))
+	{
+		if(!object->friendlyDisabledHail)
+			object->friendlyDisabledHail = GameData::Phrases().Get("friendly disabled");
+		SetDirty();
+	}
 	string hostileHail = object->hostileHail ? object->hostileHail->Name() : "";
-	if(ImGui::InputText("hostile hail", &hostileHail, ImGuiInputTextFlags_EnterReturnsTrue))
-		if(GameData::Phrases().Has(hostileHail))
-		{
-			object->hostileHail = GameData::Phrases().Get(hostileHail);
-			SetDirty();
-		}
+	if(ImGui::InputCombo("hostile hail", &hostileHail, &object->hostileHail, GameData::Phrases()))
+		SetDirty();
 	string hostileDisabledHail = object->hostileDisabledHail? object->hostileDisabledHail->Name() : "";
-	if(ImGui::InputText("hostile disabled hail", &hostileDisabledHail, ImGuiInputTextFlags_EnterReturnsTrue))
-		if(GameData::Phrases().Has(hostileDisabledHail))
-		{
-			object->hostileDisabledHail = GameData::Phrases().Get(hostileDisabledHail);
-			SetDirty();
-		}
+	if(ImGui::InputCombo("hostile disabled hail", &hostileDisabledHail, &object->hostileDisabledHail, GameData::Phrases()))
+	{
+		if(!object->hostileDisabledHail)
+			object->hostileDisabledHail = GameData::Phrases().Get("hostile disabled");
+		SetDirty();
+	}
 
 	if(ImGui::InputText("language", &object->language))
 		SetDirty();
 	string raidName = object->raidFleet ? object->raidFleet->Name() : "";
-	if(ImGui::InputText("raid fleet", &raidName, ImGuiInputTextFlags_EnterReturnsTrue))
-		if(GameData::Fleets().Has(raidName))
-		{
-			object->raidFleet = GameData::Fleets().Get(raidName);
-			SetDirty();
-		}
+	if(ImGui::InputCombo("raid fleet", &raidName, &object->raidFleet, GameData::Fleets()))
+		SetDirty();
 
 	static string enforcements;
 	if(ImGui::InputTextMultiline("enforces", &enforcements))
