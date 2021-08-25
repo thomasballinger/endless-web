@@ -54,6 +54,7 @@ public:
 	void RenderMain();
 
 	void ShowConfirmationDialog();
+	void ReloadPluginResources();
 
 	bool HasPlugin() const;
 	bool HasUnsavedChanges() const;

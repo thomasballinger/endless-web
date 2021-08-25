@@ -16,6 +16,7 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "CategoryTypes.h"
 #include "Sale.h"
 #include "Set.h"
+#include "SpriteQueue.h"
 #include "Trade.h"
 
 #include <map>
@@ -149,7 +150,7 @@ public:
 	static const std::map<std::string, std::string> &HelpTemplates();
 	
 	static const std::map<std::string, std::string> &PluginAboutText();
-	
+
 	
 private:
 	static void LoadSources();
@@ -169,6 +170,8 @@ private:
 	static Set<Sale<Ship>> defaultShipSales;
 	static Set<System> defaultSystems;
 	static Set<Planet> defaultPlanets;
+
+	static SpriteQueue spriteQueue;
 
 	friend class Editor;
 	friend class FleetEditor;

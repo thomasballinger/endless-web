@@ -115,7 +115,6 @@ namespace {
 	map<string, string> helpMessages;
 	map<string, string> plugins;
 	
-	SpriteQueue spriteQueue;
 	// Whether sprites and audio have finished loading at game startup.
 	bool initiallyLoaded = false;
 	
@@ -162,6 +161,8 @@ Set<Ship> GameData::defaultShips;
 Set<Sale<Ship>> GameData::defaultShipSales;
 Set<System> GameData::defaultSystems;
 Set<Planet> GameData::defaultPlanets;
+
+SpriteQueue GameData::spriteQueue;
 
 
 

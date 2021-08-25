@@ -27,11 +27,13 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #include "GameData.h"
 #include "Government.h"
 #include "Hazard.h"
+#include "ImageSet.h"
 #include "MainEditorPanel.h"
 #include "MainPanel.h"
 #include "MapEditorPanel.h"
 #include "MapPanel.h"
 #include "Minable.h"
+#include "Music.h"
 #include "Planet.h"
 #include "PlayerInfo.h"
 #include "Ship.h"
@@ -457,6 +459,8 @@ void Editor::RenderMain()
 				menu.Push(new MapEditorPanel(player, &systemEditor));
 			if(ImGui::MenuItem("Open In-System Editor"))
 				menu.Push(new MainEditorPanel(player, &systemEditor));
+			if(ImGui::MenuItem("Reload Plugin Resources", nullptr, false, HasPlugin()))
+				ReloadPluginResources();
 			ImGui::EndMenu();
 		}
 
@@ -674,6 +678,44 @@ void Editor::ShowConfirmationDialog()
 	else
 		// No unsaved changes, so just quit.
 		menu.Quit();
+}
+
+
+
+void Editor::ReloadPluginResources()
+{
+	if(!HasPlugin())
+		return;
+
+	string directoryPath = currentPlugin + "images/";
+	size_t start = directoryPath.size();
+
+	vector<string> imageFiles = Files::RecursiveList(directoryPath);
+	map<string, shared_ptr<ImageSet>> images;
+	for(const string &path : imageFiles)
+		if(ImageSet::IsImage(path))
+		{
+			string name = ImageSet::Name(path.substr(start));
+
+			shared_ptr<ImageSet> &imageSet = images[name];
+			if(!imageSet)
+				imageSet.reset(new ImageSet(name));
+			imageSet->Add(path);
+		}
+
+	for(const auto &it : images)
+	{
+		// This should never happen, but just in case:
+		if(!it.second)
+			continue;
+
+		// Check that the image set is complete.
+		it.second->Check();
+		// For landscapes, remember all the source files but don't load them yet.
+		GameData::spriteQueue.Add(it.second);
+	}
+	Music::Init({currentPlugin});
+	GameData::spriteQueue.Finish();
 }
 
 
