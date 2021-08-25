@@ -189,6 +189,7 @@ bool MainEditorPanel::Click(int x, int y, int clicks)
 			moveStellars = true;
 			return true;
 		}
+	currentObject = nullptr;
 	moveStellars = false;
 	return true;
 }
