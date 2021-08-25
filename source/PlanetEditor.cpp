@@ -389,13 +389,16 @@ void PlanetEditor::RenderPlanet()
 	}
 
 
-	static string landscape;
+	static string landscapeName;
+	static Sprite *landscape = nullptr;
 	if(object->landscape)
-		landscape = object->landscape->Name();
-	if(ImGui::InputText("landscape", &landscape, ImGuiInputTextFlags_EnterReturnsTrue))
+		landscapeName = object->landscape->Name();
+	if(ImGui::InputCombo("landscape", &landscapeName, &landscape, SpriteSet::GetSprites()))
 	{
-		object->landscape = SpriteSet::Get(landscape);
+		object->landscape = landscape;
 		GameData::Preload(object->landscape);
+		landscape = nullptr;
+		landscapeName.clear();
 		SetDirty();
 	}
 	if(ImGui::InputText("music", &object->music, ImGuiInputTextFlags_EnterReturnsTrue))
@@ -429,6 +432,12 @@ void PlanetEditor::RenderPlanet()
 
 				if(selected)
 					ImGui::SetItemDefaultFocus();
+			}
+
+			if(ImGui::Selectable("[remove]"))
+			{
+				object->government = nullptr;
+				SetDirty();
 			}
 			ImGui::EndCombo();
 		}
