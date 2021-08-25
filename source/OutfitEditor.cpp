@@ -80,12 +80,26 @@ void OutfitEditor::Render()
 	{
 		if(ImGui::BeginMenu("Tools"))
 		{
-			if(ImGui::MenuItem("Add to Cargo"))
-			{
-			}
-			if(ImGui::MenuItem("Add to current Ship"))
-			{
-			}
+			if(ImGui::MenuItem("Add to Cargo", nullptr, false, object && editor.Player().Cargo().Free() >= -object->Attributes().Get("outfit space")))
+				editor.Player().Cargo().Add(object);
+			if(!object || editor.Player().Cargo().Free() < -object->Attributes().Get("outfit space"))
+				if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				{
+					if(!object)
+						ImGui::SetTooltip("Select an outfit first.");
+					else
+						ImGui::SetTooltip("Not enough space in your cargo hold for this outfit.");
+				}
+			if(ImGui::MenuItem("Add to Flagship", nullptr, false, object && editor.Player().Flagship()->Attributes().CanAdd(*object, 1) > 0))
+				editor.Player().Flagship()->AddOutfit(object, 1);
+			if(!object || editor.Player().Flagship()->Attributes().CanAdd(*object, 1) <= 0)
+				if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+				{
+					if(!object)
+						ImGui::SetTooltip("Select an outfit first.");
+					else
+						ImGui::SetTooltip("Not enough outfit space in your flagship.");
+				}
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenuBar();
