@@ -597,7 +597,19 @@ void Editor::RenderMain()
 	{
 		static string openPlugin;
 		ImGui::Text("Open plugin:");
-		bool create = ImGui::InputText("", &openPlugin, ImGuiInputTextFlags_EnterReturnsTrue);
+		if(ImGui::BeginCombo("", openPlugin.c_str()))
+		{
+			auto plugins = Files::ListDirectories(Files::Config() + "plugins/");
+			for(auto plugin : plugins)
+			{
+				plugin.pop_back();
+				plugin = Files::Name(plugin);
+				if(ImGui::Selectable(plugin.c_str()))
+					openPlugin = plugin;
+			}
+
+			ImGui::EndCombo();
+		}
 		if(ImGui::Button("Cancel"))
 		{
 			ImGui::CloseCurrentPopup();
@@ -607,7 +619,7 @@ void Editor::RenderMain()
 		if(openPlugin.empty())
 			ImGui::PushDisabled();
 		bool dontDisable = false;
-		if(ImGui::Button("Ok") || create)
+		if(ImGui::Button("Ok") || (!openPlugin.empty() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))))
 		{
 			OpenPlugin(openPlugin);
 			ImGui::CloseCurrentPopup();
