@@ -256,6 +256,7 @@ void SystemEditor::RenderSystem()
 			{
 				if(newLink)
 					toAdd.insert(newLink);
+				newLink = nullptr;
 				toRemove.insert(const_cast<System *>(link));
 			}
 			ImGui::PopID();
