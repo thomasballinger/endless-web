@@ -445,7 +445,7 @@ void Editor::RenderMain()
 			if(ImGui::MenuItem("System Editor", nullptr, &showSystemMenu))
 			{
 				auto *panel = dynamic_cast<MapEditorPanel *>(menu.Top().get());
-				if(!panel)
+				if(!panel && !dynamic_cast<MainEditorPanel *>(menu.Top().get()))
 					menu.Push(new MapEditorPanel(player, &systemEditor));
 			}
 			ImGui::MenuItem("Planet Editor", nullptr, &showPlanetMenu);
