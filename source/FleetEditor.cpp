@@ -257,9 +257,9 @@ void FleetEditor::RenderFleet()
 	}
 	if(ImGui::TreeNode("outfitters"))
 	{
-		auto found = object->outfitters.end();
-		const Sale<Outfit> *toAdd = nullptr;
 		int index = 0;
+		const Sale<Outfit> *toAdd = nullptr;
+		const Sale<Outfit> *toRemove = nullptr;
 		for(auto it = object->outfitters.begin(); it != object->outfitters.end(); ++it)
 		{
 			ImGui::PushID(index++);
@@ -270,27 +270,36 @@ void FleetEditor::RenderFleet()
 					const bool selected = &item.second == *it;
 					if(ImGui::Selectable(item.first.c_str(), selected))
 					{
-						found = it;
 						toAdd = &item.second;
+						toRemove = *it;
 						SetDirty();
 					}
 					if(selected)
 						ImGui::SetItemDefaultFocus();
 				}
+
+				if(ImGui::Selectable("[remove]"))
+				{
+					toRemove = *it;
+					SetDirty();
+				}
 				ImGui::EndCombo();
-			}
-			if(ImGui::Selectable("[remove]"))
-			{
-				found = it;
-				SetDirty();
 			}
 			ImGui::PopID();
 		}
-		if(found != object->outfitters.end())
+		if(toAdd)
+			object->outfitters.insert(toAdd);
+		if(toRemove)
+			object->outfitters.erase(toRemove);
+		if(ImGui::BeginCombo("add outfitter", ""))
 		{
-			object->outfitters.erase(found);
-			if(toAdd)
-				object->outfitters.insert(toAdd);
+			for(const auto &item : GameData::Outfitters())
+				if(ImGui::Selectable(item.first.c_str()))
+				{
+					object->outfitters.insert(&item.second);
+					SetDirty();
+				}
+			ImGui::EndCombo();
 		}
 		ImGui::TreePop();
 	}
@@ -625,10 +634,12 @@ void FleetEditor::RenderFleet()
 						}
 						if(shipOpen)
 						{
-							if(ImGui::InputText("ship##input", &shipName, ImGuiInputTextFlags_EnterReturnsTrue))
-								if(GameData::Ships().Has(shipName))
+							static Ship *ship = nullptr;
+							if(ImGui::InputCombo("ship##input", &shipName, &ship, GameData::Ships()))
+								if(!shipName.empty())
 								{
-									*first = GameData::Ships().Get(shipName);
+									*first = ship;
+									ship = nullptr;
 									SetDirty();
 								}
 							int oldCount = count;

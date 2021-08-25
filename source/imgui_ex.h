@@ -92,7 +92,7 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 				*element = const_cast<T *>(elements.Get(*input));
 			CloseCurrentPopup();
 			EndCombo();
-			return true;
+			return input->empty();
 		}
 
 		std::vector<const std::string *> strings(elements.size());
