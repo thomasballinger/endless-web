@@ -250,12 +250,12 @@ void SystemEditor::RenderSystem()
 		for(auto &link : object->links)
 		{
 			ImGui::PushID(index++);
+			static System *newLink = nullptr;
 			string name = link->Name();
-			if(ImGui::InputText("link", &name, ImGuiInputTextFlags_EnterReturnsTrue))
+			if(ImGui::InputCombo("link", &name, &newLink, GameData::Systems()))
 			{
-				auto *system = const_cast<System *>(GameData::Systems().Find(name));
-				if(system)
-					toAdd.insert(system);
+				if(newLink)
+					toAdd.insert(newLink);
 				toRemove.insert(const_cast<System *>(link));
 			}
 			ImGui::PopID();
