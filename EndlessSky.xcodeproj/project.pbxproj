@@ -28,6 +28,7 @@
 		62C3111A1CE172D000409D91 /* Flotsam.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 62C311181CE172D000409D91 /* Flotsam.cpp */; };
 		6A5716331E25BE6F00585EB2 /* CollisionSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6A5716311E25BE6F00585EB2 /* CollisionSet.cpp */; };
 		6EC347E6A79BA5602BA4D1EA /* StartConditionsPanel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 11EA4AD7A889B6AC1441A198 /* StartConditionsPanel.cpp */; };
+		6F364349997849F605C16D92 /* EffectEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 480D4167A02A39C70C8BF646 /* EffectEditor.cpp */; };
 		6FBC456187922A5E05E51D1B /* OutfitEditor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C7A14327AD92EC7673D20A5E /* OutfitEditor.cpp */; };
 		7A0F4F86A8BD6ADADF4182C0 /* Editor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48C94A54918068EBCF00D639 /* Editor.cpp */; };
 		90CF46CE84794C6186FC6CE2 /* EsUuid.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 950742538F8CECF5D4168FBC /* EsUuid.cpp */; };
@@ -238,6 +239,7 @@
 		3DA345D69ABF34BD53827AC4 /* GovernmentEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GovernmentEditor.h; path = source/GovernmentEditor.h; sourceTree = "<group>"; };
 		3FB94E8FB97514F79F73FA6B /* imgui_impl_sdl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = imgui_impl_sdl.h; path = source/imgui_impl_sdl.h; sourceTree = "<group>"; };
 		43C24ABD85EC1A084413CB2C /* ShipyardEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ShipyardEditor.h; path = source/ShipyardEditor.h; sourceTree = "<group>"; };
+		480D4167A02A39C70C8BF646 /* EffectEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = EffectEditor.cpp; path = source/EffectEditor.cpp; sourceTree = "<group>"; };
 		48C94A54918068EBCF00D639 /* Editor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Editor.cpp; path = source/Editor.cpp; sourceTree = "<group>"; };
 		5155CD711DBB9FF900EF090B /* Depreciation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Depreciation.cpp; path = source/Depreciation.cpp; sourceTree = "<group>"; };
 		5155CD721DBB9FF900EF090B /* Depreciation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depreciation.h; path = source/Depreciation.h; sourceTree = "<group>"; };
@@ -529,6 +531,7 @@
 		B5DDA6922001B7F600DBA76A /* News.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = News.cpp; path = source/News.cpp; sourceTree = "<group>"; };
 		B5DDA6932001B7F600DBA76A /* News.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = News.h; path = source/News.h; sourceTree = "<group>"; };
 		B7F144DDBABD665E2448B406 /* imgui_impl_opengl3.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_impl_opengl3.cpp; path = source/imgui_impl_opengl3.cpp; sourceTree = "<group>"; };
+		B88E4771B6D935635A0606A8 /* EffectEditor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = EffectEditor.h; path = source/EffectEditor.h; sourceTree = "<group>"; };
 		BDA542ADA50279E2F707E8E3 /* imgui_ex.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_ex.cpp; path = source/imgui_ex.cpp; sourceTree = "<group>"; };
 		BF6A488FB58031C23D0DC528 /* imgui_draw.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = imgui_draw.cpp; path = source/imgui_draw.cpp; sourceTree = "<group>"; };
 		C26F447D9AE6A3AA888FE1AA /* ShipyardEditor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ShipyardEditor.cpp; path = source/ShipyardEditor.cpp; sourceTree = "<group>"; };
@@ -901,6 +904,8 @@
 				72A9480498926E2CFEE02872 /* OutfitterEditor.h */,
 				C26F447D9AE6A3AA888FE1AA /* ShipyardEditor.cpp */,
 				43C24ABD85EC1A084413CB2C /* ShipyardEditor.h */,
+				480D4167A02A39C70C8BF646 /* EffectEditor.cpp */,
+				B88E4771B6D935635A0606A8 /* EffectEditor.h */,
 			);
 			name = source;
 			sourceTree = "<group>";
@@ -1267,6 +1272,7 @@
 				A22D42BBA5BE658B3A7B05C8 /* MainEditorPanel.cpp in Sources */,
 				BF4040AA9D23A17D7D057DFF /* OutfitterEditor.cpp in Sources */,
 				BAD444FBAB7E335002466B18 /* ShipyardEditor.cpp in Sources */,
+				6F364349997849F605C16D92 /* EffectEditor.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
