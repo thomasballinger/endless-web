@@ -125,8 +125,14 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 				return c;
 			};
 			for(int i = 0, size = std::min(lhsPairs.size(), rhsPairs.size()); i < size; ++i)
-				if(transform(lhsPairs[i]) == transform(rhsPairs[i]))
+			{
+				const auto &lhs = transform(lhsPairs[i]);
+				const auto &rhs = transform(rhsPairs[i]);
+				if(lhs == rhs)
 					++sameCount;
+				else if(i == size - 1 && lhs.second == '\0' && lhs.first == rhs.first)
+					++sameCount;
+			}
 
 			weights.emplace_back((2. * sameCount) / (lhsPairs.size() + rhsPairs.size()), second->c_str());
 		}
