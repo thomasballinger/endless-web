@@ -584,12 +584,10 @@ void SystemEditor::RenderSystem()
 		SetDirty();
 	if(object->jumpRange < 0.)
 		object->jumpRange = 0.;
-	static Sprite *haze = nullptr;
 	string enterHaze = object->haze ? object->haze->Name() : "";
-	if(ImGui::InputCombo("haze", &enterHaze, &haze, SpriteSet::GetSprites()))
+	if(ImGui::InputCombo("haze", &enterHaze, &object->haze, SpriteSet::GetSprites()))
 	{
-		object->haze = haze;
-		haze = nullptr;
+		enterHaze = object->haze->Name();
 		SetDirty();
 	}
 

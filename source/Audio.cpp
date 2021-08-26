@@ -88,7 +88,7 @@ namespace {
 	thread::id mainThreadID;
 	
 	// Sound resources that have been loaded from files.
-	map<string, Sound> sounds;
+	Set<Sound> sounds;
 	// OpenAL "sources" available for playing sounds. There are a limited number
 	// of these, so they must be reused.
 	vector<Source> sources;
@@ -219,7 +219,7 @@ void Audio::SetVolume(double level)
 const Sound *Audio::Get(const string &name)
 {
 	unique_lock<mutex> lock(audioMutex);
-	return &sounds[name];
+	return sounds.Get(name);
 }
 
 
@@ -227,7 +227,14 @@ const Sound *Audio::Get(const string &name)
 bool Audio::Has(const string &name)
 {
 	unique_lock<mutex> lock(audioMutex);
-	return sounds.find(name) != sounds.end();
+	return sounds.Has(name);
+}
+
+
+
+const Set<Sound> &Audio::GetSounds()
+{
+	return sounds;
 }
 
 
@@ -471,7 +478,7 @@ void Audio::Quit()
 		ALuint id = it.second.Buffer();
 		alDeleteBuffers(1, &id);
 	}
-	sounds.clear();
+	sounds.Revert({});
 	
 	// Clean up the music source and buffers.
 	if(isInitialized)
@@ -588,7 +595,7 @@ namespace {
 
 				// Since we need to unlock the mutex below, create the map entry to
 				// avoid a race condition when accessing sounds' size.
-				sound = &sounds[name];
+				sound = sounds.Get(name);
 			}
 			
 			// Unlock the mutex for the time-intensive part of the loop.

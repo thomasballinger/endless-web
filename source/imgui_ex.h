@@ -134,11 +134,25 @@ IMGUI_API bool ImGui::InputCombo(const char *label, std::string *input, T **elem
 		std::sort(weights.begin(), weights.end(),
 				[](const std::pair<double, const char *> &lhs, const std::pair<double, const char *> &rhs)
 					{ return lhs.first > rhs.first; });
+
 		auto topWeight = weights[0].first;
 		for(const auto &item : weights)
 		{
+			// Allow the user to select an entry in the combo box.
+			// This is a hack to workaround the fact that we change the focus when clicking an
+			// entry and that this means that the filtered list will change (breaking entries).
+			if(GetActiveID() == GetCurrentWindow()->GetID(item.second) || GetFocusID() == GetCurrentWindow()->GetID(item.second))
+			{
+				*element = const_cast<T *>(elements.Get(item.second));
+				changed = true;
+				*input = item.second;
+				CloseCurrentPopup();
+				SetActiveID(0, GetCurrentWindow());
+			}
+
 			if(topWeight && item.first < topWeight * .45)
-				break;
+				continue;
+
 			if(Selectable(item.second) || autocomplete)
 			{
 				*element = const_cast<T *>(elements.Get(item.second));

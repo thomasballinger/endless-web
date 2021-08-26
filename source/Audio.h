@@ -13,6 +13,8 @@ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #ifndef AUDIO_H_
 #define AUDIO_H_
 
+#include "Set.h"
+
 #include <string>
 #include <vector>
 
@@ -45,6 +47,7 @@ public:
 	// Do not call this function until Progress() is 100%.
 	static const Sound *Get(const std::string &name);
 	static bool Has(const std::string &name);
+	static const Set<Sound> &GetSounds();
 	
 	// Set the listener's position, and also update any sounds that have been
 	// added but deferred because they were added from a thread other than the
