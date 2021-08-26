@@ -536,22 +536,6 @@ void SystemEditor::RenderSystem()
 		object->position.Set(pos[0], pos[1]);
 		updatedPos = true;
 	}
-	ImGui::SameLine();
-	auto *mapPanel = dynamic_cast<MapPanel *>(editor.GetUI().Top().get());
-	if(!mapPanel)
-		ImGui::PushDisabled();
-	if(ImGui::Button("set to last click pos"))
-	{
-		object->position = mapPanel->click;
-		updatedPos = true;
-	}
-	if(!mapPanel)
-		ImGui::PopDisabled();
-	if(updatedPos)
-	{
-		mapPanel->UpdateCache();
-		SetDirty();
-	}
 
 	{
 		if(ImGui::BeginCombo("governments", object->government ? object->government->TrueName().c_str() : ""))
