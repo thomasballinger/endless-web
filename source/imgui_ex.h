@@ -40,7 +40,7 @@ namespace ImGui
 	template <typename T>
 	IMGUI_API bool InputCombo(const char *label, std::string *input, const T **element, const Set<T> &elements);
 
-	IMGUI_API bool InputSwizzle(const char *label, int *swizzle);
+	IMGUI_API bool InputSwizzle(const char *label, int *swizzle, bool allowNoSwizzle = false);
 }
 
 

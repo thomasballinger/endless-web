@@ -180,7 +180,13 @@ void ShipEditor::RenderShip()
 	static string buffer;
 	static double value;
 
-	ImGui::Text("model: %s", object->modelName.c_str());
+	if(object->variantName.empty())
+		ImGui::Text("model: %s", object->modelName.c_str());
+	else
+	{
+		ImGui::Text("model: %s", object->base->ModelName().c_str());
+		ImGui::Text("variant: %s", object->variantName.c_str());
+	}
 	if(ImGui::InputText("plural", &object->pluralModelName))
 		SetDirty();
 	if(ImGui::InputText("noun", &object->noun))
@@ -203,7 +209,7 @@ void ShipEditor::RenderShip()
 		object->isCapturable = !uncapturable;
 		SetDirty();
 	}
-	if(ImGui::InputInt("swizzle", &object->customSwizzle))
+	if(ImGui::InputSwizzle("swizzle", &object->customSwizzle, true))
 		SetDirty();
 
 	if(ImGui::TreeNode("attributes"))
@@ -339,14 +345,12 @@ void ShipEditor::RenderShip()
 		ImGui::Spacing();
 		static string addOutfit;
 		static Outfit *outfit = nullptr;
-		ImGui::InputCombo("add outfit", &addOutfit, &outfit, GameData::Outfits());
-		int ivalue = 0;
-		if(ImGui::InputInt("add amount", &ivalue, 1, 1, ImGuiInputTextFlags_EnterReturnsTrue))
+		if(ImGui::InputCombo("add outfit", &addOutfit, &outfit, GameData::Outfits()))
 		{
-			object->AddOutfit(outfit, ivalue);
+			object->AddOutfit(outfit, 1);
 			addOutfit.clear();
+			outfit = nullptr;
 			SetDirty();
-			addOutfit.clear();
 		}
 		ImGui::TreePop();
 	}
@@ -576,13 +580,14 @@ void ShipEditor::RenderShip()
 					it->point.Set(.5 * pos[0], .5 * pos[1]);
 					SetDirty();
 				}
+				static Outfit *outfit;
 				string outfitName = it->GetOutfit() ? it->GetOutfit()->Name() : "";
-				if(ImGui::InputText("outfit", &outfitName, ImGuiInputTextFlags_EnterReturnsTrue))
-					if(GameData::Outfits().Has(outfitName))
-					{
-						it->outfit = GameData::Outfits().Get(outfitName);
-						SetDirty();
-					}
+				if(ImGui::InputCombo("outfit", &outfitName, &outfit, GameData::Outfits()))
+				{
+					it->outfit = outfit;
+					outfit = nullptr;
+					SetDirty();
+				}
 				if(!it->IsTurret() && ImGui::InputDoubleEx("angle", &hardpointAngle))
 					SetDirty();
 				if(!it->IsTurret() && ImGui::Checkbox("parallel", &it->isParallel))
@@ -694,10 +699,11 @@ void ShipEditor::RenderShip()
 						}
 						if(effectItselfOpen)
 						{
-							if(ImGui::InputText("effect", &effectName, ImGuiInputTextFlags_EnterReturnsTrue))
-								if(GameData::Effects().Has(effectName))
+							static Effect *effect;
+							if(ImGui::InputCombo("effect", &effectName, &effect, GameData::Effects()))
+								if(!effectName.empty())
 								{
-									toAdd = GameData::Effects().Get(effectName);
+									toAdd = effect;
 									toRemove = jt;
 									SetDirty();
 								}
@@ -752,10 +758,11 @@ void ShipEditor::RenderShip()
 			}
 			if(open)
 			{
-				if(ImGui::InputText("leak##input", &effectName, ImGuiInputTextFlags_EnterReturnsTrue))
-					if(GameData::Effects().Has(effectName))
+				static Effect *effect;
+				if(ImGui::InputCombo("leak##input", &effectName, &effect, GameData::Effects()))
+					if(!effectName.empty())
 					{
-						it->effect = GameData::Effects().Get(effectName);
+						it->effect = effect;
 						SetDirty();
 					}
 				if(ImGui::InputInt("open period", &it->openPeriod))
@@ -782,7 +789,10 @@ void ShipEditor::RenderShip()
 
 void ShipEditor::WriteToFile(DataWriter &writer, const Ship *ship)
 {
-	writer.Write("ship", ship->modelName);
+	if(ship->variantName.empty())
+		writer.Write("ship", ship->modelName);
+	else
+		writer.Write("ship", ship->base->ModelName(), ship->variantName);
 	writer.BeginChild();
 	if(ship->pluralModelName != ship->modelName + 's')
 		writer.Write("plural", ship->pluralModelName);

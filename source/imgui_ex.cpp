@@ -57,7 +57,7 @@ namespace ImGui
 
 
 
-	IMGUI_API bool InputSwizzle(const char *label, int *swizzle)
+	IMGUI_API bool InputSwizzle(const char *label, int *swizzle, bool allowNoSwizzle)
 	{
 		constexpr int count = 29;
 		constexpr const char *swizzles[count] =
@@ -93,12 +93,12 @@ namespace ImGui
 			"28 - black only (outline)",
 		};
 		bool changed = false;
-		if(BeginCombo(label, swizzles[*swizzle]))
+		if(BeginCombo(label, *swizzle == -1 ? "-1 - none" : swizzles[*swizzle]))
 		{
-			for(int i = 0; i < count; ++i)
+			for(int i = allowNoSwizzle ? -1 : 0; i < count; ++i)
 			{
 				const bool selected = i == *swizzle;
-				if(Selectable(swizzles[i], selected))
+				if(Selectable(i == -1 ? "-1 - none" : swizzles[i], selected))
 				{
 					*swizzle = i;
 					changed = true;
