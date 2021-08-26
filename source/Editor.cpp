@@ -52,7 +52,8 @@ using namespace std;
 
 
 Editor::Editor(PlayerInfo &player, UI &menu, UI &ui) noexcept
-	: player(player), menu(menu), ui(ui), fleetEditor(*this, showFleetMenu), hazardEditor(*this, showHazardMenu),
+	: player(player), menu(menu), ui(ui),
+	effectEditor(*this, showEffectMenu), fleetEditor(*this, showFleetMenu), hazardEditor(*this, showHazardMenu),
 	governmentEditor(*this, showGovernmentMenu), outfitEditor(*this, showOutfitMenu), outfitterEditor(*this, showOutfitterMenu),
 	planetEditor(*this, showPlanetMenu), shipEditor(*this, showShipMenu), shipyardEditor(*this, showShipyardMenu),
 	systemEditor(*this, showSystemMenu)
@@ -76,6 +77,7 @@ void Editor::SaveAll()
 		return;
 
 	// Commit to any unsaved changes.
+	effectEditor.WriteAll();
 	fleetEditor.WriteAll();
 	hazardEditor.WriteAll();
 	governmentEditor.WriteAll();
@@ -95,6 +97,7 @@ void Editor::WriteAll()
 	if(!HasPlugin())
 		return;
 
+	const auto &effects = effectEditor.Changes();
 	const auto &fleets = fleetEditor.Changes();
 	const auto &hazards = hazardEditor.Changes();
 	const auto &governments = governmentEditor.Changes();
@@ -106,6 +109,7 @@ void Editor::WriteAll()
 	const auto &systems = systemEditor.Changes();
 
 	// Which object we have saved to file.
+	set<string> effectsSaved;
 	set<string> fleetsSaved;
 	set<string> hazardsSaved;
 	set<string> governmentsSaved;
@@ -124,7 +128,7 @@ void Editor::WriteAll()
 		if(fileName == "map.txt" || fileName == "ships.txt" || fileName == "outfits.txt"
 				|| fileName == "hazards.txt" || fileName == "governments.txt"
 				|| fileName == "fleets.txt" || fileName == "outfitters.txt"
-				|| fileName == "shipyards.txt")
+				|| fileName == "shipyards.txt" || fileName == "effects.txt")
 			continue;
 
 		DataWriter writer(file.first);
@@ -240,6 +244,18 @@ void Editor::WriteAll()
 					continue;
 				}
 			}
+			else if(objects[0] == '9')
+			{
+				auto it = find_if(effects.begin(), effects.end(),
+						[&toSearch](const Effect &e) { return e.Name() == toSearch; });
+				if(it != effects.end())
+				{
+					effectEditor.WriteToFile(writer, &*it);
+					writer.Write();
+					effectsSaved.insert(it->Name());
+					continue;
+				}
+			}
 			else
 				assert(!"Invalid object type to write to file! Please report this.");
 		}
@@ -340,6 +356,16 @@ void Editor::WriteAll()
 				shipyardsTxt.Write();
 			}
 	}
+	if(effectsSaved.size() < effects.size())
+	{
+		DataWriter effectsTxt(currentPlugin + "data/effects.txt");
+		for(auto &&effect : effects)
+			if(!effectsSaved.count(effect.Name()))
+			{
+				effectEditor.WriteToFile(effectsTxt, &effect);
+				effectsTxt.Write();
+			}
+	}
 }
 
 
@@ -355,6 +381,8 @@ bool Editor::HasUnsavedChanges() const
 {
 	return
 		!hazardEditor.Dirty().empty()
+		|| !effectEditor.Dirty().empty()
+		|| !fleetEditor.Dirty().empty()
 		|| !fleetEditor.Dirty().empty()
 		|| !governmentEditor.Dirty().empty()
 		|| !outfitEditor.Dirty().empty()
@@ -397,6 +425,8 @@ UI &Editor::GetMenu()
 
 void Editor::RenderMain()
 {
+	if(showEffectMenu)
+		effectEditor.Render();
 	if(showFleetMenu)
 		fleetEditor.Render();
 	if(showHazardMenu)
@@ -437,6 +467,7 @@ void Editor::RenderMain()
 		}
 		if(ImGui::BeginMenu("Editors"))
 		{
+			ImGui::MenuItem("Effect Editor", nullptr, &showEffectMenu);
 			ImGui::MenuItem("Fleet Editor", nullptr, &showFleetMenu);
 			ImGui::MenuItem("Hazard Editor", nullptr, &showHazardMenu);
 			ImGui::MenuItem("Government Editor", nullptr, &showGovernmentMenu);
@@ -464,6 +495,7 @@ void Editor::RenderMain()
 			ImGui::EndMenu();
 		}
 
+		const auto &dirtyEffects = effectEditor.Dirty();
 		const auto &dirtyFleets = fleetEditor.Dirty();
 		const auto &dirtyHazards = hazardEditor.Dirty();
 		const auto &dirtyGovernments = governmentEditor.Dirty();
@@ -479,6 +511,13 @@ void Editor::RenderMain()
 			ImGui::PushStyleColor(ImGuiCol_PopupBg, static_cast<ImVec4>(ImColor(255, 91, 71)));
 		if(ImGui::BeginMenu("Unsaved Changes", hasChanges))
 		{
+			if(!dirtyEffects.empty() && ImGui::BeginMenu("Effects"))
+			{
+				for(auto &&e : dirtyEffects)
+					ImGui::MenuItem(e->Name().c_str(), nullptr, false, false);
+				ImGui::EndMenu();
+			}
+
 			if(!dirtyFleets.empty() && ImGui::BeginMenu("Fleets"))
 			{
 				for(auto &&f : dirtyFleets)
@@ -802,6 +841,11 @@ void Editor::OpenPlugin(const string &plugin)
 			{
 				num = '8';
 				shipyardEditor.WriteToPlugin(GameData::Shipyards().Get(value));
+			}
+			else if(key == "effect")
+			{
+				num = '9';
+				effectEditor.WriteToPlugin(GameData::Effects().Get(value));
 			}
 			else
 			{

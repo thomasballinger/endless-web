@@ -152,6 +152,7 @@ namespace {
 
 
 
+Set<Effect> GameData::defaultEffects;
 Set<Fleet> GameData::defaultFleets;
 Set<Hazard> GameData::defaultHazards;
 Set<Government> GameData::defaultGovernments;
@@ -248,6 +249,7 @@ bool GameData::BeginLoad(const char * const *argv)
 	);
 	
 	// Store the current state, to revert back to later.
+	defaultEffects = effects;
 	defaultFleets = fleets;
 	defaultGovernments = governments;
 	defaultHazards = hazards;

@@ -161,6 +161,7 @@ private:
 	static void PrintTestsTable();
 	static void PrintWeaponTable();
 
+	static Set<Effect> defaultEffects;
 	static Set<Fleet> defaultFleets;
 	static Set<Hazard> defaultHazards;
 	static Set<Government> defaultGovernments;
@@ -174,6 +175,7 @@ private:
 	static SpriteQueue spriteQueue;
 
 	friend class Editor;
+	friend class EffectEditor;
 	friend class FleetEditor;
 	friend class HazardEditor;
 	friend class GovernmentEditor;
