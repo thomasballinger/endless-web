@@ -739,7 +739,10 @@ void SystemEditor::RenderObject(StellarObject &object, int index, int &nested, b
 			planetName = object.planet->TrueName();
 		if(ImGui::InputCombo("planet", &planetName, &planet, GameData::Planets()))
 		{
+			if(object.planet)
+				const_cast<Planet *>(object.planet)->RemoveSystem(object.planet->GetSystem());
 			object.planet = planet;
+			planet->SetSystem(this->object);
 			planet = nullptr;
 			SetDirty();
 		}
