@@ -1,6 +1,5 @@
 EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
 
-dataversion.js: endless-sky.js
 clean:
 	rm -f endless-sky.js
 	#rm -f endless-sky.worker.js
