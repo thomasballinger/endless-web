@@ -48,7 +48,6 @@ CFLAGS = $(COMMON_FLAGS)\
 	-DES_GLES\
 	-DES_NO_THREADS\
 	-gsource-map\
-	-fno-rtti\
 	-I libjpeg-turbo-2.1.0\
 
 
