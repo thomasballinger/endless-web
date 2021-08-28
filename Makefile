@@ -54,6 +54,7 @@ CFLAGS = $(COMMON_FLAGS)\
 
 # Note that that libmad is not linked! It's mocked out until it works with Emscripten
 LINK_FLAGS = $(COMMON_FLAGS)\
+	-s LLD_REPORT_UNDEFINED\
 	-L libjpeg-turbo-2.1.0\
 	-l jpeg\
 	-lidbfs.js\
