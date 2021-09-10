@@ -65,7 +65,7 @@
           padding: 0 1em;
           width: 80%;
       }
-      .loading {
+      .loading, .error {
         position: absolute;
         top: 0;
         left: 0;
@@ -77,6 +77,13 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
+      }
+      .error {
+        z-index: -2;
+        color: red;
+      }
+      .error * {
+        margin: 10px;
       }
       .title {
         color: white;
@@ -125,8 +132,13 @@
     </style>
   </head>
   <body>
+    <div class="error">
+      <button>Hide error</button>
+      Please report this error on <a href="https://github.com/thomasballinger/endless-web">GitHub</a> or the #third-party-chat room of <a href="https://discord.gg/ZeuASSx">the Endless Sky Discord</a>.
+      <div></div>
+    </div>
     <div class="loading">
-      <div class="title">E&middot;n&middot;d&middot;l&middot;e&middot;s&middot;s W&middot;e&middot;b</div>
+      <div class="title">E&middot;n&middot;d&middot;l&middot;e&middot;s&middot;s &nbsp;&nbsp;W&middot;e&middot;b</div>
       <div class="progress-bar-section">
         <p class="progress-text">Downloading data...</p>
         <div class="progress-bar">
@@ -140,7 +152,7 @@
     <div class="debug">
       <h1>Debug panel</h1>
       <p> press backslash to hide </p>
-      <button onclick="document.querySelector('.file-selector').click();" />Upload save game files</button>
+      <button onclick="document.querySelector('.file-selector').click();" />upload saved game</button>
       <button class="show-save-games">Show save game files for download</button>
       <div class="save-games"></div>
       <input type="file" style="display: none;" class="file-selector" multiple="multiple">
@@ -149,9 +161,12 @@
     </div>
 
     <div class="ugly-header">
-      <button onclick="document.querySelector('.file-selector').click();">Upload save game files</button>
-      <button class="toggle-debug">press \ for debug panel</button>
-      <button class="dismiss-upload">dismiss these buttons</button>
+      <button class="dismiss-upload">hide top bar</button>
+      <button onclick="document.querySelector('.file-selector').click();">upload saved game</button>
+      <button class="toggle-debug">download saved games</button>
+      <a href="https://github.com/thomasballinger/endless-web" target="_blank">Endless Web on GitHub</a>
+      <a href="https://github.com/endless-sky/endless-sky" target="_blank">Endless Sky on GitHub</a>
+      <a href="https://github.com/thomasballinger/endless-web/issues" target="_blank">report bug</a>
     </div>
 
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
@@ -284,9 +299,13 @@
       function supported() {
         const gl = document.createElement('canvas').getContext('webgl2');
         if (!gl) {
-          return 'your browser does not support WebGL2.'
+          return 'your browser does not support WebGL2.';
+        } else if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === false) {
+          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy';
+        } else if (typeof Atomics === 'undefined') {
+          return "your browser does not support Atomics, required for the threaded version of Endless Web. There should be a version without it, I'll work on it.";
         } else {
-          return true
+          return true;
         }
       }
 
@@ -297,6 +316,23 @@
         tag.src = "endless-sky.js";
         document.body.appendChild(tag);
       }
+
+      function hideError() {
+        document.querySelector('.error').style.zIndex = -2;
+      }
+      function showError(err) {
+        document.querySelector('.error div').innerText = `${err.message}\n\n${err.stack}`;
+        document.querySelector('.error').style.zIndex = 2;
+      }
+      function onRejectedPromise(errEvent) {
+        showError(errEvent.reason);
+      }
+      function onError(errEvent) {
+        showError(errEvent.error);
+      }
+      window.addEventListener('error', onError);
+      window.addEventListener("unhandledrejection", onRejectedPromise);
+      document.querySelector('.error button').addEventListener('click', hideError);
 
       async function main() {
         const why = supported();
