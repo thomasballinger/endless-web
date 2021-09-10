@@ -107,3 +107,27 @@ For the Code::Blocks project, the archive program can be configured in Code::Blo
 The Scons builds can be controlled by setting the appropriate environment variable(s), either directly in the environment or just for the lifetime of the command:
 
   $ AR=gcc-ar scons
+
+
+
+Building for the web:
+
+Mac and Linux (Windows not supported):
+
+Install scons with apt, yum, brew, etc. Unlike the setup instructions for the normal build on Mac above, you will need scons on Mac.
+
+  $ apt install scons  # just run one of these commands, this one is for Debian
+  $ yum install scons  # RPM-based
+  $ brew install scons  # mac
+
+Next, install emscripten. The last time I checked, this looked like:
+
+  $ git clone https://github.com/emscripten-core/emsdk.git
+  $ cd emsdk
+  $ ./emsdk install 2.0.16
+  $ ./emsdk activate 2.0.16
+  $ source ./emsdk_env.sh  # you'll need to run this one each time you open a new terminal
+
+Now back in the endless-sky repo directory again, run
+
+  $ make dev
