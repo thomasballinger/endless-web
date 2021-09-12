@@ -1,5 +1,6 @@
 EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
 
+all: dev
 clean:
 	rm -f endless-sky.js
 	#rm -f endless-sky.worker.js
@@ -9,12 +10,13 @@ clean:
 	rm -rf output
 	rm -f endless-sky.wasm.map
 	rm -f lib/emcc/libendless-sky.a
-clean-full: clean
 	rm -f favicon.ico
 	rm -f Ubuntu-Regular.ttf
 	rm -f title.png
 	rm -rf build/emcc
+distclean: clean
 	rm -rf lib/emcc
+	rm -rf libjpeg-turbo-2.1.0
 2.1.0.tar.gz:
 	wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz
 libjpeg-turbo-2.1.0: 2.1.0.tar.gz
@@ -25,7 +27,7 @@ ifndef EMSCRIPTEN_ENV
 	$(error "emmake is not available, activate the emscripten env first")
 endif
 	cd libjpeg-turbo-2.1.0; emcmake cmake -G"Unix Makefiles" -DWITH_SIMD=0 -DCMAKE_BUILD_TYPE=Release -Wno-dev
-	cd libjpeg-turbo-2.1.0; emmake make
+	cd libjpeg-turbo-2.1.0; emmake $(MAKE)
 dev: endless-sky.js dataversion.js Ubuntu-Regular.ttf title.png
 	emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing endless-sky.html
 title.png:
@@ -87,7 +89,7 @@ TEMP := $(subst source/,build/emcc/,$(CPPS_EXCEPT_MAIN))
 OBJS_EXCEPT_MAIN := $(subst .cpp,.o,$(TEMP))
 HEADERS := $(shell ls source/*.h*) $(shell ls source/text/*.h*)
 
-build/emcc/%.o: source/%.cpp
+build/emcc/%.o: source/%.cpp $(HEADERS) libjpeg-turbo-2.1.0/libturbojpeg.a
 	@mkdir -p build/emcc
 	@mkdir -p build/emcc/text
 	em++ $(CFLAGS) -c $< -o $@
