@@ -38,6 +38,8 @@
       <p style="flex: 2;" class="plugin-author"></p>
       `;
 
+        let toDelete = null;
+
         // add dynamic values using DOM apis to prevent XSS injection
         row.querySelector("input").value = url;
         row.querySelector(".plugin-title").textContent = name;
@@ -47,7 +49,6 @@
 
         const proxy = "https://temp-cors-proxy.herokuapp.com/";
         const githubZip = `${proxy}${url}`;
-        //const pluginPath = url.split("/").reverse()[0] + "-master";
         container.appendChild(row);
 
         row
@@ -64,6 +65,7 @@
               });
               const jszip = await JSZip.loadAsync(data);
               for (const name of Object.keys(jszip.files)) {
+                if (!toDelete) toDelete = name;
                 const zipObj = jszip.files[name];
                 if (zipObj.dir) {
                   const path = ("/plugins/" + name).slice(0, -1); // remove trailing slash
@@ -78,7 +80,8 @@
               }
               this.disabled = false;
             } else {
-              const path = `/plugins/${pluginPath}`;
+              const path = `/plugins/${toDelete}`;
+              console.log(path);
               rmdashr(path);
             }
           });
