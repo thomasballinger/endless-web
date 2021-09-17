@@ -1,0 +1,33 @@
+name: browser
+
+on:
+  push:
+  pull_request:
+    types:
+      - synchronize
+      - opened
+
+env:
+  EM_VERSION: 2.0.29
+  EM_CACHE_FOLDER: 'emsdk-cache'
+
+jobs:
+  test:
+    environment: aws-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup cache
+        id: cache-system-libraries
+        uses: actions/cache@v2
+        with:
+          path: ${{env.EM_CACHE_FOLDER}}
+          key: ${{env.EM_VERSION}}-${{ runner.os }}
+      - uses: mymindstorm/setup-emsdk@v9
+        with:
+          version: ${{env.EM_VERSION}}
+          actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
+      - name: Build
+        run: make output/index.html 
+      - name: Deploy
+        run: make deploy
