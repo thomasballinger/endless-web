@@ -8,26 +8,59 @@ on:
       - opened
 
 env:
-  EM_VERSION: 2.0.29
+  EM_VERSION: 2.0.28
   EM_CACHE_FOLDER: 'emsdk-cache'
 
 jobs:
-  test:
+  build:
     environment: aws-deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Setup cache
-        id: cache-system-libraries
+
+      - name: Cache emscripten
+        id: cache-emscripten
         uses: actions/cache@v2
+        env:
+          cache-name: cache-emscripten
         with:
-          path: ${{env.EM_CACHE_FOLDER}}
-          key: ${{env.EM_VERSION}}-${{ runner.os }}
-      - uses: mymindstorm/setup-emsdk@v9
+          path: emsdk
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
+
+      - name: install emsdk
+        if: steps.cache-emscripten.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          ./emsdk/emsdk install ${{ env.EM_VERSION }}
+          ./emsdk/emsdk activate ${{ env.EM_VERSION }}
+
+      - name: Cache libjpegturbo
+        id: cache-libjpegturbo
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-libjpegturbo
         with:
-          version: ${{env.EM_VERSION}}
-          actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
+          path: libjpeg-turbo-2.1.0/
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
+
+      - name: Cache build directory
+        id: cache-build
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-build
+        with:
+          path: build
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
       - name: Build
-        run: make output/index.html 
+        run: source emsdk/emsdk_env.sh; make output/index.html 
       - name: Deploy
-        run: make deploy
+        if: ${{ github.ref == 'refs/heads/endless-web' && github.event_name == 'push' }}
+        run: source emsdk/emsdk_env.sh; make deploy
