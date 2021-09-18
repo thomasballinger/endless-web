@@ -40,7 +40,9 @@ jobs:
         env:
           cache-name: cache-libjpegturbo
         with:
-          path: libjpeg-turbo-2.1.0/
+          path: |
+            libjpeg-turbo-2.1.0/
+            2.1.0.tar.gz
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
 
       - name: Cache build directory
