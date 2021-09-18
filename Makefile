@@ -1,4 +1,5 @@
 EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
+CXX := $(shell command -v ccache 2> /dev/null > /dev/null && echo ccache em++ || echo em++)
 
 all: dev
 clean:
@@ -18,9 +19,9 @@ distclean: clean
 	rm -rf lib/emcc
 	rm -rf libjpeg-turbo-2.1.0
 2.1.0.tar.gz:
-	wget https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz
+	wget -nv https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz
 libjpeg-turbo-2.1.0: 2.1.0.tar.gz
-	tar xzvf 2.1.0.tar.gz
+	tar xzf 2.1.0.tar.gz
 # | means libjpeg-turbo-2.1.0 is a "order-only prerequisite" so creating the file doesn't invalidate the dir
 libjpeg-turbo-2.1.0/libturbojpeg.a: | libjpeg-turbo-2.1.0
 ifndef EMSCRIPTEN_ENV
@@ -35,7 +36,7 @@ title.png:
 Ubuntu-Regular.ttf:
 	curl -Ls 'https://github.com/google/fonts/blob/main/ufl/ubuntu/Ubuntu-Regular.ttf?raw=true' > Ubuntu-Regular.ttf
 favicon.ico:
-	wget https://endless-sky.github.io/favicon.ico
+	wget -nv https://endless-sky.github.io/favicon.ico
 
 # not using -flto because of a change introduced in emscripten in 2.0.27 that I don't understand
 COMMON_FLAGS = -O3\
@@ -92,7 +93,7 @@ HEADERS := $(shell ls source/*.h*) $(shell ls source/text/*.h*)
 build/emcc/%.o: source/%.cpp $(HEADERS) libjpeg-turbo-2.1.0/libturbojpeg.a
 	@mkdir -p build/emcc
 	@mkdir -p build/emcc/text
-	em++ $(CFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@
 
 lib/emcc/libendless-sky.a: $(OBJS_EXCEPT_MAIN)
 	@mkdir -p lib/emcc
