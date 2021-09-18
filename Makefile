@@ -1,5 +1,5 @@
 EMSCRIPTEN_ENV := $(shell command -v emmake 2> /dev/null)
-CXX := $(shell command -v cdcache 2> /dev/null && echo ccache em++ || echo em++)
+CXX := $(shell command -v ccache 2> /dev/null && echo ccache em++ || echo em++)
 
 all: dev
 clean:
