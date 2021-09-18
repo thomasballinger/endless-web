@@ -18,6 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ env.EM_VERSION }}
+
       - name: Cache emscripten
         id: cache-emscripten
         uses: actions/cache@v2
@@ -40,7 +45,9 @@ jobs:
         env:
           cache-name: cache-libjpegturbo
         with:
-          path: libjpeg-turbo-2.1.0/
+          path: |
+            libjpeg-turbo-2.1.0/
+            2.1.0.tar.gz
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
 
       - name: Cache build directory
