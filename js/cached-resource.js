@@ -47,20 +47,32 @@
 
   // Caches a single version of a resource
   class CachedResource {
-    constructor(resourceUrl) {
+    constructor(resourceUrl, keySuffix) {
+      if (keySuffix === undefined) keySuffix = "";
       this.resourceUrl = resourceUrl;
+      this.cacheKey = resourceUrl + keySuffix;
     }
     async get(length, version, progressCallback = () => {}) {
-      const cachedData = await kvstore.get(this.resourceUrl);
-      const cachedVersion = await kvstore.get(this.resourceUrl + "-version");
+      const cachedData = await kvstore.get(this.cacheKey);
+      const cachedVersion = await kvstore.get(this.cacheKey + "-version");
       if (cachedData) {
         if (version === cachedVersion) {
-          console.log("Using cached resource", this.resourceUrl);
+          console.log(
+            "Using cached resource",
+            this.cacheKey,
+            "originally downloaded from",
+            this.resourceUrl
+          );
           progressCallback(cachedData.byteLength, cachedData.byteLength, true);
           console.log("cached data:", cachedData);
           return cachedData;
         }
-        console.log("Out of date resource, redownloading", this.resourceUrl);
+        console.log(
+          "Out of date resource",
+          this.cacheKey,
+          "so redownloading",
+          this.resourceUrl
+        );
         console.log(
           "required version",
           version,
@@ -100,8 +112,8 @@
 
       console.log("downloaded", this.resourceUrl, data);
       try {
-        await kvstore.set(this.resourceUrl, data);
-        await kvstore.set(this.resourceUrl + "-version", version);
+        await kvstore.set(this.cacheKey, data);
+        await kvstore.set(this.cacheKey + "-version", version);
       } catch (e) {
         console.log(
           "Failure writing to IndexedDB, maybe private browsing / incognito mode or low on disk space"
