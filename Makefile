@@ -107,7 +107,7 @@ endif
 
 dataversion.js: endless-sky.js
 	./hash-data.py endless-sky.data dataversion.js
-output/index.html: endless-sky.js endless-sky.html favicon.ico endless-sky.data Ubuntu-Regular.ttf dataversion.js js/cached-resource.js js/plugins.js js/save-games.js
+output/index.html: endless-sky.js endless-sky.html favicon.ico Ubuntu-Regular.ttf dataversion.js js/cached-resource.js js/plugins.js js/save-games.js
 	rm -rf output
 	mkdir -p output
 	cp endless-sky.html output/index.html
