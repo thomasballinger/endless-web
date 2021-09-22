@@ -110,23 +110,23 @@ dataversion.js: endless-sky.js
 output/index.html: endless-sky.js endless-sky.html favicon.ico Ubuntu-Regular.ttf dataversion.js js/cached-resource.js js/plugins.js js/save-games.js
 	rm -rf output
 	mkdir -p output
-	cp endless-sky.html output/index.html
-	cp endless-sky.wasm endless-sky.data endless-sky.js output/
-	cp -r js/ output/js
-	cp dataversion.js output/
-	cp loading.mp3 output/
+	cp endless-sky.html to-be-modified-endless-sky.html
+	cp endless-sky.js to-be-modified-endless-sky.js
+	./copy-to-hashed-location.py endless-sky.wasm endless-sky.data endless-sky.js output/
+	mkdir output/js
+	./copy-to-hashed-location.py js/* output/
+	./copy-to-hashed-location.py dataversion.js output/
+	./copy-to-hashed-location.py loading.mp3 output/
+	./copy-to-hashed-location.py Ubuntu-Regular.ttf output/
 	cp favicon.ico output/
-	cp Ubuntu-Regular.ttf output/
+	mv to-be-modified-endless-sky.js output/endless-sky-*.js
+	mv to-be-modified-endless-sky.html output/index.html
+test: output/index.html
+	cd output; emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing index.html
 deploy: output/index.html
-	@if curl -s https://play-endless-sky.com/dataversion.js | diff - dataversion.js; \
-		then \
-			echo 'uploading all files except endless-sky.data...'; \
-			aws s3 sync --exclude endless-sky.data output s3://play-endless-sky.com/live;\
-		else \
-			echo 'uploading all files, including endless-sky.data...'; \
-			aws s3 sync output s3://play-endless-sky.com/live;\
-	fi
+	aws s3 sync --size-only --exclude index.html output s3://play-endless-sky.com/live --cache-control 'public, max-age=604800, immutable'
+	aws s3 sync --exclude '*' --include index.html output s3://play-endless-sky.com/live --cache-control 'max-age=0'
 	# play-endless-sky.com
-	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths /\*
+	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths / /index.html
 	# play-endless-web.com
-	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths /\*
+	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths / /index.html
