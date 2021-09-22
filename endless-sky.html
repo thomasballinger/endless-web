@@ -159,8 +159,10 @@
           <div class="progress"></div>
         </div>
       </div>
-      <button class="load-button" disabled>Play Endless Sky</button>
-      <h2 class="plugins-header" style="display: none;">Plugins</h2>
+      <button class="load-button" disabled hidden>Play</button>
+      <h2 class="plugin-editor-header" style="display: none;">Upload Plugins</h2>
+      <div class="plugin-editor-upload"></div>
+      <h2 class="external-plugins-header" style="display: none;">Published Plugins</h2>
       <div class="plugins-list">Plugins</div>
     </div>
     <div class="debug">
@@ -169,6 +171,8 @@
       <button onclick="document.querySelector('.file-selector').click();" />upload saved game</button>
       <button class="show-save-games">Show save game files for download</button>
       <div class="save-games"></div>
+      <button class="show-plugins-to-download">Show plugins for download</button>
+      <div class="plugins-to-download"></div>
       <input type="file" style="display: none;" class="file-selector" multiple="multiple">
       <div class="status">Status goes here</div>
       <textarea id="output" rows="8">stdout output goes here</textarea>
@@ -263,6 +267,9 @@
       const saveGamesList = document.querySelector('.save-games');
       const showSaveGamesButton = document.querySelector('.show-save-games');
       showSaveGamesButton.addEventListener('click', () => showSaveGames(saveGamesList));
+      const pluginsToDownloadList = document.querySelector('.plugins-to-download');
+      const pluginsToDownloadButton = document.querySelector('.show-plugins-to-download');
+      pluginsToDownloadButton.addEventListener('click', () => showPluginsForDownload(pluginsToDownloadList));
 
       const progressBar = document.querySelector('.progressBar');
       const progress = document.querySelector('.progress');
@@ -275,9 +282,9 @@
         if (numerator === denominator) {
           progress.style.transition = 'none';
           if (usingCache) {
-            progressText.textContent = "Using cached data. Loading..."
+            progressText.textContent = "Using cached data."
           } else {
-            progressText.textContent = "Downloading complete. Loading..."
+            progressText.textContent = "Downloading complete."
           }
         }
       }
@@ -389,17 +396,20 @@
         }
         await idbReady();
 
-        const showPluginManager = (new URL(location)).searchParams.has('plugins');
+        const showRemotePlugins = (new URL(location)).searchParams.has('plugins');
 
         let loadButtonResolve
         const loadButtonPromise = new Promise((r) => loadButtonResolve = r);
         const loadButton = document.querySelector('.load-button');
 
-        if (showPluginManager) {
+        const pluginEditor = (new URL(location)).searchParams.has('plugins');
+        if (showRemotePlugins || pluginEditor) {
+          loadButton.hidden = false;
           loadButton.disabled = false;
           loadButton.addEventListener("click", loadButtonResolve);
         } else {
-          loadButton.style.display = 'none';
+          // just load immediately
+          loadButtonResolve();
         }
 
         // If no dataversion available, force download with date string
@@ -417,16 +427,43 @@
         await addMainScriptTag(data);
         await runtimeInitializedPromise;
 
-        if (showPluginManager) {
-          document.querySelector('.plugins-header').style.display = '';
-          const plugins = await (await fetch("https://raw.githubusercontent.com/EndlessSkyCommunity/endless-sky-plugins/master/generated/plugins.json")).json()
-          showPlugins(document.querySelector('.plugins-list'), plugins);
-          FS.mkdir('plugins');
+        FS.mkdir('plugins');
+        FS.mkdir('saves');
+        if (showRemotePlugins) {
+          let remotePlugins;
+          // catch mostly for offline dev
+          try {
+            remotePlugins = await (await fetch("https://raw.githubusercontent.com/EndlessSkyCommunity/endless-sky-plugins/master/generated/plugins.json")).json();
+          } catch (e) {
+            window.foo = e;
+            if (e instanceof TypeError && e.message === 'Failed to fetch') {
+              console.log("maybe the GitHub plugins link is broken, but more likely you're offline");
+              // TODO check connection status?
+            } else throw e;
+          }
 
-          await loadButtonPromise
+          if (remotePlugins) {
+            document.querySelector('.external-plugins-header').style.display = '';
+            showPlugins(document.querySelector('.plugins-list'), remotePlugins);
+          }
         }
+        if (pluginEditor) {
+            document.querySelector('.plugin-editor-header').style.display = '';
+            showPluginUpload(document.querySelector('.plugin-editor-upload'));
+        }
+        await loadButtonPromise;
+        loadButton.style.display = 'none';
         loadButton.disabled = true;
         document.querySelector('.loading').style.zIndex = -1;
+
+        progressText.textContent = progressText.textContent + " Loading...";
+
+        // yield to event loop so that button disappears immediately
+        await new Promise(r => setTimeout(r, 1));
+
+        // important to hide to avoid stealing focus
+        document.querySelector('.plugin-editor-upload').style.display = 'none';
+
         Module.callMain([]);
       }
 

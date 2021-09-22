@@ -17,7 +17,7 @@
     container.innerHTML = "";
     container.style.display = "flex";
     container.style.flexDirection = "column";
-    container.style.height = "40%";
+    container.style.height = "30%";
     container.style.backgroundColor = "grey";
     container.style.overflow = "scroll";
     plugins.forEach(
@@ -81,7 +81,6 @@
               this.disabled = false;
             } else {
               const path = `/plugins/${toDelete}`;
-              console.log(path);
               rmdashr(path);
             }
           });
@@ -89,5 +88,217 @@
     );
   }
 
+  async function getAllFileEntries(dataTransferItemList) {
+    let fileEntries = [];
+    let queue = [];
+    for (let i = 0; i < dataTransferItemList.length; i++) {
+      queue.push(dataTransferItemList[i].webkitGetAsEntry());
+    }
+    while (queue.length > 0) {
+      let entry = queue.shift();
+      if (entry.isFile) {
+        fileEntries.push(entry);
+      } else if (entry.isDirectory) {
+        queue.push(...(await readAllDirectoryEntries(entry.createReader())));
+      }
+    }
+    return fileEntries;
+  }
+
+  async function readAllDirectoryEntries(directoryReader) {
+    let entries = [];
+    let readEntries = await readEntriesPromise(directoryReader);
+    while (readEntries.length > 0) {
+      entries.push(...readEntries);
+      readEntries = await readEntriesPromise(directoryReader);
+    }
+    return entries;
+  }
+
+  async function readEntriesPromise(directoryReader) {
+    try {
+      return await new Promise((resolve, reject) => {
+        directoryReader.readEntries(resolve, reject);
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  function showPluginUpload(container) {
+    container.innerHTML = "";
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.backgroundColor = "grey";
+    container.style.overflow = "scroll";
+
+    container.innerHTML = `
+      <input style="align-self: center;" type="file" directory allowdirs webkitdirectory/>
+      <div id="drop-target" style="flex: 1; position: inset;"></div>
+      `;
+    const input = container.querySelector("input");
+    const dropTarget = container.querySelector("#drop-target");
+
+    function parentDirsFromRoot(path) {
+      const dirs = [];
+      let parent = "";
+      const parts = path.split("/");
+      for (const part of parts.slice(0, parts.length - 1)) {
+        if (!part) continue; // slash always already exists
+        parent = parent + "/" + part;
+        dirs.push(parent);
+      }
+      return dirs;
+    }
+
+    // intermediate representation so this works with drag and drop
+    // (which uses fileentries) and input (which uses files)
+    async function addPluginFiles(filesAndPaths) {
+      for (const { file, path } of filesAndPaths) {
+        // TODO I think these are always unix-like / paths? check Windows
+        const dest = "/plugins" + (path[0] === "/" ? path : "/" + path);
+        for (const dir of parentDirsFromRoot(dest)) {
+          if (!FS.analyzePath(dir).exists) {
+            FS.mkdir(dir);
+          }
+        }
+        const ab = await file.arrayBuffer();
+        const stream = FS.open(dest, "w+");
+        FS.write(stream, new Uint8Array(ab), 0, ab.byteLength, 0);
+        FS.close(stream);
+        console.log("wrote uploaded data to", dest);
+      }
+
+      input.style.display = "none";
+      container.innerHTML =
+        "Uploaded " + filesAndPaths.length + " plugin files";
+    }
+
+    input.addEventListener("input", async (e) => {
+      // TODO does this always contain all files?
+      await addPluginFiles(
+        [...e.target.files].map((f) => ({
+          path: f.webkitRelativePath,
+          file: f,
+        }))
+      );
+    });
+
+    function restoreTinyDropzone() {
+      dropTarget.style.outline = "";
+      dropTarget.style.zIndex = "";
+      dropTarget.style.top = "";
+      dropTarget.style.left = "";
+      dropTarget.style.width = "";
+      dropTarget.style.height = "";
+      dropTarget.style.position = "";
+      dropTarget.style.opacity = "";
+      dropTarget.style.backgroundColor = "";
+    }
+
+    dropTarget.addEventListener(
+      "drop",
+      async function (event) {
+        event.preventDefault();
+        restoreTinyDropzone();
+        container.querySelector("input").files = event.dataTransfer.files;
+        const all = await getAllFileEntries(event.dataTransfer.items);
+        addPluginFiles(
+          await Promise.all(
+            all.map(async (fileEntry) => {
+              return {
+                path: fileEntry.fullPath,
+                file: await new Promise((r) => fileEntry.file(r)),
+              };
+            })
+          )
+        );
+      },
+      false
+    );
+    document.querySelector("html").addEventListener("dragenter", (e) => {
+      dropTarget.style.outline = "solid 5px blue";
+      dropTarget.style.zIndex = 100;
+      dropTarget.style.top = "0";
+      dropTarget.style.left = "0";
+      dropTarget.style.width = "100vw";
+      dropTarget.style.height = "100vh";
+      dropTarget.style.position = "absolute";
+      dropTarget.style.opacity = "0.5";
+      dropTarget.style.backgroundColor = "grey";
+      e.preventDefault();
+    });
+    dropTarget.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+    });
+    dropTarget.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+    dropTarget.addEventListener("dragleave", (e) => {
+      restoreTinyDropzone();
+    });
+  }
+
+  function showPluginsForDownload(container) {
+    const now = new Date();
+    const contents = FS.lookupPath("plugins").node.contents;
+    const plugins = Object.keys(contents).map((name) => {
+      const path = `/plugins/${name}`;
+      return {
+        name,
+        path: `/plugins/${name}`,
+      };
+    });
+
+    container.innerHTML = "";
+    plugins.forEach(({ name, path }) => {
+      const button = document.createElement("button");
+      button.class = "download-button";
+      button.innerText = `${name}`;
+      function zipName(path) {
+        return path.replace("plugins/", "");
+      }
+      button.onclick = async function offerFileAsDownload() {
+        const archive = new JSZip();
+
+        const frontier = [path];
+
+        while (frontier.length) {
+          const path = frontier.pop();
+          const node = FS.lookupPath(path).node;
+          if (node.isFolder) {
+            for (const [name, _childNode] of Object.entries(node.contents)) {
+              frontier.push(path + "/" + name);
+            }
+            archive.folder(zipName(path));
+            continue;
+          }
+          // TODO preserve data modified etc.
+          // TODO preserve folders (they get lost on upload)
+          archive.file(zipName(path), FS.lookupPath(path).node.contents);
+        }
+
+        const downloadable = await archive.generateAsync({
+          type: "blob",
+        });
+
+        const a = document.createElement("a");
+        a.download = name;
+        a.href = URL.createObjectURL(downloadable);
+        a.style.display = "none";
+
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        }, 10000);
+      };
+      container.appendChild(button);
+    });
+  }
+
+  window.showPluginsForDownload = showPluginsForDownload;
   window.showPlugins = showPlugins;
+  window.showPluginUpload = showPluginUpload;
 })();
