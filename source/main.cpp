@@ -68,7 +68,11 @@ void InitConsole();
 int main(int argc, char *argv[])
 {
 #ifdef __EMSCRIPTEN__
-	EM_ASM(FS.mkdir('/saves');
+	EM_ASM(
+	if (!FS.analyzePath('/saves').exists) {
+		// may have already been created for uploading
+		FS.mkdir('/saves');
+	}
 	FS.mount(IDBFS, {}, '/saves');
 
 	// sync from persisted state into memory
