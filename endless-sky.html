@@ -416,7 +416,7 @@
         const versionString = typeof endlessSkyDataVersion === 'undefined' ? Date() : endlessSkyDataVersion;
         // If no data size available, dunno
         const dataSize = typeof endlessSkyDataSize === 'undefined' ? 0 : endlessSkyDataSize;
-        data = await (new CachedResource("endless-sky.data")).get(dataSize, versionString, updateProgress);
+        data = await (new CachedResource("endless-sky.data", "preloadedData")).get(dataSize, versionString, updateProgress);
 
         await Promise.race([
           musicPlayingPromise,
