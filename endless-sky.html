@@ -2,6 +2,12 @@
 <html lang="en-us">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="user-scalable=0">
+    <!--
+      huh, this doesn't work because the initial width is wrong, we want to disable
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    -->
+
     <!-- some privacy-respecting analytics to make sure people are able to use the site-->
     <script async defer data-domain="play-endless-web.com" src="https://plausible.io/js/plausible.js"></script>
     <title>Endless Sky</title>
@@ -45,6 +51,25 @@
       }
       button:hover, .ugly-header a:hover {
         color: rgb(215, 215, 215);
+      }
+      .touch-controls {
+        display: none;
+        flex-direction: row;
+        justify-content: space-between;
+        pointer-events: none;
+        user-select: none; 
+        /*(position: absolute;*/
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+      }
+      .touch-control {
+        pointer-events: auto;
+        background-color:rgba(0, 200, 0, 0.5);
+        border-radius: 5px;
+        text-align: center;
+        font-size: 40px;
+        width: 40px;
       }
       h1, h2, h3 {
         color: rgb(115, 115, 115);
@@ -186,9 +211,85 @@
       <a href="https://github.com/thomasballinger/endless-web" target="_blank">Endless Web on GitHub</a>
       <a href="https://github.com/endless-sky/endless-sky" target="_blank">Endless Sky on GitHub</a>
       <a href="https://github.com/thomasballinger/endless-web/issues" target="_blank">report bug</a>
+      <!-- TODO hide for non-mobile browsers -->
+      <button class="show-touch-controls">show touch controls</button>
     </div>
 
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    
+    <div class="touch-controls">
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="left-arrow-control">←</div>
+        <div class="touch-control" id="up-arrow-control">↑</div>
+        <div class="touch-control" id="right-arrow-control">→</div>
+      </div>
+      <div class="touch-control" id="esc-control" style="width: 80px;">esc</div>
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="j-control">J</div>
+        <div class="touch-control" id="m-control">M</div>
+        <div class="touch-control" id="l-control">L</div>
+      </div>
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="tab-control" style="width: 80px">tab</div>
+        <div class="touch-control" id="w-control">W</div>
+        <div class="touch-control" id="q-control">Q</div>
+      </div>
+    </div>
+    <script>
+      function simulateKeyEvent(eventType, keyCode, charCode) {
+        var e = document.createEventObject ? document.createEventObject() : document.createEvent("Events");
+        if (e.initEvent) e.initEvent(eventType, true, true);
+
+        e.keyCode = keyCode;
+        e.which = keyCode;
+        e.charCode = charCode;
+
+        // Dispatch directly to Emscripten's html5.h API (use this if page uses emscripten/html5.h event handling):
+        if (typeof JSEvents !== 'undefined' && JSEvents.eventHandlers && JSEvents.eventHandlers.length > 0) {
+          for(var i = 0; i < JSEvents.eventHandlers.length; ++i) {
+            if ((JSEvents.eventHandlers[i].target == Module['canvas'] || JSEvents.eventHandlers[i].target == window)
+             && JSEvents.eventHandlers[i].eventTypeString == eventType) {
+               JSEvents.eventHandlers[i].handlerFunc(e);
+            }
+          }
+        } else {
+          // Dispatch to browser for real (use this if page uses SDL or something else for event handling):
+          Module['canvas'].dispatchEvent ? Module['canvas'].dispatchEvent(e) : Module['canvas'].fireEvent("on" + eventType, e);
+        }
+      }
+
+      // [element id, keycode, minDuration]
+      [
+            ["up-arrow-control", 38, false],
+            ["left-arrow-control", 37, false],
+            ["right-arrow-control", 39, false],
+            ["l-control", 76, true],
+            ["j-control", 74, true],
+            ["m-control", 77, false],
+            ["esc-control", 27, false],
+            ["tab-control", 9, true],
+            ["w-control", 87, true],
+            ["q-control", 81, true],
+      ].forEach(([name, num, minDuration]) => {
+        document.querySelector('#'+name).addEventListener('touchstart', (e) => {
+          simulateKeyEvent('keydown', num, 0);
+        });
+        document.querySelector('#'+name).addEventListener('touchend', (e) => {
+          if (minDuration) {
+            setTimeout(() => {
+              simulateKeyEvent('keyup', num, 0);
+            }, 100)
+          } else {
+            simulateKeyEvent('keyup', num, 0);
+          }
+        });
+      });
+      window.oncontextmenu = function(event) {
+           event.preventDefault();
+           event.stopPropagation();
+           return false;
+      };
+    </script>
 
     <!-- these are GPLv3 licensed libraries that we should download instead of hotlinking at some point -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.js" integrity="sha512-18QiVdJv36r1ryb5mr1lFpm4wZMORhvGgvz0mHQllOmx3NmSZkYwWuDcecFByaRVWqiQ0F/FZC5pCBMuy8IfkQ==" crossorigin="anonymous"></script>
@@ -311,6 +412,11 @@
       });
       document.querySelector('.dismiss-upload').addEventListener('click', function() {
         this.parentNode.style.display = 'none';
+        window.dispatchEvent(new Event('resize'));
+      });
+      document.querySelector('.show-touch-controls').addEventListener('click', function() {
+        document.querySelector('.touch-controls').style.display = 'inline-flex';
+        window.dispatchEvent(new Event('resize'));
       });
 
       let runtimeInitializedResolve;
@@ -468,6 +574,13 @@
       }
 
       main();
+    </script>
+    <script>
+      document.addEventListener('touchmove', e => {
+        if (e.touches.length > 1) {  
+           e.preventDefault();
+        }
+      }, {passive: false})
     </script>
   </body>
 </html>
