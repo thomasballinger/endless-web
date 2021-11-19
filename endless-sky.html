@@ -2,6 +2,11 @@
 <html lang="en-us">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="user-scalable=0">
+    <!--
+      huh, this doesn't work because the initial width is wrong, we want to disable
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    -->
 
     <!-- some privacy-respecting analytics to make sure people are able to use the site-->
     <script async defer data-domain="play-endless-web.com" src="https://plausible.io/js/plausible.js"></script>
@@ -46,6 +51,35 @@
       }
       button:hover, .ugly-header a:hover {
         color: rgb(215, 215, 215);
+      }
+      .mobile-control {
+        display: none;
+        background-color: green;
+        user-select: none; 
+        position: absolute;
+        border-radius: 5px;
+        text-align: center;
+        bottom: 10px;
+        font-size: 40px;
+        width: 40px;
+      }
+      #left-arrow-control {
+        left: 20px;
+      }
+      #up-arrow-control {
+        left: 60px;
+      }
+      #right-arrow-control {
+        left: 100px;
+      }
+      #l-control {
+        left: 140px;
+      }
+      #j-control {
+        left: 180px;
+      }
+      #m-control {
+        left: 220px;
       }
       h1, h2, h3 {
         color: rgb(115, 115, 115);
@@ -187,9 +221,63 @@
       <a href="https://github.com/thomasballinger/endless-web" target="_blank">Endless Web on GitHub</a>
       <a href="https://github.com/endless-sky/endless-sky" target="_blank">Endless Sky on GitHub</a>
       <a href="https://github.com/thomasballinger/endless-web/issues" target="_blank">report bug</a>
+      <button class="show-mobile-controls">show onscreen controls</button>
     </div>
 
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    
+    <div class="mobile-control" id="up-arrow-control">↑</div>
+    <div class="mobile-control" id="left-arrow-control">←</div>
+    <div class="mobile-control" id="right-arrow-control">→</div>
+    <div class="mobile-control" id="l-control">L</div>
+    <div class="mobile-control" id="j-control">J</div>
+    <div class="mobile-control" id="m-control">M</div>
+    <script>
+      function simulateKeyEvent(eventType, keyCode, charCode) {
+        var e = document.createEventObject ? document.createEventObject() : document.createEvent("Events");
+        if (e.initEvent) e.initEvent(eventType, true, true);
+
+        e.keyCode = keyCode;
+        e.which = keyCode;
+        e.charCode = charCode;
+
+        // Dispatch directly to Emscripten's html5.h API (use this if page uses emscripten/html5.h event handling):
+        if (typeof JSEvents !== 'undefined' && JSEvents.eventHandlers && JSEvents.eventHandlers.length > 0) {
+          for(var i = 0; i < JSEvents.eventHandlers.length; ++i) {
+            if ((JSEvents.eventHandlers[i].target == Module['canvas'] || JSEvents.eventHandlers[i].target == window)
+             && JSEvents.eventHandlers[i].eventTypeString == eventType) {
+               JSEvents.eventHandlers[i].handlerFunc(e);
+            }
+          }
+        } else {
+          // Dispatch to browser for real (use this if page uses SDL or something else for event handling):
+          Module['canvas'].dispatchEvent ? Module['canvas'].dispatchEvent(e) : Module['canvas'].fireEvent("on" + eventType, e);
+        }
+      }
+
+      //const mobileControlTarget = document.getElementById('canvas');
+      const mobileControlTarget = document.body;
+      [
+            ["up-arrow-control", 38],
+            ["left-arrow-control", 37],
+            ["right-arrow-control", 39],
+            ["l-control", 76],
+            ["j-control", 74],
+            ["m-control", 77],
+      ].forEach(([name, num]) => {
+        document.querySelector('#'+name).addEventListener('touchstart', (e) => {
+          simulateKeyEvent('keydown', num, 0);
+        });
+        document.querySelector('#'+name).addEventListener('touchend', (e) => {
+          simulateKeyEvent('keyup', num, 0);
+        });
+      });
+      window.oncontextmenu = function(event) {
+           event.preventDefault();
+           event.stopPropagation();
+           return false;
+      };
+    </script>
 
     <!-- these are GPLv3 licensed libraries that we should download instead of hotlinking at some point -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.js" integrity="sha512-18QiVdJv36r1ryb5mr1lFpm4wZMORhvGgvz0mHQllOmx3NmSZkYwWuDcecFByaRVWqiQ0F/FZC5pCBMuy8IfkQ==" crossorigin="anonymous"></script>
@@ -312,6 +400,11 @@
       });
       document.querySelector('.dismiss-upload').addEventListener('click', function() {
         this.parentNode.style.display = 'none';
+      });
+      document.querySelector('.show-mobile-controls').addEventListener('click', function() {
+        [...document.querySelectorAll('.mobile-control')].forEach(el => {
+          el.style.display = 'inline-block';
+        })
       });
 
       let runtimeInitializedResolve;
