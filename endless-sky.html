@@ -258,23 +258,30 @@
         }
       }
 
+      // [element id, keycode, minDuration]
       [
-            ["up-arrow-control", 38],
-            ["left-arrow-control", 37],
-            ["right-arrow-control", 39],
-            ["l-control", 76],
-            ["j-control", 74],
-            ["m-control", 77],
-            ["esc-control", 27],
-            ["tab-control", 9],
-            ["w-control", 87],
-            ["q-control", 81],
-      ].forEach(([name, num]) => {
+            ["up-arrow-control", 38, false],
+            ["left-arrow-control", 37, false],
+            ["right-arrow-control", 39, false],
+            ["l-control", 76, true],
+            ["j-control", 74, true],
+            ["m-control", 77, false],
+            ["esc-control", 27, false],
+            ["tab-control", 9, true],
+            ["w-control", 87, true],
+            ["q-control", 81, true],
+      ].forEach(([name, num, minDuration]) => {
         document.querySelector('#'+name).addEventListener('touchstart', (e) => {
           simulateKeyEvent('keydown', num, 0);
         });
         document.querySelector('#'+name).addEventListener('touchend', (e) => {
-          simulateKeyEvent('keyup', num, 0);
+          if (minDuration) {
+            setTimeout(() => {
+              simulateKeyEvent('keyup', num, 0);
+            }, 100)
+          } else {
+            simulateKeyEvent('keyup', num, 0);
+          }
         });
       });
       window.oncontextmenu = function(event) {
