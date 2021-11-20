@@ -52,24 +52,25 @@
       button:hover, .ugly-header a:hover {
         color: rgb(215, 215, 215);
       }
-      .mobile-control {
+      .touch-controls {
         display: none;
-        background-color: green;
+        flex-direction: row;
+        justify-content: space-between;
+        pointer-events: none;
         user-select: none; 
-        position: absolute;
+        /*(position: absolute;*/
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+      }
+      .touch-control {
+        pointer-events: auto;
+        background-color:rgba(0, 200, 0, 0.5);
         border-radius: 5px;
         text-align: center;
-        bottom: 10px;
         font-size: 40px;
         width: 40px;
       }
-      #left-arrow-control { left: 20px; }
-      #up-arrow-control { left: 60px; }
-      #right-arrow-control { left: 100px; }
-      #l-control { left: 140px; }
-      #j-control { left: 180px; }
-      #m-control { left: 220px; }
-      #esc-control { left: 300px; width: 60px; }
       h1, h2, h3 {
         color: rgb(115, 115, 115);
       }
@@ -211,18 +212,29 @@
       <a href="https://github.com/endless-sky/endless-sky" target="_blank">Endless Sky on GitHub</a>
       <a href="https://github.com/thomasballinger/endless-web/issues" target="_blank">report bug</a>
       <!-- TODO hide for non-mobile browsers -->
-      <button class="show-mobile-controls">show touch controls</button>
+      <button class="show-touch-controls">show touch controls</button>
     </div>
 
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     
-    <div class="mobile-control" id="up-arrow-control">↑</div>
-    <div class="mobile-control" id="left-arrow-control">←</div>
-    <div class="mobile-control" id="right-arrow-control">→</div>
-    <div class="mobile-control" id="l-control">L</div>
-    <div class="mobile-control" id="j-control">J</div>
-    <div class="mobile-control" id="m-control">M</div>
-    <div class="mobile-control" id="esc-control">esc</div>
+    <div class="touch-controls">
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="left-arrow-control">←</div>
+        <div class="touch-control" id="up-arrow-control">↑</div>
+        <div class="touch-control" id="right-arrow-control">→</div>
+      </div>
+      <div class="touch-control" id="esc-control" style="width: 80px;">esc</div>
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="j-control">J</div>
+        <div class="touch-control" id="m-control">M</div>
+        <div class="touch-control" id="l-control">L</div>
+      </div>
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="tab-control" style="width: 80px">tab</div>
+        <div class="touch-control" id="w-control">W</div>
+        <div class="touch-control" id="q-control">Q</div>
+      </div>
+    </div>
     <script>
       function simulateKeyEvent(eventType, keyCode, charCode) {
         var e = document.createEventObject ? document.createEventObject() : document.createEvent("Events");
@@ -246,8 +258,6 @@
         }
       }
 
-      //const mobileControlTarget = document.getElementById('canvas');
-      const mobileControlTarget = document.body;
       [
             ["up-arrow-control", 38],
             ["left-arrow-control", 37],
@@ -256,6 +266,9 @@
             ["j-control", 74],
             ["m-control", 77],
             ["esc-control", 27],
+            ["tab-control", 9],
+            ["w-control", 87],
+            ["q-control", 81],
       ].forEach(([name, num]) => {
         document.querySelector('#'+name).addEventListener('touchstart', (e) => {
           simulateKeyEvent('keydown', num, 0);
@@ -392,11 +405,11 @@
       });
       document.querySelector('.dismiss-upload').addEventListener('click', function() {
         this.parentNode.style.display = 'none';
+        window.dispatchEvent(new Event('resize'));
       });
-      document.querySelector('.show-mobile-controls').addEventListener('click', function() {
-        [...document.querySelectorAll('.mobile-control')].forEach(el => {
-          el.style.display = 'inline-block';
-        })
+      document.querySelector('.show-touch-controls').addEventListener('click', function() {
+        document.querySelector('.touch-controls').style.display = 'inline-flex';
+        window.dispatchEvent(new Event('resize'));
       });
 
       let runtimeInitializedResolve;
