@@ -236,6 +236,13 @@
       </div>
     </div>
     <script>
+      if (window.location.hostname === 'play-endless-sky.com') {
+        const loud = document.createElement('div');
+        loud.innerHTML = `<h1>play-endless-sky.com is deprecated, please use play-endless-web.com (<a href="https://play-endless-web.com/">play-endless-web.com</a>) instead<h1>
+     <h3>You will need to migrate your save files. Download them with the "download saved games" button above, and upload them to play-endless-web to play with them</h3>`;
+        document.querySelector('.ugly-header').appendChild(loud);
+      }
+
       function simulateKeyEvent(eventType, keyCode, charCode) {
         var e = document.createEventObject ? document.createEventObject() : document.createEvent("Events");
         if (e.initEvent) e.initEvent(eventType, true, true);
