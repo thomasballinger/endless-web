@@ -8,7 +8,7 @@ on:
       - opened
 
 env:
-  EM_VERSION: 3.1.0
+  EM_VERSION: 3.1.24
   EM_CACHE_FOLDER: 'emsdk-cache'
 
 jobs:

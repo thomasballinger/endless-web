@@ -46,7 +46,7 @@ COMMON_FLAGS = -O3\
 
 CFLAGS = $(COMMON_FLAGS)\
 	-Duuid_generate_random=uuid_generate\
-	-std=c++17\
+	-std=c++11\
 	-Wall\
 	-Werror\
 	-Wold-style-cast\

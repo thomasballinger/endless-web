@@ -160,8 +160,8 @@ The last time I checked, this looked like:
 ```
   $ git clone https://github.com/emscripten-core/emsdk.git
   $ cd emsdk
-  $ ./emsdk install 3.1.0
-  $ ./emsdk activate 3.1.0
+  $ ./emsdk install 3.1.24
+  $ ./emsdk activate 3.1.24
   $ source ./emsdk_env.sh  # you'll need to run this one each time you open a new terminal
 ```
 
