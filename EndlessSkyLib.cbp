@@ -137,6 +137,7 @@
 		<Unit filename="source/EsUuid.cpp" />
 		<Unit filename="source/EsUuid.h" />
 		<Unit filename="source/ExclusiveItem.h" />
+		<Unit filename="source/FakeMad.h" />
 		<Unit filename="source/File.cpp" />
 		<Unit filename="source/File.h" />
 		<Unit filename="source/Files.cpp" />
