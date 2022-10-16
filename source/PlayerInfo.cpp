@@ -55,7 +55,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <stdexcept>
 
 #ifdef __EMSCRIPTEN__
-#    include <emscripten.h>
+#include <emscripten.h>
 #endif
 
 using namespace std;
@@ -507,10 +507,10 @@ void PlayerInfo::Save() const
 
 #ifdef __EMSCRIPTEN__
 	EM_ASM(
-	   // syncfs(false) means save in-memory fs to persistent storage
-	   FS.syncfs(false, function(err) {
-		   assert(!err);
-		   console.log("persisted save file to IndexedDB.");
+		// syncfs(false) means save in-memory fs to persistent storage
+		FS.syncfs(false, function(err) {
+			assert(!err);
+			console.log("persisted save file to IndexedDB.");
 	}););
 #endif
 }
