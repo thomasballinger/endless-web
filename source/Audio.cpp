@@ -182,7 +182,7 @@ void Audio::Init(const vector<string> &sources)
 	// so just load synchronously
 	Load();
 #endif
-	
+
 	// Create the music-streaming threads.
 #ifdef __EMSCRIPTEN__
 	return; // Return early because Emscripten doesn't like threads! (and uses a no-op libmad mock)
@@ -431,7 +431,7 @@ void Audio::Step()
 		alSourcePlay(source);
 	}
 	queue.clear();
-	
+
 #ifdef __EMSCRIPTEN__
 	return; // Return early because Emscripten doesn't like threads! (and uses a no-op libmad mock)
 #endif

@@ -67,7 +67,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Build
-        run: source emsdk/emsdk_env.sh; make output/index.html 
+        run: source emsdk/emsdk_env.sh; make output/index.html
       - name: Deploy
         if: ${{ github.ref == 'refs/heads/endless-web' && github.event_name == 'push' }}
         run: source emsdk/emsdk_env.sh; make deploy
