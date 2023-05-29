@@ -82,17 +82,19 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 	-s EXPORTED_RUNTIME_METHODS=['callMain']\
 	--emrun
 
-CPPS := $(shell ls source/*.cpp) $(shell ls source/text/*.cpp)
-CPPS_EXCEPT_MAIN := $(shell ls source/*.cpp | grep -v main.cpp) $(shell ls source/text/*.cpp)
+CPPS := $(shell ls source/*.cpp) $(shell ls source/text/*.cpp) $(shell ls source/ship/*.cpp)
+CPPS_EXCEPT_MAIN := $(shell ls source/*.cpp | grep -v main.cpp) $(shell ls source/text/*.cpp) $(shell ls source/ship/*.cpp)
 TEMP := $(subst source/,build/emcc/,$(CPPS))
 OBJS := $(subst .cpp,.o,$(TEMP))
 TEMP := $(subst source/,build/emcc/,$(CPPS_EXCEPT_MAIN))
 OBJS_EXCEPT_MAIN := $(subst .cpp,.o,$(TEMP))
-HEADERS := $(shell ls source/*.h*) $(shell ls source/text/*.h*)
+HEADERS := $(shell ls source/*.h*) $(shell ls source/text/*.h*) $(shell ls source/ship/*.h*) $(shell ls source/comparators/*.h*)
 
 build/emcc/%.o: source/%.cpp $(HEADERS) libjpeg-turbo-2.1.0/libturbojpeg.a
 	@mkdir -p build/emcc
 	@mkdir -p build/emcc/text
+	@mkdir -p build/emcc/ship
+	@mkdir -p build/emcc/comparators
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 lib/emcc/libendless-sky.a: $(OBJS_EXCEPT_MAIN)
