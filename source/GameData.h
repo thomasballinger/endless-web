@@ -27,15 +27,19 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+class CategoryList;
 class Color;
+class ConditionsStore;
 class Conversation;
 class DataNode;
 class DataWriter;
 class Date;
 class Effect;
 class Fleet;
+class FormationPattern;
 class Galaxy;
 class GameEvent;
+class Gamerules;
 class Government;
 class Hazard;
 class ImageSet;
@@ -58,6 +62,8 @@ class System;
 class Test;
 class TestData;
 class TextReplacements;
+class UniverseObjects;
+class Wormhole;
 
 
 
@@ -69,7 +75,11 @@ class TextReplacements;
 // universe.
 class GameData {
 public:
+#ifndef ES_NO_THREADS
 	static std::future<void> BeginLoad(bool onlyLoadData, bool debugMode);
+#else
+	static void BeginLoad(bool onlyLoadData, bool debugMode);
+#endif // ES_NO_THREADS
 	static void FinishLoading();
 	// Check for objects that are referred to but never defined.
 	static void CheckReferences();
@@ -86,6 +96,9 @@ public:
 
 	// Get the list of resource sources (i.e. plugin folders).
 	static const std::vector<std::string> &Sources();
+
+	// Get a reference to the UniverseObjects object.
+	static UniverseObjects &Objects();
 
 	// Revert any changes that have been made to the universe.
 	static void Revert();
@@ -113,6 +126,7 @@ public:
 	static const Set<Effect> &Effects();
 	static const Set<GameEvent> &Events();
 	static const Set<Fleet> &Fleets();
+	static const Set<FormationPattern> &Formations();
 	static const Set<Galaxy> &Galaxies();
 	static const Set<Government> &Governments();
 	static const Set<Hazard> &Hazards();
@@ -130,6 +144,9 @@ public:
 	static const Set<System> &Systems();
 	static const Set<Test> &Tests();
 	static const Set<TestData> &TestDataSets();
+	static const Set<Wormhole> &Wormholes();
+
+	static ConditionsStore &GlobalConditions();
 
 	static const Government *PlayerGovernment();
 	static Politics &GetPolitics();
@@ -147,8 +164,8 @@ public:
 
 	// Strings for combat rating levels, etc.
 	static const std::string &Rating(const std::string &type, int level);
-	// Strings for ship, bay type, and outfit categories.
-	static const std::vector<std::string> &Category(const CategoryType type);
+	// Collections for ship, bay type, outfit, and other categories.
+	static const CategoryList &GetCategory(const CategoryType type);
 
 	static const StarField &Background();
 	static void SetHaze(const Sprite *sprite, bool allowAnimation);
@@ -157,11 +174,11 @@ public:
 	static std::string HelpMessage(const std::string &name);
 	static const std::map<std::string, std::string> &HelpTemplates();
 
-	static const std::map<std::string, std::string> &PluginAboutText();
-
 	static MaskManager &GetMaskManager();
 
 	static const TextReplacements &GetTextReplacements();
+
+	static const Gamerules &GetGamerules();
 
 	// Thread-safe way to draw the menu background.
 	static void DrawMenuBackground(Panel *panel);

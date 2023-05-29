@@ -72,6 +72,11 @@ string GameWindow::SDLVersions()
 
 bool GameWindow::Init()
 {
+#ifdef _WIN32
+	// Tell Windows this process is high dpi aware and doesn't need to get scaled.
+	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+#endif
+
 	// This needs to be called before any other SDL commands.
 	if(SDL_Init(SDL_INIT_VIDEO) != 0)
 	{
@@ -97,8 +102,10 @@ bool GameWindow::Init()
 	int maxHeight = mode.h;
 	if(maxWidth < minWidth || maxHeight < minHeight)
 	{
+#ifndef __EMSCRIPTEN__
 		ExitWithError("Monitor resolution is too small!");
 		return false;
+#endif
 	}
 
 	int windowWidth = maxWidth - 100;
@@ -425,6 +432,7 @@ void GameWindow::ExitWithError(const string &message, bool doPopUp)
 		box.title = "Endless Sky: Error";
 		box.message = message.c_str();
 		box.colorScheme = nullptr;
+		printf("Error: %s\n", message.c_str());
 
 		SDL_MessageBoxButtonData button;
 		button.flags = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;

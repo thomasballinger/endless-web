@@ -1,0 +1,593 @@
+<!doctype HTML>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="user-scalable=0">
+    <!--
+      huh, this doesn't work because the initial width is wrong, we want to disable
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    -->
+
+    <!-- some privacy-respecting analytics to make sure people are able to use the site-->
+    <script async defer data-domain="play-endless-web.com" src="https://plausible.io/js/plausible.js"></script>
+    <title>Endless Sky</title>
+    <style>
+      html {
+          width: 100%;
+          height: 100%;
+      }
+      @font-face {
+        font-family: "Ubuntu";
+        src: url("Ubuntu-Regular.ttf");
+      }
+      body {
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          height: 100%;
+          font-family: 'Ubuntu', "times new roman", times, roman, serif;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+      }
+      .ugly-header a {
+        appearance: button;
+        text-decoration: none;
+        color: initial;
+      }
+      button, .ugly-header a {
+        background-color: rgba(24, 24, 24, 1);
+        border-width: 1px;
+        color: rgb(115, 115, 115);
+        border-style: solid;
+        border-top-color: rgb(80, 80, 80);
+        border-right-color: rgb(80, 80, 80);
+        border-bottom-color: rgb(50, 50, 50);
+        border-left-color: rgb(50, 50, 50);
+        font-family: 'Ubuntu', "times new roman", times, roman, serif;
+        font-size: 14px;
+        padding: 1px 6px;
+        outline: none;
+      }
+      button:hover, .ugly-header a:hover {
+        color: rgb(215, 215, 215);
+      }
+      .touch-controls {
+        display: none;
+        flex-direction: row;
+        justify-content: space-between;
+        pointer-events: none;
+        user-select: none;
+        /*(position: absolute;*/
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+      }
+      .touch-control {
+        pointer-events: auto;
+        background-color:rgba(0, 200, 0, 0.5);
+        border-radius: 5px;
+        text-align: center;
+        font-size: 40px;
+        width: 40px;
+      }
+      h1, h2, h3 {
+        color: rgb(115, 115, 115);
+      }
+      #canvas {
+          flex: 1;
+          width: 100%;
+          min-height: 10%;
+      }
+      .save-games {
+        display: flex;
+        flex-direction: column;
+      }
+      .download-button {
+        width: 100%
+      }
+      .load-button {
+        margin: 20px;
+      }
+      .status {
+          text-align: center;
+          min-height: 1em;
+      }
+      #output {
+          background-color: rgba(24, 24, 24, 0);
+          color: rgb(115, 115, 115);
+          padding: 0 1em;
+          width: 80%;
+      }
+      .loading, .error {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        background-color: black;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .error {
+        z-index: -2;
+        color: red;
+      }
+      .error * {
+        margin: 10px;
+      }
+      .title {
+        color: white;
+        text-transform: uppercase;
+        font-size: 64px;
+        color: #6e6e6e;
+      }
+      .progress-bar-section {
+        font-family: 'Ubuntu', "times new roman", times, roman, serif;
+        color: #4e4e4e;
+        text-align: center;
+      }
+      .progress-bar {
+        width: 400px;
+        height: 20px;
+        background-color: #dddddd;
+      }
+      .progress {
+        height: 100%;
+        width: 1%;
+        transition: width .2s;
+        background-color: #6e6e6e;
+      }
+      .debug {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 70%;
+        background-color: rgba(48, 48, 48, 0.5);
+        backdrop-filter: blur(4px) saturate(150%);
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        resize: horizontal;
+        overflow: auto;
+        display: none;
+        padding: 0 10px;
+        color: rgb(115, 115, 115);
+        border: solid 1px rgb(100, 100, 100);
+      }
+      .ugly-header {
+        padding-left: 2px;
+        z-index: 2;
+      }
+      audio {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="error">
+      <button>Hide error</button>
+      Please report this error on <a href="https://github.com/thomasballinger/endless-web">GitHub</a> or the #third-party-chat room of <a href="https://discord.gg/ZeuASSx">the Endless Sky Discord</a>.
+      <div></div>
+    </div>
+    <div class="loading">
+      <audio controls autoplay src="./loading.mp3"></audio>
+      <div class="title">E&middot;n&middot;d&middot;l&middot;e&middot;s&middot;s &nbsp;&nbsp;W&middot;e&middot;b</div>
+      <div class="progress-bar-section">
+        <p class="music-text">click anywhere to play loading music</p>
+        <p class="progress-text">Downloading data...</p>
+        <div class="progress-bar">
+          <div class="progress"></div>
+        </div>
+      </div>
+      <button class="load-button" disabled hidden>Play</button>
+      <h2 class="plugin-editor-header" style="display: none;">Upload Plugins</h2>
+      <div class="plugin-editor-upload"></div>
+      <h2 class="external-plugins-header" style="display: none;">Published Plugins</h2>
+      <div class="plugins-list">Plugins</div>
+    </div>
+    <div class="debug">
+      <h1>Debug panel</h1>
+      <p> press backslash to hide </p>
+      <button onclick="document.querySelector('.file-selector').click();" />upload saved game</button>
+      <button class="show-save-games">Show save game files for download</button>
+      <div class="save-games"></div>
+      <button class="show-plugins-to-download">Show plugins for download</button>
+      <div class="plugins-to-download"></div>
+      <input type="file" style="display: none;" class="file-selector" multiple="multiple">
+      <div class="status">Status goes here</div>
+      <textarea id="output" rows="8">stdout output goes here</textarea>
+    </div>
+
+    <div class="ugly-header">
+      <button class="dismiss-upload">hide top bar</button>
+      <button onclick="document.querySelector('.file-selector').click();">upload saved game</button>
+      <button class="toggle-debug">download saved games</button>
+      <button class="stop-music">start music</button>
+      <a href="https://github.com/thomasballinger/endless-web" target="_blank">Endless Web on GitHub</a>
+      <a href="https://github.com/endless-sky/endless-sky" target="_blank">Endless Sky on GitHub</a>
+      <a href="https://github.com/thomasballinger/endless-web/issues" target="_blank">report bug</a>
+      <!-- TODO hide for non-mobile browsers -->
+      <button class="show-touch-controls">show touch controls</button>
+    </div>
+
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+    <div class="touch-controls">
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="left-arrow-control">←</div>
+        <div class="touch-control" id="up-arrow-control">↑</div>
+        <div class="touch-control" id="right-arrow-control">→</div>
+      </div>
+      <div class="touch-control" id="esc-control" style="width: 80px;">esc</div>
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="j-control">J</div>
+        <div class="touch-control" id="m-control">M</div>
+        <div class="touch-control" id="l-control">L</div>
+      </div>
+      <div style="display: inline-flex;">
+        <div class="touch-control" id="tab-control" style="width: 80px">tab</div>
+        <div class="touch-control" id="w-control">W</div>
+        <div class="touch-control" id="q-control">Q</div>
+      </div>
+    </div>
+    <script>
+      if (window.location.hostname === 'play-endless-sky.com') {
+        const loud = document.createElement('div');
+        loud.innerHTML = `<h1>play-endless-sky.com is deprecated, please use play-endless-web.com (<a href="https://play-endless-web.com/">play-endless-web.com</a>) instead<h1>
+     <h3>You will need to migrate your save files. Download them with the "download saved games" button above, and upload them to play-endless-web to play with them</h3>`;
+        document.querySelector('.ugly-header').appendChild(loud);
+      }
+
+      function simulateKeyEvent(eventType, keyCode, charCode) {
+        var e = document.createEventObject ? document.createEventObject() : document.createEvent("Events");
+        if (e.initEvent) e.initEvent(eventType, true, true);
+
+        e.keyCode = keyCode;
+        e.which = keyCode;
+        e.charCode = charCode;
+
+        // Dispatch directly to Emscripten's html5.h API (use this if page uses emscripten/html5.h event handling):
+        if (typeof JSEvents !== 'undefined' && JSEvents.eventHandlers && JSEvents.eventHandlers.length > 0) {
+          for(var i = 0; i < JSEvents.eventHandlers.length; ++i) {
+            if ((JSEvents.eventHandlers[i].target == Module['canvas'] || JSEvents.eventHandlers[i].target == window)
+             && JSEvents.eventHandlers[i].eventTypeString == eventType) {
+               JSEvents.eventHandlers[i].handlerFunc(e);
+            }
+          }
+        } else {
+          // Dispatch to browser for real (use this if page uses SDL or something else for event handling):
+          Module['canvas'].dispatchEvent ? Module['canvas'].dispatchEvent(e) : Module['canvas'].fireEvent("on" + eventType, e);
+        }
+      }
+
+      // [element id, keycode, minDuration]
+      [
+            ["up-arrow-control", 38, false],
+            ["left-arrow-control", 37, false],
+            ["right-arrow-control", 39, false],
+            ["l-control", 76, true],
+            ["j-control", 74, true],
+            ["m-control", 77, false],
+            ["esc-control", 27, false],
+            ["tab-control", 9, true],
+            ["w-control", 87, true],
+            ["q-control", 81, true],
+      ].forEach(([name, num, minDuration]) => {
+        document.querySelector('#'+name).addEventListener('touchstart', (e) => {
+          simulateKeyEvent('keydown', num, 0);
+        });
+        document.querySelector('#'+name).addEventListener('touchend', (e) => {
+          if (minDuration) {
+            setTimeout(() => {
+              simulateKeyEvent('keyup', num, 0);
+            }, 100)
+          } else {
+            simulateKeyEvent('keyup', num, 0);
+          }
+        });
+      });
+      window.oncontextmenu = function(event) {
+           event.preventDefault();
+           event.stopPropagation();
+           return false;
+      };
+    </script>
+
+    <!-- these are GPLv3 licensed libraries that we should download instead of hotlinking at some point -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.js" integrity="sha512-18QiVdJv36r1ryb5mr1lFpm4wZMORhvGgvz0mHQllOmx3NmSZkYwWuDcecFByaRVWqiQ0F/FZC5pCBMuy8IfkQ==" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip-utils/0.1.0/jszip-utils.js" integrity="sha512-vzp9X4pwJHRiGSEH692sqmRe5R8OQNKSCe1zg38GQoNUGJtnPrwhwKF3lbaFZMsT8ZQ3ppZ8tlLqkJGosi5/CA==" crossorigin="anonymous"></script>
+
+    <!-- These naive scripts create globals so load order matters -->
+    <script src="js/cached-resource.js"></script>
+    <script src="js/save-games.js"></script>
+    <script src="js/plugins.js"></script>
+    <script src="dataversion.js"></script>
+    <script type='text/javascript'>
+      function idbReady() {
+        const isSafari =
+          !navigator.userAgentData &&
+          /Safari\//.test(navigator.userAgent) &&
+          !/Chrom(e|ium)\//.test(navigator.userAgent);
+
+        // No point putting other browsers or older versions of Safari through this mess.
+        if (!isSafari || !indexedDB.databases) return Promise.resolve();
+
+        let intervalId;
+
+        return new Promise((resolve) => {
+          const tryIdb = () => indexedDB.databases().finally(resolve);
+          intervalId = setInterval(tryIdb, 100);
+          tryIdb();
+        }).finally(() => clearInterval(intervalId));
+      }
+      let musicPlayerResolve;
+      const musicPlayingPromise = new Promise(r => {musicPlayerResolve = r});
+      let readyToLoadResolve;
+      const readyToLoadPromise = new Promise(r => {readyToLoadResolve = r});
+
+      function onThemeMusicPlay() {
+        document.querySelector('.stop-music').innerText = 'stop music';
+        document.querySelector('.music-text').style.visibility = 'hidden';
+        musicPlayerResolve();
+      }
+      document.querySelector('audio').addEventListener('play', onThemeMusicPlay);
+      document.querySelector('.stop-music').addEventListener('click', () => {
+        const button = document.querySelector('.stop-music');
+        if (button.innerText === 'stop music') {
+          button.innerText = 'start music'
+          document.querySelector('audio').pause();
+        } else if (button.innerText === 'start music') {
+          button.innerText = 'stop music';
+          document.querySelector('audio').play();
+        }
+      });
+      document.querySelector('.loading').addEventListener('click', () => {
+        document.querySelector('audio').play();
+      });
+
+      function toggleDebugWindow() {
+        const debug = document.querySelector('.debug');
+        if (debug.style.display === 'none' || debug.style.display === '') {
+          debug.style.display = 'initial';
+        } else {
+          debug.style.display = 'none'
+          saveGamesList.innerHTML = ''
+        }
+      }
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Backslash') {
+          e.preventDefault();
+          toggleDebugWindow();
+        }
+        if (e.code === "KeyI" && e.metaKey && e.altKey) {
+          // capture at the top level so meta-alt-i still opens dev console
+          e.stopPropagation()
+        }
+      }, {capture: true})
+
+      document.querySelector('.toggle-debug').addEventListener('click', toggleDebugWindow);
+
+      const saveGamesList = document.querySelector('.save-games');
+      const showSaveGamesButton = document.querySelector('.show-save-games');
+      showSaveGamesButton.addEventListener('click', () => showSaveGames(saveGamesList));
+      const pluginsToDownloadList = document.querySelector('.plugins-to-download');
+      const pluginsToDownloadButton = document.querySelector('.show-plugins-to-download');
+      pluginsToDownloadButton.addEventListener('click', () => showPluginsForDownload(pluginsToDownloadList));
+
+      const progressBar = document.querySelector('.progressBar');
+      const progress = document.querySelector('.progress');
+      const progressText = document.querySelector('.progress-text');
+      function updateProgress(numerator, denominator, usingCache) {
+        progress.style.width = `${numerator / denominator * 100}%`;
+        const soFar = (numerator / 1000000).toFixed(1);
+        const total = (denominator / 1000000).toFixed(1);
+        progressText.textContent = `Downloading data (${soFar}MB / ${total}MB)`
+        if (numerator === denominator) {
+          progress.style.transition = 'none';
+          if (usingCache) {
+            progressText.textContent = "Using cached data."
+          } else {
+            progressText.textContent = "Downloading complete."
+          }
+        }
+      }
+
+      // Prevents known errors which fire thousands of times from making the console hard to use
+      function errFilter(text) {
+        // ignore errors about missing image frames
+        if (/missing frame/.exec(text)) text = null;
+      }
+
+      [...document.querySelectorAll('.file-selector')].map(el => {
+        el.addEventListener("change", async function() {
+          // write every file uploaded to the filesystem
+          for (const file of [...this.files]) {
+            const data = new Uint8Array(await file.arrayBuffer());
+            const path = 'saves/' + file.name;
+            const stream = FS.open(path, 'w+');
+            FS.write(stream, data, 0, data.length, 0);
+            FS.close(stream);
+          }
+          // syncfs(false) means save to IndexedDB
+          await new Promise((resolve) => FS.syncfs(false, resolve));
+        });
+      });
+      document.querySelector('.dismiss-upload').addEventListener('click', function() {
+        this.parentNode.style.display = 'none';
+        window.dispatchEvent(new Event('resize'));
+      });
+      document.querySelector('.show-touch-controls').addEventListener('click', function() {
+        document.querySelector('.touch-controls').style.display = 'inline-flex';
+        window.dispatchEvent(new Event('resize'));
+      });
+
+      let runtimeInitializedResolve;
+      const runtimeInitializedPromise = new Promise(r => {runtimeInitializedResolve = r});
+
+      var Module = {
+          print: (function(text) {
+              var element = document.getElementById('output');
+              if (element) element.value = 'stdout output goes here'; // clear browser cache
+              return function(text) {
+                  if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                  console.log(text);
+                  if (element) {
+                      element.value += text + "\n";
+                      element.scrollTop = element.scrollHeight; // focus on bottom
+                  }
+              };
+          })(),
+          printErr: function(text) {
+            text = errFilter(text)
+            if (text) console.error(text);
+          },
+          setStatus: (function() {
+              const element = document.querySelector('.status');
+              if (element) element.textContent = 'status goes here';
+              return function setStatus(text) {
+                element.textContent = text;
+              };
+          })(),
+          canvas: document.getElementById('canvas'),
+          getPreloadedPackage: function() { return Module.downloadedData; },
+          noInitialRun: true,
+          onRuntimeInitialized: () => {console.log('runtime initialized'); runtimeInitializedResolve();}
+      };
+
+      // returns true if this browser, otherwise a string for an error message.
+      function supported() {
+        const gl = document.createElement('canvas').getContext('webgl2');
+        if (!gl) {
+          return 'your browser does not support WebGL2.';
+        }
+        /* for when compiled with threads
+        if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated === false) {
+          return 'the page is not crossOriginIsolated! see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy';
+        }
+        if (typeof Atomics === 'undefined') {
+          return "your browser does not support Atomics, required for the threaded version of Endless Web. There should be a version without it, I'll work on it.";
+        }
+        */
+        return true;
+      }
+
+      async function addMainScriptTag(data) {
+        // dynamically loaded so we can load the data ourselves
+        Module.downloadedData = data;
+        const tag = document.createElement('script');
+        tag.src = "endless-sky.js";
+        document.body.appendChild(tag);
+      }
+
+      function hideError() {
+        document.querySelector('.error').style.zIndex = -2;
+      }
+      function showError(err) {
+        document.querySelector('.error div').innerText = `${err.message}\n\n${err.stack}`;
+        document.querySelector('.error').style.zIndex = 2;
+      }
+      function onRejectedPromise(errEvent) {
+        showError(errEvent.reason);
+      }
+      function onError(errEvent) {
+        showError(errEvent.error);
+      }
+      window.addEventListener('error', onError);
+      window.addEventListener("unhandledrejection", onRejectedPromise);
+      document.querySelector('.error button').addEventListener('click', hideError);
+
+      async function main() {
+        const why = supported();
+        if (why !== true) {
+          progressText.textContent = `Not supported because ${why}`
+          return;
+        }
+        await idbReady();
+
+        const showRemotePlugins = (new URL(location)).searchParams.has('plugins');
+
+        let loadButtonResolve
+        const loadButtonPromise = new Promise((r) => loadButtonResolve = r);
+        const loadButton = document.querySelector('.load-button');
+
+        const pluginEditor = (new URL(location)).searchParams.has('plugins');
+        if (showRemotePlugins || pluginEditor) {
+          loadButton.hidden = false;
+          loadButton.disabled = false;
+          loadButton.addEventListener("click", loadButtonResolve);
+        } else {
+          // just load immediately
+          loadButtonResolve();
+        }
+
+        // If no dataversion available, force download with date string
+        const versionString = typeof endlessSkyDataVersion === 'undefined' ? Date() : endlessSkyDataVersion;
+        // If no data size available, dunno
+        const dataSize = typeof endlessSkyDataSize === 'undefined' ? 0 : endlessSkyDataSize;
+        data = await (new CachedResource("endless-sky.data", "preloadedData")).get(dataSize, versionString, updateProgress);
+
+        await Promise.race([
+          musicPlayingPromise,
+          new Promise(resolve => setTimeout(resolve, 2000))
+        ]);
+        // too late, you can't enable music during the load when the browser locks up
+        document.querySelector('.music-text').style.visibility = 'hidden';
+        await addMainScriptTag(data);
+        await runtimeInitializedPromise;
+
+        FS.mkdir('plugins');
+        FS.mkdir('saves');
+        if (showRemotePlugins) {
+          let remotePlugins;
+          // catch mostly for offline dev
+          try {
+            remotePlugins = await (await fetch("https://raw.githubusercontent.com/EndlessSkyCommunity/endless-sky-plugins/master/generated/plugins.json")).json();
+          } catch (e) {
+            window.foo = e;
+            if (e instanceof TypeError && e.message === 'Failed to fetch') {
+              console.log("maybe the GitHub plugins link is broken, but more likely you're offline");
+              // TODO check connection status?
+            } else throw e;
+          }
+
+          if (remotePlugins) {
+            document.querySelector('.external-plugins-header').style.display = '';
+            showPlugins(document.querySelector('.plugins-list'), remotePlugins);
+          }
+        }
+        if (pluginEditor) {
+            document.querySelector('.plugin-editor-header').style.display = '';
+            showPluginUpload(document.querySelector('.plugin-editor-upload'));
+        }
+        await loadButtonPromise;
+        loadButton.style.display = 'none';
+        loadButton.disabled = true;
+        document.querySelector('.loading').style.zIndex = -1;
+
+        progressText.textContent = progressText.textContent + " Loading...";
+
+        // yield to event loop so that button disappears immediately
+        await new Promise(r => setTimeout(r, 1));
+
+        // important to hide to avoid stealing focus
+        document.querySelector('.plugin-editor-upload').style.display = 'none';
+
+        Module.callMain([]);
+      }
+
+      main();
+    </script>
+    <script>
+      document.addEventListener('touchmove', e => {
+        if (e.touches.length > 1) {
+           e.preventDefault();
+        }
+      }, {passive: false})
+    </script>
+  </body>
+</html>

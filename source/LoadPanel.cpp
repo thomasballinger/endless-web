@@ -46,6 +46,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <algorithm>
 #include <stdexcept>
 
+#ifdef __EMSCRIPTEN__
+#    include <emscripten.h>
+#endif
+
 using namespace std;
 
 namespace {
@@ -352,8 +356,9 @@ bool LoadPanel::Click(int x, int y, int clicks)
 		for(const auto &it : filesIt->second)
 			if(i++ == selected)
 			{
+				const bool sameSelected = selectedFile == it.first;
 				selectedFile = it.first;
-				if(clicks > 1)
+				if(sameSelected && clicks > 1)
 					KeyDown('l', 0, Command(), true);
 				break;
 			}
@@ -491,6 +496,14 @@ void LoadPanel::WriteSnapshot(const string &sourceFile, const string &snapshotNa
 		UpdateLists();
 		selectedFile = Files::Name(snapshotName);
 		loadedInfo.Load(Files::Saves() + selectedFile);
+
+#ifdef __EMSCRIPTEN__
+		// sync from persisted state into memory and then
+		EM_ASM(FS.syncfs(function(err) {
+			assert(!err);
+			console.log("save snapshot synced to IndexedDB");
+		}););
+#endif
 	}
 	else
 		GetUI()->Push(new Dialog("Error: unable to create the file \"" + snapshotName + "\"."));
