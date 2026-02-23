@@ -33,6 +33,10 @@ Developers
   W1zrad
   Zitchas
 
+WebAssembly Port
+  Michał Janiszewski (janisozaur)
+  Thomas Ballinger
+
 Major Programming
   AdamKauffman
   Amazinite
