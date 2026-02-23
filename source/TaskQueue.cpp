@@ -23,6 +23,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 using namespace std;
 
+#ifndef __EMSCRIPTEN__
 namespace {
 
 	// The main task queue used by the worker threads.
@@ -55,11 +56,13 @@ namespace {
 		vector<thread> threads;
 	} threads;
 }
+#endif // !__EMSCRIPTEN__
 
 
 
 void TaskQueue::SetWorkerThreadCount(uint64_t count)
 {
+#ifndef __EMSCRIPTEN__
 	if(count == 0 || threads.threads.size() == count)
 		return;
 
@@ -67,6 +70,8 @@ void TaskQueue::SetWorkerThreadCount(uint64_t count)
 	lock_guard<mutex> lock(asyncMutex);
 	shouldQuit = false;
 	new(&threads) WorkerThreads(count);
+#endif
+	// In Emscripten there is no worker thread pool to resize.
 }
 
 
@@ -85,6 +90,25 @@ TaskQueue::~TaskQueue()
 // any main thread task that still need to be executed!
 shared_future<void> TaskQueue::Run(function<void()> asyncTask, function<void()> syncTask)
 {
+#ifdef __EMSCRIPTEN__
+	// In Emscripten, execute tasks synchronously on the calling thread.
+	if(asyncTask)
+	{
+		try {
+			asyncTask();
+		}
+		catch(...)
+		{
+			auto exception = current_exception();
+			syncTask = [exception] { rethrow_exception(exception); };
+		}
+	}
+	if(syncTask)
+		syncTasks.push(std::move(syncTask));
+	promise<void> p;
+	p.set_value();
+	return p.get_future();
+#else
 	shared_future<void> result;
 	{
 		lock_guard<mutex> lock(asyncMutex);
@@ -99,6 +123,7 @@ shared_future<void> TaskQueue::Run(function<void()> asyncTask, function<void()> 
 	}
 	asyncCondition.notify_one();
 	return result;
+#endif
 }
 
 
@@ -106,6 +131,14 @@ shared_future<void> TaskQueue::Run(function<void()> asyncTask, function<void()> 
 // Process any tasks to be scheduled to be executed on the main thread.
 void TaskQueue::ProcessSyncTasks()
 {
+#ifdef __EMSCRIPTEN__
+	for(int i = 0; !syncTasks.empty() && i < MAX_SYNC_TASKS; ++i)
+	{
+		auto task = std::move(syncTasks.front());
+		syncTasks.pop();
+		task();
+	}
+#else
 	unique_lock<mutex> lock(syncMutex);
 	for(int i = 0; !syncTasks.empty() && i < MAX_SYNC_TASKS; ++i)
 	{
@@ -117,6 +150,7 @@ void TaskQueue::ProcessSyncTasks()
 		task();
 		lock.lock();
 	}
+#endif
 }
 
 
@@ -124,8 +158,11 @@ void TaskQueue::ProcessSyncTasks()
 // Waits for all of this queue's task to finish. Ignores any sync tasks to be processed.
 void TaskQueue::Wait()
 {
+#ifndef __EMSCRIPTEN__
 	while(!IsDone())
 		this_thread::yield();
+#endif
+	// In Emscripten, all tasks execute synchronously in Run(), so nothing to wait for.
 }
 
 
@@ -133,8 +170,12 @@ void TaskQueue::Wait()
 // Whether there are any outstanding async tasks left in this queue.
 bool TaskQueue::IsDone() const
 {
+#ifdef __EMSCRIPTEN__
+	return true;
+#else
 	lock_guard<mutex> lock(asyncMutex);
 	return futures.empty();
+#endif
 }
 
 
@@ -142,6 +183,7 @@ bool TaskQueue::IsDone() const
 // Thread entry point.
 void TaskQueue::ThreadLoop() noexcept
 {
+#ifndef __EMSCRIPTEN__
 	while(true)
 	{
 		unique_lock<mutex> lock(asyncMutex);
@@ -194,4 +236,5 @@ void TaskQueue::ThreadLoop() noexcept
 
 		asyncCondition.wait(lock, [] { return shouldQuit || !tasks.empty(); });
 	}
+#endif // !__EMSCRIPTEN__
 }
