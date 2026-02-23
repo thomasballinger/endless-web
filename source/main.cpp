@@ -63,6 +63,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <exception>
 #include <string>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #ifdef _WIN32
 #define STRICT
 #define WIN32_LEAN_AND_MEAN
@@ -148,6 +152,18 @@ int main(int argc, char *argv[])
 			noTestMute = true;
 	}
 	printData = PrintData::IsPrintDataArgument(argv);
+
+#ifdef __EMSCRIPTEN__
+	EM_ASM(
+		if(!FS.analyzePath('/saves').exists)
+			FS.mkdir('/saves');
+		FS.mount(IDBFS, {}, '/saves');
+		FS.syncfs(true, function(err) {
+			if(err) console.error('IDBFS load error:', err);
+		});
+	);
+#endif
+
 	Files::Init(argv);
 
 	// Whether we are running an integration test.
