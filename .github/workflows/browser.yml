@@ -8,7 +8,7 @@ on:
       - opened
 
 env:
-  EM_VERSION: 3.1.24
+  EM_VERSION: 5.0.1
   EM_CACHE_FOLDER: 'emsdk-cache'
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
     environment: aws-deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1
@@ -25,7 +25,7 @@ jobs:
 
       - name: Cache emscripten
         id: cache-emscripten
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-emscripten
         with:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Cache libjpegturbo
         id: cache-libjpegturbo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-libjpegturbo
         with:
@@ -52,7 +52,7 @@ jobs:
 
       - name: Cache build directory
         id: cache-build
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-build
         with:
@@ -60,7 +60,7 @@ jobs:
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
