@@ -26,7 +26,7 @@ ifndef EMSCRIPTEN_ENV
 	$(error "emmake is not available, activate the emscripten env first")
 endif
 	cd libjpeg-turbo-2.1.0; emcmake cmake -G"Unix Makefiles" -DWITH_SIMD=0 -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -Wno-dev
-	cd libjpeg-turbo-2.1.0; sed -i '' 's/SIZEOF_SIZE_T  [0-9]*/SIZEOF_SIZE_T  4/' jconfigint.h
+	cd libjpeg-turbo-2.1.0; sed 's/SIZEOF_SIZE_T  [0-9]*/SIZEOF_SIZE_T  4/' jconfigint.h > jconfigint.h.tmp && mv jconfigint.h.tmp jconfigint.h
 	cd libjpeg-turbo-2.1.0; emmake $(MAKE)
 dev: endless-sky.js dataversion.js Ubuntu-Regular.ttf title.png
 	emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing endless-sky.html
