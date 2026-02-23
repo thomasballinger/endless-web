@@ -16,7 +16,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Files.h"
 
 #include "Logger.h"
+#ifndef __EMSCRIPTEN__
 #include "ZipFile.h"
+#endif
 
 #include <SDL2/SDL.h>
 
@@ -63,6 +65,16 @@ namespace {
 #endif
 	}
 
+#ifdef __EMSCRIPTEN__
+	// No zip file support needed in the web build — data files are preloaded
+	// into Emscripten's virtual filesystem as loose files.
+	struct ZipFile {
+		vector<filesystem::path> ListFiles(const filesystem::path &, bool, bool) { return {}; }
+		bool Exists(const filesystem::path &) { return false; }
+		string ReadFile(const filesystem::path &) { return {}; }
+	};
+	shared_ptr<ZipFile> GetZipFile(const filesystem::path &) { return {}; }
+#else
 	/// The open zip files per thread. Since ZLIB doesn't support multithreaded access on the same zip handle,
 	/// each file is opened multiple times on demand.
 	thread_local map<filesystem::path, shared_ptr<ZipFile>> OPEN_ZIP_FILES;
@@ -91,6 +103,7 @@ namespace {
 
 		return {};
 	}
+#endif
 }
 
 
@@ -109,6 +122,10 @@ void Files::Init(const char *const *argv)
 
 	}
 
+#ifdef __EMSCRIPTEN__
+	resources = "/";
+	config = "/";
+#else
 	if(resources.empty())
 	{
 		// Find the path to the resource directory. This will depend on the
@@ -146,11 +163,13 @@ void Files::Init(const char *const *argv)
 			throw runtime_error("Unable to find the resource directories!");
 		resources = resources.parent_path();
 	}
+#endif // __EMSCRIPTEN__
 	dataPath = resources / "data";
 	imagePath = resources / "images";
 	soundPath = resources / "sounds";
 	globalPluginPath = resources / "plugins";
 
+#ifndef __EMSCRIPTEN__
 	if(config.empty())
 	{
 		// Create the directory for the saved games, preferences, etc., if necessary.
@@ -165,6 +184,7 @@ void Files::Init(const char *const *argv)
 		throw runtime_error("Unable to create config directory!");
 
 	config = filesystem::canonical(config);
+#endif
 
 	savePath = config / "saves";
 	CreateFolder(savePath);
