@@ -1,0 +1,73 @@
+name: browser
+
+on:
+  push:
+  pull_request:
+    types:
+      - synchronize
+      - opened
+
+env:
+  EM_VERSION: 3.1.24
+  EM_CACHE_FOLDER: 'emsdk-cache'
+
+jobs:
+  build:
+    environment: aws-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ env.EM_VERSION }}
+
+      - name: Cache emscripten
+        id: cache-emscripten
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-emscripten
+        with:
+          path: emsdk
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
+
+      - name: install emsdk
+        if: steps.cache-emscripten.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          ./emsdk/emsdk install ${{ env.EM_VERSION }}
+          ./emsdk/emsdk activate ${{ env.EM_VERSION }}
+
+      - name: Cache libjpegturbo
+        id: cache-libjpegturbo
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-libjpegturbo
+        with:
+          path: |
+            libjpeg-turbo-2.1.0/
+            2.1.0.tar.gz
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
+
+      - name: Cache build directory
+        id: cache-build
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-build
+        with:
+          path: build
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Build
+        run: source emsdk/emsdk_env.sh; make output/index.html
+      - name: Deploy
+        if: ${{ github.ref == 'refs/heads/endless-web' && github.event_name == 'push' }}
+        run: source emsdk/emsdk_env.sh; make deploy
