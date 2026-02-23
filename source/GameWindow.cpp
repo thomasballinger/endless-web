@@ -32,9 +32,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 using namespace std;
 
 namespace {
+#ifndef __EMSCRIPTEN__
 	// The minimal screen resolution requirements.
 	constexpr int minWidth = 1024;
 	constexpr int minHeight = 768;
+#endif
 
 	SDL_Window *mainWindow = nullptr;
 	SDL_GLContext context = nullptr;
@@ -118,11 +120,13 @@ bool GameWindow::Init(bool headless)
 	// Make the window just slightly smaller than the monitor resolution.
 	int maxWidth = mode.w;
 	int maxHeight = mode.h;
+#ifndef __EMSCRIPTEN__
 	if(maxWidth < minWidth || maxHeight < minHeight)
 		Logger::Log("Monitor resolution is too small! Minimal requirement is "
 			+ to_string(minWidth) + 'x' + to_string(minHeight)
 			+ ", while your resolution is " + to_string(maxWidth) + 'x' + to_string(maxHeight) + '.',
 			Logger::Level::WARNING);
+#endif
 
 	int windowWidth = maxWidth - 100;
 	int windowHeight = maxHeight - 100;
@@ -452,6 +456,7 @@ void GameWindow::ToggleBlockScreenSaver()
 void GameWindow::ExitWithError(const string &message, bool doPopUp)
 {
 	// Print the error message in the terminal and the error file.
+	printf("Error: %s\n", message.c_str());
 	Logger::Log(message, Logger::Level::ERROR);
 	checkSDLerror();
 

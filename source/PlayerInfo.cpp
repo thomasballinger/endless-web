@@ -15,6 +15,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "PlayerInfo.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include "AI.h"
 #include "audio/Audio.h"
 #include "ConversationPanel.h"
@@ -682,6 +686,14 @@ void PlayerInfo::Save() const
 	// Save global conditions:
 	DataWriter globalConditions(Files::Config() / "global conditions.txt");
 	GameData::GlobalConditions().Save(globalConditions);
+
+#ifdef __EMSCRIPTEN__
+	EM_ASM(
+		FS.syncfs(false, function(err) {
+			if(err) console.error('IDBFS save error:', err);
+		});
+	);
+#endif
 }
 
 
@@ -4945,6 +4957,14 @@ void PlayerInfo::Autosave() const
 
 	string path = filePath.substr(0, filePath.length() - 4) + "~autosave.txt";
 	Save(path);
+
+#ifdef __EMSCRIPTEN__
+	EM_ASM(
+		FS.syncfs(false, function(err) {
+			if(err) console.error('IDBFS autosave error:', err);
+		});
+	);
+#endif
 }
 
 
