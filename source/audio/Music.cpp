@@ -16,9 +16,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Music.h"
 
 #include "../Files.h"
+#ifndef __EMSCRIPTEN__
 #include "supplier/FlacSupplier.h"
-#include "../text/Format.h"
 #include "supplier/Mp3Supplier.h"
+#endif
+#include "../text/Format.h"
 
 
 #include <map>
@@ -37,6 +39,10 @@ namespace {
 
 void Music::Init(const vector<filesystem::path> &sources)
 {
+#ifdef __EMSCRIPTEN__
+	// Music is disabled under Emscripten.
+	(void)sources;
+#else
 	for(const auto &source : sources)
 	{
 		// Find all the sound files that this resource source provides.
@@ -53,12 +59,18 @@ void Music::Init(const vector<filesystem::path> &sources)
 				paths[name] = {path, MusicFileType::FLAC};
 		}
 	}
+#endif
 }
 
 
 
 unique_ptr<AudioSupplier> Music::CreateSupplier(const string &name, bool looping)
 {
+#ifdef __EMSCRIPTEN__
+	(void)name;
+	(void)looping;
+	return {};
+#else
 	if(paths.contains(name))
 		switch(paths[name].second)
 		{
@@ -70,4 +82,5 @@ unique_ptr<AudioSupplier> Music::CreateSupplier(const string &name, bool looping
 					new FlacSupplier{Files::Open(paths[name].first), looping}};
 		}
 	return {};
+#endif
 }
