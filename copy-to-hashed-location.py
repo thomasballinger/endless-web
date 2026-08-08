@@ -54,8 +54,11 @@ if __name__ == '__main__':
 	sources = sys.argv[1:-1]
 	if not os.path.isdir(target):
 		raise ValueError("dest must be a directory")
-	for file_to_modify in FILES_TO_MODIFY:
-		if not os.path.exists(file_to_modify):
-			raise ValueError(file_to_modify + " must exist to be modified")
+	# endless-sky.js is hashed last, after it has itself been rewritten and moved
+	# into place, so by then it is no longer available to be modified. Skip any
+	# file that has already been consumed, but require at least one to remain.
+	FILES_TO_MODIFY = [f for f in FILES_TO_MODIFY if os.path.exists(f)]
+	if not FILES_TO_MODIFY:
+		raise ValueError("none of the files to modify exist")
 	for source in sources:
 		copy_and_add_hash(target, source, FILES_TO_MODIFY)
