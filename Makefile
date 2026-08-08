@@ -127,14 +127,22 @@ output/index.html: endless-sky.js endless-sky.html favicon.ico Ubuntu-Regular.tt
 	mkdir -p output
 	cp endless-sky.html to-be-modified-endless-sky.html
 	cp endless-sky.js to-be-modified-endless-sky.js
-	./copy-to-hashed-location.py endless-sky.wasm endless-sky.data endless-sky.js output/
+	./copy-to-hashed-location.py endless-sky.wasm endless-sky.data output/
 	mkdir output/js
 	./copy-to-hashed-location.py js/* output/
 	./copy-to-hashed-location.py dataversion.js output/
 	./copy-to-hashed-location.py loading.mp3 output/
 	./copy-to-hashed-location.py Ubuntu-Regular.ttf output/
 	cp favicon.ico output/
-	mv to-be-modified-endless-sky.js output/endless-sky-*.js
+	# Hash endless-sky.js only after its .wasm and .data references have been
+	# rewritten, so the filename reflects the bytes that actually ship. Hashing it
+	# beforehand meant two builds differing only in C++ produced an identical
+	# filename of identical length, so 'aws s3 sync --size-only' silently skipped
+	# uploading the newer one and the site kept loading the previous wasm.
+	mv endless-sky.js endless-sky.js.prehash
+	mv to-be-modified-endless-sky.js endless-sky.js
+	./copy-to-hashed-location.py endless-sky.js output/
+	mv endless-sky.js.prehash endless-sky.js
 	mv to-be-modified-endless-sky.html output/index.html
 test: output/index.html
 	cd output; emrun --serve_after_close --serve_after_exit --browser chrome --private_browsing index.html
