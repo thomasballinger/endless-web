@@ -15,28 +15,20 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Random.h"
 
-#include <random>
-
-#ifndef __linux__
 #include <mutex>
-#endif
+#include <random>
 
 using namespace std;
 
-// Right now thread_local storage is only supported under Linux.
+// A single generator is shared by all threads, so that seeding it (e.g. with
+// --rngseed) makes the simulation reproducible no matter which worker thread
+// runs each step.
 namespace {
-#ifndef __linux__
-	mutex workaroundMutex;
+	mutex generatorMutex;
 	mt19937_64 gen;
 	uniform_int_distribution<uint32_t> uniform;
 	uniform_real_distribution<double> real;
 	normal_distribution<double> normal;
-#else
-	thread_local mt19937_64 gen;
-	thread_local uniform_int_distribution<uint32_t> uniform;
-	thread_local uniform_real_distribution<double> real;
-	thread_local normal_distribution<double> normal;
-#endif
 
 	bool useFixedSeed = false;
 	uint64_t fixedSeed = 0;
@@ -48,9 +40,7 @@ namespace {
 // numbers it produced previously).
 void Random::Seed(uint64_t seed)
 {
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	gen.seed(useFixedSeed ? fixedSeed : seed);
 }
 
@@ -66,9 +56,7 @@ void Random::SetFixedSeed(uint64_t seed)
 
 uint32_t Random::Int()
 {
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	return uniform(gen);
 }
 
@@ -76,9 +64,7 @@ uint32_t Random::Int()
 
 uint32_t Random::Int(uint32_t upper_bound)
 {
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	const uint32_t x = uniform(gen);
 	return (static_cast<uint64_t>(x) * static_cast<uint64_t>(upper_bound)) >> 32;
 }
@@ -87,9 +73,7 @@ uint32_t Random::Int(uint32_t upper_bound)
 
 double Random::Real()
 {
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	return real(gen);
 }
 
@@ -100,9 +84,7 @@ double Random::Real()
 uint32_t Random::Polya(uint32_t k, double p)
 {
 	negative_binomial_distribution<uint32_t> polya(k, p);
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	return polya(gen);
 }
 
@@ -112,9 +94,7 @@ uint32_t Random::Polya(uint32_t k, double p)
 uint32_t Random::Binomial(uint32_t t, double p)
 {
 	binomial_distribution<uint32_t> binomial(t, p);
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	return binomial(gen);
 }
 
@@ -123,8 +103,6 @@ uint32_t Random::Binomial(uint32_t t, double p)
 // Get a normally distributed number with standard or specified mean and stddev.
 double Random::Normal(double mean, double sigma)
 {
-#ifndef __linux__
-	lock_guard<mutex> lock(workaroundMutex);
-#endif
+	lock_guard<mutex> lock(generatorMutex);
 	return sigma * normal(gen) + mean;
 }
