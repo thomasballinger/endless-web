@@ -1653,8 +1653,9 @@ void Engine::CalculateStep()
 	const Ship *flagship = player.Flagship();
 	const System *playerSystem = player.GetSystem();
 
-	// DETERMINISM PROBE (local experiment, not for commit): print a hash of
-	// all ship kinematics every 60 steps when ES_STATE_HASH is set.
+	// When ES_STATE_HASH is set, print a hash of all ship kinematics every 60
+	// steps. tests/ai/compare-runs.sh uses this to check that runs with the same
+	// --rngseed are identical, and that AI changes don't alter behavior.
 	static const bool printStateHash = getenv("ES_STATE_HASH");
 	static uint64_t probeStep = 0;
 	if(printStateHash && !(++probeStep % 60))
