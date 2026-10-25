@@ -80,6 +80,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <string>
 
 using namespace std;
@@ -1686,6 +1687,15 @@ void Engine::CalculateStep()
 	if(printStateHash && detailParsed && static_cast<long long>(probeStep) >= detailFirst
 			&& static_cast<long long>(probeStep) <= detailLast)
 	{
+		// Maps keyed by pointer iterate in memory address order, which can
+		// differ between builds, so show the order of the governments.
+		set<const Government *> governments;
+		for(const shared_ptr<Ship> &ship : ships)
+			governments.insert(ship->GetGovernment());
+		printf("GOVORDER %llu", static_cast<unsigned long long>(probeStep));
+		for(const Government *government : governments)
+			printf(" |%s", government ? government->TrueName().c_str() : "none");
+		printf("\n");
 		for(const shared_ptr<Ship> &ship : ships)
 		{
 			shared_ptr<const Ship> target = ship->GetTargetShip();

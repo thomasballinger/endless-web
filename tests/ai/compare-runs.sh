@@ -20,7 +20,8 @@
 # Each VARIANT is "label" or "label:VAR=value VAR2=value ...". Every variant is
 # run once with its environment variables set, and its hashes are compared to
 # the first variant's. A variant can set BINARY=path to run a different build,
-# e.g. to compare a refactored AI against the previous commit. With no
+# e.g. to compare a refactored AI against the previous commit, or
+# RESOURCES=path to use different game data. With no
 # variants, the scenario is simply run twice.
 #
 # Environment:
@@ -65,10 +66,14 @@ run_variant() {
 		envs=${1#*:}
 	fi
 	local binary=$BINARY
+	local resources=$RESOURCES
 	local word
 	for word in $envs; do
 		if [[ "$word" == BINARY=* ]]; then
 			binary=$(realpath "${word#BINARY=}")
+			envs=${envs//$word/}
+		elif [[ "$word" == RESOURCES=* ]]; then
+			resources=${word#RESOURCES=}
 			envs=${envs//$word/}
 		fi
 	done
@@ -76,7 +81,7 @@ run_variant() {
 	rm -rf "$config"
 	cp -r "$CONFIG_TEMPLATE" "$config"
 	# shellcheck disable=SC2086
-	env ES_STATE_HASH=1 $envs "${RUNNER[@]}" "$binary" --config "$config" --resources "$RESOURCES" \
+	env ES_STATE_HASH=1 $envs "${RUNNER[@]}" "$binary" --config "$config" --resources "$resources" \
 		--rngseed "$SEED" ${ES_EXTRA_ARGS:-} --test "$TEST_NAME" > "$OUT/$label.log" 2>&1
 	local status=$?
 	grep '^STATEHASH' "$OUT/$label.log" > "$OUT/$label.hashes"
