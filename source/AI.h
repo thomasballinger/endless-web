@@ -311,7 +311,10 @@ private:
 	std::map<const Ship *, int> miningTime;
 	std::map<const Ship *, double> appeasementThreshold;
 	std::map<const Ship *, const Ship *> boarders;
-	std::map<const Ship *, std::set<std::weak_ptr<const Ship>, std::owner_less<std::weak_ptr<const Ship>>>> closeBy;
+	// Ships each ship may need to scatter away from. This is a vector rather
+	// than a set so that the order they are checked in, which decides which
+	// way a ship turns, doesn't depend on where ships are in memory.
+	std::map<const Ship *, std::vector<std::weak_ptr<const Ship>>> closeBy;
 
 	// Records for formations flying around leadships and other objects.
 	std::map<const Body *, std::map<const FormationPattern *, FormationPositioner>> formations;
@@ -320,9 +323,16 @@ private:
 	std::map<const Ship *, int64_t> shipStrength;
 	std::map<const Government *, int64_t> enemyStrength;
 	std::map<const Government *, int64_t> allyStrength;
-	std::map<const Government *, std::vector<Ship *>> governmentRosters;
-	std::map<const Government *, std::vector<Ship *>> enemyLists;
-	std::map<const Government *, std::vector<Ship *>> allyLists;
+	// Iterating over these determines the order in which ships are considered
+	// as targets, so they are sorted by government name rather than by address
+	// to keep the AI's choices independent of where objects are in memory.
+	class GovernmentOrder {
+	public:
+		bool operator()(const Government *a, const Government *b) const;
+	};
+	std::map<const Government *, std::vector<Ship *>, GovernmentOrder> governmentRosters;
+	std::map<const Government *, std::vector<Ship *>, GovernmentOrder> enemyLists;
+	std::map<const Government *, std::vector<Ship *>, GovernmentOrder> allyLists;
 
 	// Route planning cache:
 	std::unordered_map<RouteCacheKey, RoutePlan, RouteCacheKey::HashFunction> routeCache;

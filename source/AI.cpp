@@ -817,6 +817,17 @@ namespace {
 
 
 
+bool AI::GovernmentOrder::operator()(const Government *a, const Government *b) const
+{
+	if(!a || !b)
+		return !a && b;
+	if(a->TrueName() != b->TrueName())
+		return a->TrueName() < b->TrueName();
+	return a < b;
+}
+
+
+
 void AI::Step(Command &activeCommands)
 {
 	// First, figure out the comparative strengths of the present governments.
@@ -3808,7 +3819,7 @@ void AI::DoScatter(const Ship &ship, Command &command, bool recheckCloseShips)
 			Point offset = other->Position() - ship.Position();
 			if(offset.LengthSquared() > SCATTER_TRACK)
 				continue;
-			close.insert(other);
+			close.emplace_back(other);
 		}
 	}
 
@@ -3849,7 +3860,11 @@ void AI::DoScatter(const Ship &ship, Command &command, bool recheckCloseShips)
 		{
 			command.SetTurn(flip * offset.Cross(ship.Facing().Unit()) > 0. ? 1. : -1.);
 			// The other ship should also know to turn away from this one.
-			closeBy[other.get()].insert(ship.weak_from_this());
+			auto &otherClose = closeBy[other.get()];
+			weak_ptr<const Ship> self = ship.weak_from_this();
+			if(none_of(otherClose.begin(), otherClose.end(), [&self](const weak_ptr<const Ship> &entry)
+					{ return !entry.owner_before(self) && !self.owner_before(entry); }))
+				otherClose.push_back(self);
 			return;
 		}
 		else
