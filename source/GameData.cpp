@@ -574,6 +574,13 @@ const Set<Fleet> &GameData::Fleets()
 
 
 
+const Set<AIRules> &GameData::AIRuleSets()
+{
+	return objects.aiRules;
+}
+
+
+
 const Set<FormationPattern> &GameData::Formations()
 {
 	return objects.formations;

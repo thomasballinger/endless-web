@@ -16,6 +16,8 @@ endif()
 target_sources(EndlessSkyLib PRIVATE
 	AI.cpp
 	AI.h
+	AIRules.cpp
+	AIRules.h
 	Account.cpp
 	Account.h
 	AlertLabel.cpp

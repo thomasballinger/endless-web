@@ -460,6 +460,21 @@ bool Personality::IsQuiet() const
 
 
 
+int Personality::TraitIndex(const string &name)
+{
+	auto it = TOKEN.find(name);
+	return it == TOKEN.end() ? -1 : it->second;
+}
+
+
+
+bool Personality::Has(int traitIndex) const
+{
+	return traitIndex >= 0 && traitIndex < PERSONALITY_COUNT && flags.test(traitIndex);
+}
+
+
+
 const Confusion *Personality::GetConfusion() const
 {
 	return confusion.Ptr();

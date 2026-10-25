@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Set.h"
 #include "Shop.h"
 
+#include "AIRules.h"
 #include "CategoryList.h"
 #include "Color.h"
 #include "Confusion.h"
@@ -111,6 +112,7 @@ private:
 
 
 private:
+	Set<AIRules> aiRules;
 	Set<Color> colors;
 	Set<Swizzle> swizzles;
 	Set<Confusion> confusions;

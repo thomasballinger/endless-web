@@ -1674,6 +1674,29 @@ void Engine::CalculateStep()
 			static_cast<unsigned long long>(h));
 		fflush(stdout);
 	}
+	// With ES_STATE_DETAIL=<first>-<last> as well, print every ship's state on
+	// each of those steps, to find exactly where two runs diverge.
+	static long long detailFirst = -1;
+	static long long detailLast = -1;
+	static const bool detailParsed = [] {
+		if(const char *detail = getenv("ES_STATE_DETAIL"))
+			return sscanf(detail, "%lld-%lld", &detailFirst, &detailLast) == 2;
+		return false;
+	}();
+	if(printStateHash && detailParsed && static_cast<long long>(probeStep) >= detailFirst
+			&& static_cast<long long>(probeStep) <= detailLast)
+	{
+		for(const shared_ptr<Ship> &ship : ships)
+		{
+			shared_ptr<const Ship> target = ship->GetTargetShip();
+			printf("STATE %llu %s|%s pos=%.17g,%.17g vel=%.17g,%.17g facing=%.17g target=%s\n",
+				static_cast<unsigned long long>(probeStep), ship->GivenName().c_str(),
+				ship->GetGovernment() ? ship->GetGovernment()->TrueName().c_str() : "none",
+				ship->Position().X(), ship->Position().Y(), ship->Velocity().X(), ship->Velocity().Y(),
+				ship->Facing().Degrees(), target ? target->GivenName().c_str() : "none");
+		}
+		fflush(stdout);
+	}
 
 	if(timePaused)
 	{

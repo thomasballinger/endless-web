@@ -442,6 +442,8 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 				*fleet = Fleet();
 			fleet->Load(node);
 		}
+		else if(key == "ai" && hasValue)
+			aiRules.Get(node.Token(1))->Load(node);
 		else if(key == "formation" && hasValue)
 		{
 			FormationPattern *formation = formations.Get(node.Token(1));

@@ -393,6 +393,149 @@ test-data "AI Combat Carriers Save"
 		visited Vega
 		visited Menkent
 
+test-data "AI Avgi Space Save"
+	category "savegame"
+	contents
+		pilot Bobbi Bughunter
+		date 16 11 3013
+		system Ne-20
+		planet Nilokep
+		clearance
+		# Set some reputations to positive to avoid combat
+		"reputation with"
+			Bounty 1
+			"Bounty Hunter" 1
+			Pirate 1
+		# What you own:
+		ship "Star Barge"
+			name "Buggy Barge"
+			sprite "ship/star barge"
+			attributes
+				category "Light Freighter"
+				cost 190000
+				mass 70
+				bunks 3
+				"cargo space" 50
+				drag 2.1
+				"engine capacity" 400
+				"fuel capacity" 300
+				"heat dissipation" 0.8
+				hull 1000
+				"outfit space" 1300
+				"required crew" 1
+				shields 600
+				"turret mounts" 1
+				"weapon capacity" 200
+			outfits
+				"X1700 Ion Thruster"
+				"X1200 Ion Steering"
+				Hyperdrive
+				"Anti-Missile Turret"
+				"D14-RN Shield Generator"
+				"nGVF-BB Fuel Cell"
+				"LP036a Battery Pack"
+			crew 1
+			fuel 300
+			shields 600
+			hull 1000
+			engine -9 38 1
+			engine 9 38 1
+			turret 0 -8 "Anti-Missile Turret"
+			leak leak 60 50
+			explode "tiny explosion" 10
+			explode "small explosion" 10
+			system Ne-20
+			planet Nilokep
+		ship "Star Barge"
+			name "Critical Container"
+			sprite "ship/star barge"
+			attributes
+				category "Light Freighter"
+				cost 190000
+				mass 70
+				bunks 3
+				"cargo space" 50
+				drag 2.1
+				"engine capacity" 400
+				"fuel capacity" 300
+				"heat dissipation" 0.8
+				hull 1000
+				"outfit space" 1300
+				"required crew" 1
+				shields 600
+				"turret mounts" 1
+				"weapon capacity" 200
+			outfits
+				"X1700 Ion Thruster"
+				"X1200 Ion Steering"
+				Hyperdrive
+				"Anti-Missile Turret"
+				"D14-RN Shield Generator"
+				"nGVF-BB Fuel Cell"
+				"LP036a Battery Pack"
+			crew 1
+			fuel 300
+			shields 600
+			hull 1000
+			engine -9 38 1
+			engine 9 38 1
+			turret 0 -8 "Anti-Missile Turret"
+			leak leak 60 50
+			explode "tiny explosion" 10
+			explode "small explosion" 10
+			system Ne-20
+			planet Nilokep
+		ship "Star Barge"
+			name "Errorous Enclosement"
+			sprite "ship/star barge"
+			attributes
+				category "Light Freighter"
+				cost 190000
+				mass 70
+				bunks 3
+				"cargo space" 50
+				drag 2.1
+				"engine capacity" 400
+				"fuel capacity" 300
+				"heat dissipation" 0.8
+				hull 1000
+				"outfit space" 1300
+				"required crew" 1
+				shields 600
+				"turret mounts" 1
+				"weapon capacity" 200
+			outfits
+				"X1700 Ion Thruster"
+				"X1200 Ion Steering"
+				Hyperdrive
+				"Anti-Missile Turret"
+				"D14-RN Shield Generator"
+				"nGVF-BB Fuel Cell"
+				"LP036a Battery Pack"
+			crew 1
+			fuel 300
+			shields 600
+			hull 1000
+			engine -9 38 1
+			engine 9 38 1
+			turret 0 -8 "Anti-Missile Turret"
+			leak leak 60 50
+			explode "tiny explosion" 10
+			explode "small explosion" 10
+			system Ne-20
+			planet Nilokep
+		account
+			credits 131000
+			score 400
+			history
+		cargo
+			commodities
+				Food 150
+		visited Ne-20
+		"visited planet" Nilokep
+		visited "Alpha Centauri"
+		visited "Vega"
+		visited "Menkent"
 
 test "AI Scenario - Sol traffic"
 	status active
@@ -416,6 +559,23 @@ test "AI Scenario - Al Dhanab carriers and pirates"
 	description "Depart Burthen with carriers, fighters and escorts in a system with pirates, merchants and miners."
 	sequence
 		inject "AI Combat Carriers Save"
+		call "Load First Savegame"
+		call "Depart"
+		apply
+			"test: steps to wait" = 400
+		label "idle"
+		input
+		apply
+			"test: steps to wait" = "test: steps to wait" - 1
+		branch "idle"
+			"test: steps to wait" > 0
+
+
+test "AI Scenario - Ne-20 Avgi patrols"
+	status active
+	description "Depart Nilokep with two escorts where Avgi patrols survey, Dissonance merchants swarm and Aberrant ships act secretively."
+	sequence
+		inject "AI Avgi Space Save"
 		call "Load First Savegame"
 		call "Depart"
 		apply

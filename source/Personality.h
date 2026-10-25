@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "ExclusiveItem.h"
 
 #include <bitset>
+#include <string>
 
 class Confusion;
 class DataNode;
@@ -86,6 +87,11 @@ public:
 	bool IsMute() const;
 	bool IsDecloaked() const;
 	bool IsQuiet() const;
+
+	// Look up a trait by the name used in data files, e.g. "timid". Returns -1
+	// if there is no such trait. Has() takes an index returned by TraitIndex().
+	static int TraitIndex(const std::string &name);
+	bool Has(int traitIndex) const;
 
 	// Current inaccuracy in this ship's targeting:
 	const Confusion *GetConfusion() const;

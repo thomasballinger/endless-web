@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "AIRules.h"
 #include "Command.h"
 #include "FireCommand.h"
 #include "FormationPositioner.h"
@@ -140,6 +141,29 @@ private:
 	std::shared_ptr<Ship> FindNonHostileTarget(const Ship &ship) const;
 	// Obtain a list of ships matching the desired hostility.
 	std::vector<Ship *> GetShipsList(const Ship &ship, bool targetEnemies, double maxRange = -1.) const;
+
+	// Each step, every AI-controlled ship takes a "turn" by running the rules
+	// in its AIRules. StepState is shared by every ship's turn in one step,
+	// and ShipTurn holds what one ship has figured out so far in its turn.
+	// Both are defined in AI.cpp.
+	class StepState;
+	class ShipTurn;
+	// How a turn action affects the rest of the ship's turn.
+	enum class TurnResult {
+		// Go on to the next rule.
+		CONTINUE,
+		// End the turn without issuing any commands.
+		END_SILENTLY,
+		// End the turn, issuing the movement commands but not firing commands.
+		END_WITH_COMMAND,
+		// End the turn, issuing both movement and firing commands.
+		END_WITH_ALL_COMMANDS
+	};
+	void TakeTurn(ShipTurn &turn, StepState &state);
+	bool ConditionsHold(const std::vector<AIRules::Condition> &conditions, const ShipTurn &turn,
+		const StepState &state);
+	TurnResult DoTurnAction(AIRules::TurnAction action, ShipTurn &turn, StepState &state);
+	bool DoMovementAction(AIRules::MovementAction action, ShipTurn &turn);
 
 	bool FollowOrders(Ship &ship, Command &command);
 	void MoveInFormation(Ship &ship, Command &command);

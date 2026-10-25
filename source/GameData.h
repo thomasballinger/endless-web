@@ -29,6 +29,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+class AIRules;
 class CategoryList;
 class Color;
 class ConditionsStore;
@@ -132,6 +133,7 @@ public:
 	static const Set<Effect> &Effects();
 	static const Set<GameEvent> &Events();
 	static const Set<Fleet> &Fleets();
+	static const Set<AIRules> &AIRuleSets();
 	static const Set<FormationPattern> &Formations();
 	static const Set<Galaxy> &Galaxies();
 	static const Set<Government> &Governments();

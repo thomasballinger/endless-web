@@ -30,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Hardpoint.h"
 #include "Hasher.h"
 #include "JumpType.h"
+#include "Logger.h"
 #include "image/Mask.h"
 #include "Messages.h"
 #include "Minable.h"
@@ -54,6 +55,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <ranges>
 #include <utility>
@@ -729,6 +732,91 @@ void AI::ClearOrders()
 
 
 
+// What one ship has figured out so far during its turn. The rules for the
+// turn read and update these values in order.
+class AI::ShipTurn {
+public:
+	ShipTurn(const shared_ptr<Ship> &ship, const System *playerSystem)
+		: it(ship), gov(ship->GetGovernment()), personality(ship->GetPersonality()),
+		healthRemaining(ship->HealthFraction()), isPresent(ship->GetSystem() == playerSystem),
+		isStranded(IsStranded(*ship)), thisIsLaunching(isPresent && HasDeployments(*ship))
+	{
+	}
+
+	const shared_ptr<Ship> &it;
+	const Government *gov;
+	const Personality &personality;
+	double healthRemaining;
+	bool isPresent;
+	bool isStranded;
+	bool thisIsLaunching;
+	const AIRules *movementRules = nullptr;
+
+	Command command;
+	shared_ptr<Ship> parent;
+	shared_ptr<Ship> target;
+	shared_ptr<Minable> targetAsteroid;
+	shared_ptr<Flotsam> targetFlotsam;
+	bool shouldFlee = false;
+	double targetDistance = numeric_limits<double>::infinity();
+	bool strandedWithHelper = false;
+	bool mustRecall = false;
+};
+
+
+
+// Values shared by every ship's turn during one step.
+class AI::StepState {
+public:
+	const Ship *flagship = nullptr;
+	const System *playerSystem = nullptr;
+	const AIRules *defaultRules = nullptr;
+	const AIRules *escortRules = nullptr;
+	int targetStep = 0;
+	int targetTurn = 0;
+	int scatterTurn = 0;
+	int minerCount = 0;
+	int maxMinerCount = 0;
+	bool opportunisticEscorts = false;
+	bool fightersRetreat = false;
+	int npcMaxMiningTime = 0;
+};
+
+
+
+namespace {
+	// When ES_AI_RULE_STATS is set, count how often each AI rule runs and how
+	// often it ends a ship's turn (or, for movement rules, how often it moves
+	// the ship), and print the counts when the game exits.
+	map<string, pair<uint64_t, uint64_t>> ruleStats;
+
+	void PrintRuleStats()
+	{
+		printf("AI rule usage (runs, turns ended or moves made):\n");
+		for(const auto &[rule, counts] : ruleStats)
+			printf("  %10llu %10llu  %s\n", static_cast<unsigned long long>(counts.first),
+				static_cast<unsigned long long>(counts.second), rule.c_str());
+		fflush(stdout);
+	}
+
+	void RecordRuleUse(const AIRules &rules, const char *list, size_t index, const string &description,
+		bool ended)
+	{
+		static const bool collect = getenv("ES_AI_RULE_STATS");
+		if(!collect)
+			return;
+		if(ruleStats.empty())
+			atexit(PrintRuleStats);
+		char prefix[16];
+		snprintf(prefix, sizeof(prefix), " %02zu ", index);
+		auto &counts = ruleStats[rules.Name() + " " + list + prefix + description];
+		++counts.first;
+		counts.second += ended;
+	}
+}
+
+
+
 void AI::Step(Command &activeCommands)
 {
 	// First, figure out the comparative strengths of the present governments.
@@ -769,16 +857,25 @@ void AI::Step(Command &activeCommands)
 	// even if it's minor. This means that things occur slightly off of exactly once per second, but the difference in
 	// behavior between the two methods is negligible.
 	step = (step + 1) & 63;
+	StepState state;
+	state.flagship = flagship;
+	state.playerSystem = playerSystem;
 	// Targeting occurs about twice per second, so the target step only goes from 0 to 30.
-	int targetStep = step & 31;
-	int targetTurn = 0;
-	// Scatter recalculations occur about once per second, so it can compare against the full step counter.
-	int scatterTurn = 0;
-	int minerCount = 0;
-	const int maxMinerCount = minables.empty() ? 0 : 9;
-	bool opportunisticEscorts = !Preferences::Has("Turrets focus fire");
-	bool fightersRetreat = Preferences::Has("Damaged fighters retreat");
-	const int npcMaxMiningTime = GameData::GetGamerules().NPCMaxMiningTime();
+	state.targetStep = step & 31;
+	state.maxMinerCount = minables.empty() ? 0 : 9;
+	state.opportunisticEscorts = !Preferences::Has("Turrets focus fire");
+	state.fightersRetreat = Preferences::Has("Damaged fighters retreat");
+	state.npcMaxMiningTime = GameData::GetGamerules().NPCMaxMiningTime();
+	state.defaultRules = GameData::AIRuleSets().Find("default");
+	state.escortRules = GameData::AIRuleSets().Find("player escorts");
+	if(!state.defaultRules || !state.defaultRules->HasTurnRules())
+	{
+		static bool warned = false;
+		if(!warned)
+			Logger::Log("No \"ai\" rule set named \"default\" is defined; AI ships will do nothing.",
+				Logger::Level::ERROR);
+		warned = true;
+	}
 	for(const auto &it : ships)
 	{
 		// A destroyed ship can't do anything.
@@ -796,85 +893,241 @@ void AI::Step(Command &activeCommands)
 			continue;
 		}
 
-		const Government *gov = it->GetGovernment();
-		const Personality &personality = it->GetPersonality();
-		double healthRemaining = it->HealthFraction();
-		bool isPresent = (it->GetSystem() == playerSystem);
-		bool isStranded = IsStranded(*it);
-		bool thisIsLaunching = (isPresent && HasDeployments(*it));
-		if(isStranded || it->IsDisabled())
+		ShipTurn turn(it, playerSystem);
+		TakeTurn(turn, state);
+	}
+}
+
+
+
+// Run the rules for one ship's turn, then issue its commands.
+void AI::TakeTurn(ShipTurn &turn, StepState &state)
+{
+	const Ship &ship = *turn.it;
+	const AIRules *turnRules = state.defaultRules;
+	const AIRules *movementRules = state.defaultRules;
+	if(ship.IsYours() && state.escortRules)
+	{
+		if(state.escortRules->HasTurnRules())
+			turnRules = state.escortRules;
+		if(state.escortRules->HasMovementRules())
+			movementRules = state.escortRules;
+	}
+	if(!turnRules)
+		return;
+	turn.movementRules = movementRules;
+
+	TurnResult result = TurnResult::CONTINUE;
+	const auto &rules = turnRules->TurnRules();
+	for(size_t i = 0; i < rules.size() && result == TurnResult::CONTINUE; ++i)
+	{
+		if(!ConditionsHold(rules[i].conditions, turn, state))
+			continue;
+		result = DoTurnAction(rules[i].action, turn, state);
+		RecordRuleUse(*turnRules, "turn", i, rules[i].description, result != TurnResult::CONTINUE);
+	}
+
+	if(result == TurnResult::CONTINUE || result == TurnResult::END_WITH_COMMAND
+			|| result == TurnResult::END_WITH_ALL_COMMANDS)
+		turn.it->SetCommands(turn.command);
+	if(result == TurnResult::CONTINUE || result == TurnResult::END_WITH_ALL_COMMANDS)
+		turn.it->SetCommands(firingCommands);
+}
+
+
+
+bool AI::ConditionsHold(const vector<AIRules::Condition> &conditions, const ShipTurn &turn,
+	const StepState &state)
+{
+	const Ship &ship = *turn.it;
+	const shared_ptr<Ship> &parent = turn.parent;
+	for(const AIRules::Condition &condition : conditions)
+	{
+		bool holds = false;
+		switch(condition.predicate)
 		{
+			case AIRules::Predicate::PRESENT:
+				holds = turn.isPresent;
+				break;
+			case AIRules::Predicate::YOURS:
+				holds = ship.IsYours();
+				break;
+			case AIRules::Predicate::SPECIAL:
+				holds = ship.IsSpecial();
+				break;
+			case AIRules::Predicate::DISABLED:
+				holds = ship.IsDisabled();
+				break;
+			case AIRules::Predicate::STRANDED:
+				holds = turn.isStranded;
+				break;
+			case AIRules::Predicate::NEEDS_HELP:
+				holds = turn.isStranded || ship.IsDisabled();
+				break;
+			case AIRules::Predicate::OVERHEATED:
+				holds = ship.IsOverheated();
+				break;
+			case AIRules::Predicate::PLAYER_CLOAKING:
+				holds = player.IsCloaking();
+				break;
+			case AIRules::Predicate::IN_TRANSIT:
+				holds = ship.IsHyperspacing() || ship.Zoom() < 1.;
+				break;
+			case AIRules::Predicate::HAS_TARGET:
+				holds = static_cast<bool>(turn.target);
+				break;
+			case AIRules::Predicate::HAS_FLOTSAM_TARGET:
+				holds = static_cast<bool>(turn.targetFlotsam);
+				break;
+			case AIRules::Predicate::TARGET_NEAR:
+				holds = turn.target && turn.targetDistance < 2000.;
+				break;
+			case AIRules::Predicate::SHOULD_FLEE:
+				holds = turn.shouldFlee;
+				break;
+			case AIRules::Predicate::HEAVILY_DAMAGED:
+				holds = turn.healthRemaining < RETREAT_HEALTH + .25;
+				break;
+			case AIRules::Predicate::INJURED:
+				holds = turn.healthRemaining < RETREAT_HEALTH;
+				break;
+			case AIRules::Predicate::STRANDED_WITH_HELPER:
+				holds = turn.strandedWithHelper;
+				break;
+			case AIRules::Predicate::SCAN_PERMISSION:
+				holds = scanPermissions[turn.gov];
+				break;
+			case AIRules::Predicate::MINING_ALLOWED:
+				holds = state.maxMinerCount;
+				break;
+			case AIRules::Predicate::CAN_BE_CARRIED:
+				holds = ship.CanBeCarried();
+				break;
+			case AIRules::Predicate::HAS_FUEL_CAPACITY:
+				holds = ship.MaxFuel();
+				break;
+			case AIRules::Predicate::MUST_RECALL:
+				holds = turn.mustRecall;
+				break;
+			case AIRules::Predicate::HAS_PARENT:
+				holds = static_cast<bool>(parent);
+				break;
+			case AIRules::Predicate::PARENT_ELSEWHERE:
+				holds = parent && parent->GetSystem() != ship.GetSystem();
+				break;
+			case AIRules::Predicate::PARENT_HOSTILE:
+				holds = parent && parent->GetGovernment()->IsEnemy(turn.gov);
+				break;
+			case AIRules::Predicate::PARENT_TARGETABLE:
+				holds = parent && parent->IsTargetable();
+				break;
+			case AIRules::Predicate::CAN_PURSUE_PARENT:
+				holds = parent && CanPursue(ship, *parent);
+				break;
+			case AIRules::Predicate::PARENT_DISABLED:
+				holds = parent && parent->IsDisabled();
+				break;
+			case AIRules::Predicate::PARENT_DERELICT:
+				holds = parent && parent->GetPersonality().IsDerelict();
+				break;
+			case AIRules::Predicate::PARENT_JUMPING:
+				holds = parent && parent->Commands().Has(Command::JUMP);
+				break;
+			case AIRules::Predicate::PARENT_FAR:
+				holds = parent && parent->Position().Distance(ship.Position()) > 500.;
+				break;
+			case AIRules::Predicate::PERSONALITY:
+				holds = turn.personality.Has(condition.trait);
+				break;
+		}
+		if(holds == condition.negated)
+			return false;
+	}
+	return true;
+}
+
+
+
+AI::TurnResult AI::DoTurnAction(AIRules::TurnAction action, ShipTurn &turn, StepState &state)
+{
+	const shared_ptr<Ship> &it = turn.it;
+	const Government *gov = turn.gov;
+	const Personality &personality = turn.personality;
+	Command &command = turn.command;
+	shared_ptr<Ship> &parent = turn.parent;
+	shared_ptr<Ship> &target = turn.target;
+
+	switch(action)
+	{
+		case AIRules::TurnAction::ASK_FOR_HELP:
 			// Attempt to find a friendly ship to render assistance.
-			if(!it->GetPersonality().IsDerelict())
-				AskForHelp(*it, isStranded, flagship);
+			AskForHelp(*it, turn.isStranded, state.flagship);
+			return TurnResult::CONTINUE;
 
-			if(it->IsDisabled())
+		case AIRules::TurnAction::ACT_DISABLED:
+			// Ships other than escorts should deploy fighters if disabled.
+			if(!it->IsYours() || turn.thisIsLaunching)
 			{
-				// Ships other than escorts should deploy fighters if disabled.
-				if(!it->IsYours() || thisIsLaunching)
+				it->SetCommands(Command::DEPLOY);
+				Deploy(*it, !(it->IsYours() && state.fightersRetreat));
+			}
+			// Avoid jettisoning cargo as soon as this ship is repaired.
+			if(personality.IsAppeasing())
+			{
+				double health = .5 * it->ShieldFraction() + it->HullFraction();
+				double &threshold = appeasementThreshold[it.get()];
+				threshold = max((1. - health) + .1, threshold);
+			}
+			return TurnResult::END_SILENTLY;
+
+		case AIRules::TurnAction::END_TURN:
+			return TurnResult::END_SILENTLY;
+
+		case AIRules::TurnAction::PREPARE_COMMANDS:
+			command = Command();
+			firingCommands.SetHardpoints(it->Weapons().size(), it->Decorations().size());
+			if(it->IsYours())
+			{
+				if(it->HasBays() && turn.thisIsLaunching)
 				{
-					it->SetCommands(Command::DEPLOY);
-					Deploy(*it, !(it->IsYours() && fightersRetreat));
+					// If this is a carrier, launch whichever of its fighters are at
+					// good enough health to survive a fight.
+					command |= Command::DEPLOY;
+					Deploy(*it, !state.fightersRetreat);
 				}
-				// Avoid jettisoning cargo as soon as this ship is repaired.
-				if(personality.IsAppeasing())
-				{
-					double health = .5 * it->ShieldFraction() + it->HullFraction();
-					double &threshold = appeasementThreshold[it.get()];
-					threshold = max((1. - health) + .1, threshold);
-				}
-				continue;
+				if(player.IsCloaking())
+					command |= Command::CLOAK;
 			}
-		}
-		// Overheated ships are effectively disabled, and cannot fire, cloak, etc.
-		if(it->IsOverheated())
-			continue;
+			return TurnResult::CONTINUE;
 
-		Command command;
-		firingCommands.SetHardpoints(it->Weapons().size(), it->Decorations().size());
-		if(it->IsYours())
-		{
-			if(it->HasBays() && thisIsLaunching)
+		case AIRules::TurnAction::CLOAK:
+			// Cloak if the AI considers it appropriate. If so, the ship is
+			// retreating from its target, e.g. to repair.
+			return DoCloak(*it, command) ? TurnResult::END_WITH_COMMAND : TurnResult::CONTINUE;
+
+		case AIRules::TurnAction::UPDATE_FLEET_AND_TARGETS:
+			parent = it->GetParent();
+			if(parent && parent->IsDestroyed())
 			{
-				// If this is a carrier, launch whichever of its fighters are at
-				// good enough health to survive a fight.
-				command |= Command::DEPLOY;
-				Deploy(*it, !fightersRetreat);
+				// An NPC that loses its fleet leader should attempt to
+				// follow that leader's parent. For most mission NPCs,
+				// this is the player. Any regular NPCs and mission NPCs
+				// with "personality uninterested" become independent.
+				parent = parent->GetParent();
+				it->SetParent(parent);
 			}
-			if(player.IsCloaking())
-				command |= Command::CLOAK;
-		}
+			target = it->GetTargetShip();
+			turn.targetAsteroid = it->GetTargetAsteroid();
+			turn.targetFlotsam = it->GetTargetFlotsam();
+			return TurnResult::CONTINUE;
 
-		// Cloak if the AI considers it appropriate.
-		if(!it->IsYours() || !player.IsCloaking())
-			if(DoCloak(*it, command))
-			{
-				// The ship chose to retreat from its target, e.g. to repair.
-				it->SetCommands(command);
-				continue;
-			}
+		case AIRules::TurnAction::COLLECT_FLOTSAM:
+			return FollowOrders(*it, command) ? TurnResult::END_SILENTLY : TurnResult::CONTINUE;
 
-		shared_ptr<Ship> parent = it->GetParent();
-		if(parent && parent->IsDestroyed())
+		case AIRules::TurnAction::TRACK_SCANS:
 		{
-			// An NPC that loses its fleet leader should attempt to
-			// follow that leader's parent. For most mission NPCs,
-			// this is the player. Any regular NPCs and mission NPCs
-			// with "personality uninterested" become independent.
-			parent = parent->GetParent();
-			it->SetParent(parent);
-		}
-
-		// Pick a target and automatically fire weapons.
-		shared_ptr<Ship> target = it->GetTargetShip();
-		shared_ptr<Minable> targetAsteroid = it->GetTargetAsteroid();
-		shared_ptr<Flotsam> targetFlotsam = it->GetTargetFlotsam();
-		if(isPresent && it->IsYours() && targetFlotsam && FollowOrders(*it, command))
-			continue;
-		// Determine if this ship was trying to scan its previous target. If so, keep
-		// track of this ship's scan time and count.
-		if(isPresent && !it->IsYours())
-		{
+			// Determine if this ship was trying to scan its previous target. If so, keep
+			// track of this ship's scan time and count.
 			// Assume that if the target is friendly, not disabled, of a different
 			// government to this ship, and this ship has scanning capabilities
 			// then it was attempting to scan the target. This isn't a perfect
@@ -890,75 +1143,72 @@ void AI::Step(Command &activeCommands)
 				if(it->OutfitScanFraction() >= 1.)
 					outfitScans[&*it].insert(&*target);
 			}
+			return TurnResult::CONTINUE;
 		}
-		if(isPresent && !personality.IsSwarming())
-		{
+
+		case AIRules::TurnAction::CHOOSE_TARGET:
 			// Each ship only switches targets about twice a second, so that it can
 			// focus on damaging one particular ship.
-			targetTurn = (targetTurn + 1) & 31;
-			if(targetTurn == targetStep || !target || target->IsDestroyed() || (target->IsDisabled() &&
+			state.targetTurn = (state.targetTurn + 1) & 31;
+			if(state.targetTurn == state.targetStep || !target || target->IsDestroyed() || (target->IsDisabled() &&
 					(personality.Disables() || (!FighterHitHelper::IsValidTarget(target.get()) && !personality.IsVindictive())))
 					|| (target->IsFleeing() && personality.IsMerciful()) || !target->IsTargetable())
 			{
 				target = FindTarget(*it);
 				it->SetTargetShip(target);
 			}
-		}
-		if(isPresent)
-		{
-			AimTurrets(*it, firingCommands, it->IsYours() ? opportunisticEscorts : personality.IsOpportunistic());
-			if(targetAsteroid)
-				AutoFire(*it, firingCommands, *targetAsteroid);
+			return TurnResult::CONTINUE;
+
+		case AIRules::TurnAction::AIM_AND_FIRE:
+			AimTurrets(*it, firingCommands, it->IsYours() ? state.opportunisticEscorts : personality.IsOpportunistic());
+			if(turn.targetAsteroid)
+				AutoFire(*it, firingCommands, *turn.targetAsteroid);
 			else
 				AutoFire(*it, firingCommands);
-		}
+			return TurnResult::CONTINUE;
 
-		// If this ship is hyperspacing, or in the act of
-		// launching or landing, it can't do anything else.
-		if(it->IsHyperspacing() || it->Zoom() < 1.)
-		{
-			it->SetCommands(command);
-			it->SetCommands(firingCommands);
-			continue;
-		}
+		case AIRules::TurnAction::WAIT_IN_TRANSIT:
+			// If this ship is hyperspacing, or in the act of
+			// launching or landing, it can't do anything else.
+			return TurnResult::END_WITH_ALL_COMMANDS;
 
-		// Run away if your hostile target is not disabled
-		// and you are either badly damaged or have run out of ammo.
-		// Player ships never stop targeting hostiles, while hostile mission NPCs will
-		// do so only if they are allowed to leave.
-		const bool shouldFlee = ShouldFlee(*it);
-		if(!it->IsYours() && shouldFlee && target && target->GetGovernment()->IsEnemy(gov) && !target->IsDisabled()
-			&& (!it->GetParent() || !it->GetParent()->GetGovernment()->IsEnemy(gov)))
-		{
-			// Make sure the ship has somewhere to flee to.
-			const System *system = it->GetSystem();
-			if(it->JumpsRemaining() && (!system->Links().empty() || it->JumpNavigation().HasJumpDrive()))
-				target.reset();
-			else
-				for(const StellarObject &object : system->Objects())
-					if(object.HasSprite() && object.HasValidPlanet() && object.GetPlanet()->IsInhabited()
-							&& object.GetPlanet()->CanLand(*it))
-					{
-						target.reset();
-						break;
-					}
-
-			if(target)
-				// This ship has nowhere to flee to: Stop fleeing.
-				it->SetFleeing(false);
-			else
+		case AIRules::TurnAction::CONSIDER_FLEEING:
+			// Run away if your hostile target is not disabled
+			// and you are either badly damaged or have run out of ammo.
+			// Player ships never stop targeting hostiles, while hostile mission NPCs will
+			// do so only if they are allowed to leave.
+			turn.shouldFlee = ShouldFlee(*it);
+			if(!it->IsYours() && turn.shouldFlee && target && target->GetGovernment()->IsEnemy(gov)
+				&& !target->IsDisabled() && (!it->GetParent() || !it->GetParent()->GetGovernment()->IsEnemy(gov)))
 			{
-				// This ship has somewhere to flee to: Remove target and mark this ship as fleeing.
-				it->SetTargetShip(target);
-				it->SetFleeing();
-			}
-		}
-		else if(it->IsFleeing())
-			it->SetFleeing(false);
+				// Make sure the ship has somewhere to flee to.
+				const System *system = it->GetSystem();
+				if(it->JumpsRemaining() && (!system->Links().empty() || it->JumpNavigation().HasJumpDrive()))
+					target.reset();
+				else
+					for(const StellarObject &object : system->Objects())
+						if(object.HasSprite() && object.HasValidPlanet() && object.GetPlanet()->IsInhabited()
+								&& object.GetPlanet()->CanLand(*it))
+						{
+							target.reset();
+							break;
+						}
 
-		// Special actions when a ship is heavily damaged:
-		if(healthRemaining < RETREAT_HEALTH + .25)
-		{
+				if(target)
+					// This ship has nowhere to flee to: Stop fleeing.
+					it->SetFleeing(false);
+				else
+				{
+					// This ship has somewhere to flee to: Remove target and mark this ship as fleeing.
+					it->SetTargetShip(target);
+					it->SetFleeing();
+				}
+			}
+			else if(it->IsFleeing())
+				it->SetFleeing(false);
+			return TurnResult::CONTINUE;
+
+		case AIRules::TurnAction::REACT_TO_DAMAGE:
 			// Cowards abandon their fleets.
 			if(parent && personality.IsCoward())
 			{
@@ -968,13 +1218,15 @@ void AI::Step(Command &activeCommands)
 			// Appeasing ships jettison cargo to distract their pursuers.
 			if(personality.IsAppeasing() && it->Cargo().Used())
 				DoAppeasing(it, &appeasementThreshold[it.get()]);
-		}
+			return TurnResult::CONTINUE;
 
-		// If recruited to assist a ship, follow through on the commitment
-		// instead of ignoring it due to other personality traits.
-		shared_ptr<Ship> shipToAssist = it->GetShipToAssist();
-		if(shipToAssist)
+		case AIRules::TurnAction::ASSIST:
 		{
+			// If recruited to assist a ship, follow through on the commitment
+			// instead of ignoring it due to other personality traits.
+			shared_ptr<Ship> shipToAssist = it->GetShipToAssist();
+			if(!shipToAssist)
+				return TurnResult::CONTINUE;
 			if(shipToAssist->IsDestroyed() || shipToAssist->GetSystem() != it->GetSystem()
 					|| shipToAssist->IsLanding() || shipToAssist->IsHyperspacing()
 					|| shipToAssist->GetGovernment()->IsEnemy(gov)
@@ -997,30 +1249,29 @@ void AI::Step(Command &activeCommands)
 			if(shipToAssist)
 			{
 				it->SetTargetShip(shipToAssist);
-				it->SetCommands(command);
-				it->SetCommands(firingCommands);
-				continue;
+				return TurnResult::END_WITH_ALL_COMMANDS;
 			}
+			return TurnResult::CONTINUE;
 		}
 
-		// This ship may have updated its target ship.
-		double targetDistance = numeric_limits<double>::infinity();
-		target = it->GetTargetShip();
-		if(target)
-			targetDistance = target->Position().Distance(it->Position());
+		case AIRules::TurnAction::ASSESS_SITUATION:
+			// This ship may have updated its target ship.
+			turn.targetDistance = numeric_limits<double>::infinity();
+			target = it->GetTargetShip();
+			if(target)
+				turn.targetDistance = target->Position().Distance(it->Position());
 
-		// Special case: if the player's flagship tries to board a ship to
-		// refuel it, that escort should hold position for boarding.
-		isStranded |= (flagship && it == flagship->GetTargetShip() && CanBoard(*flagship, *it)
-			&& autoPilot.Has(Command::BOARD));
+			// Special case: if the player's flagship tries to board a ship to
+			// refuel it, that escort should hold position for boarding.
+			turn.isStranded |= (state.flagship && it.get() == state.flagship->GetTargetShip().get()
+				&& CanBoard(*state.flagship, *it) && autoPilot.Has(Command::BOARD));
 
-		// Stranded ships that have a helper need to stop and be assisted.
-		bool strandedWithHelper = isStranded &&
-			(HasHelper(*it, NeedsFuel(*it), NeedsEnergy(*it)) || it->GetPersonality().IsDerelict() || it->IsYours());
+			// Stranded ships that have a helper need to stop and be assisted.
+			turn.strandedWithHelper = turn.isStranded &&
+				(HasHelper(*it, NeedsFuel(*it), NeedsEnergy(*it)) || it->GetPersonality().IsDerelict() || it->IsYours());
+			return TurnResult::CONTINUE;
 
-		// Behave in accordance with personality traits.
-		if(isPresent && personality.IsSwarming() && !strandedWithHelper)
-		{
+		case AIRules::TurnAction::SWARM:
 			// Swarming ships should not wait for (or be waited for by) any ship.
 			if(parent)
 			{
@@ -1029,46 +1280,26 @@ void AI::Step(Command &activeCommands)
 			}
 			// Flock between allied, in-system ships.
 			DoSwarming(*it, command, target);
-			it->SetCommands(command);
-			it->SetCommands(firingCommands);
-			continue;
-		}
+			return TurnResult::END_WITH_ALL_COMMANDS;
 
-		if(isPresent && personality.IsSecretive())
-		{
-			if(DoSecretive(*it, command))
-			{
-				it->SetCommands(command);
-				continue;
-			}
-		}
+		case AIRules::TurnAction::ACT_SECRETIVE:
+			return DoSecretive(*it, command) ? TurnResult::END_WITH_COMMAND : TurnResult::CONTINUE;
 
-		// Surveillance NPCs with enforcement authority (or those from
-		// missions) should perform scans and surveys of the system.
-		if(isPresent && personality.IsSurveillance() && !strandedWithHelper
-				&& (scanPermissions[gov] || it->IsSpecial()))
-		{
+		case AIRules::TurnAction::SURVEIL:
+			// Surveillance NPCs with enforcement authority (or those from
+			// missions) should perform scans and surveys of the system.
 			DoSurveillance(*it, command, target);
-			it->SetCommands(command);
-			it->SetCommands(firingCommands);
-			continue;
-		}
+			return TurnResult::END_WITH_ALL_COMMANDS;
 
-		// Ships that harvest flotsam prioritize it over stopping to be refueled.
-		if(isPresent && personality.Harvests() && DoHarvesting(*it, command))
-		{
-			it->SetCommands(command);
-			it->SetCommands(firingCommands);
-			continue;
-		}
+		case AIRules::TurnAction::HARVEST:
+			// Ships that harvest flotsam prioritize it over stopping to be refueled.
+			return DoHarvesting(*it, command) ? TurnResult::END_WITH_ALL_COMMANDS : TurnResult::CONTINUE;
 
-		// Attacking a hostile ship, fleeing and stopping to be refueled are more important than mining.
-		if(isPresent && personality.IsMining() && !shouldFlee && !target && !strandedWithHelper && maxMinerCount)
-		{
+		case AIRules::TurnAction::MINE:
 			// Miners with free cargo space and available mining time should mine. Mission NPCs
 			// should mine even if there are other miners or they have been mining a while.
 			if(it->Cargo().Free() >= 5 && IsArmed(*it) && (it->IsSpecial()
-					|| (++miningTime[&*it] < npcMaxMiningTime && ++minerCount < maxMinerCount)))
+					|| (++miningTime[&*it] < state.npcMaxMiningTime && ++state.minerCount < state.maxMinerCount)))
 			{
 				if(it->HasBays())
 				{
@@ -1076,9 +1307,7 @@ void AI::Step(Command &activeCommands)
 					Deploy(*it, false);
 				}
 				DoMining(*it, command);
-				it->SetCommands(command);
-				it->SetCommands(firingCommands);
-				continue;
+				return TurnResult::END_WITH_ALL_COMMANDS;
 			}
 			// Fighters and drones should assist their parent's mining operation if they cannot
 			// carry ore, and the asteroid is near enough that the parent can harvest the ore.
@@ -1090,16 +1319,13 @@ void AI::Step(Command &activeCommands)
 					it->SetTargetAsteroid(minable);
 					MoveToAttack(*it, command, *minable, firingCommands);
 					AutoFire(*it, firingCommands, *minable);
-					it->SetCommands(command);
-					it->SetCommands(firingCommands);
-					continue;
+					return TurnResult::END_WITH_ALL_COMMANDS;
 				}
 			}
 			it->SetTargetAsteroid(nullptr);
-		}
+			return TurnResult::CONTINUE;
 
-		// Handle carried ships:
-		if(it->CanBeCarried())
+		case AIRules::TurnAction::ACT_CARRIED:
 		{
 			// A carried ship must belong to the same government as its parent to dock with it.
 			bool hasParent = parent && !parent->IsDestroyed() && parent->GetGovernment() == gov;
@@ -1183,121 +1409,116 @@ void AI::Step(Command &activeCommands)
 					it->SetParent(parent);
 			}
 			// Otherwise, check if this ship wants to return to its parent (e.g. to repair).
-			else if(parentHasSpace && ShouldDock(*it, *parent, playerSystem))
+			else if(parentHasSpace && ShouldDock(*it, *parent, state.playerSystem))
 			{
 				it->SetTargetShip(parent);
 				MoveTo(*it, command, parent->Position(), parent->Velocity(), 40., .8);
 				command |= Command::BOARD;
-				it->SetCommands(command);
-				it->SetCommands(firingCommands);
-				continue;
+				return TurnResult::END_WITH_ALL_COMMANDS;
 			}
 			// If we get here, it means that the ship has not decided to return
 			// to its mothership. So, it should continue to be deployed.
 			command |= Command::DEPLOY;
+			return TurnResult::CONTINUE;
 		}
-		// If this ship has decided to recall all of its fighters because combat has ceased,
-		// it comes to a stop to facilitate their reboarding process.
-		bool mustRecall = false;
-		if(!target && it->HasBays() && !(it->IsYours() ?
-				thisIsLaunching : it->Commands().Has(Command::DEPLOY)))
-			for(const weak_ptr<Ship> &ptr : it->GetEscorts())
-			{
-				shared_ptr<const Ship> escort = ptr.lock();
-				// Note: HasDeployOrder is always `false` for NPC ships, as it is solely used for player ships.
-				if(escort && escort->CanBeCarried() && !escort->HasDeployOrder() && escort->GetSystem() == it->GetSystem()
-						&& !escort->IsDisabled() && it->BaysFree(escort->Attributes().Category()))
-				{
-					mustRecall = true;
-					break;
-				}
-			}
 
-		// Construct movement / navigation commands as appropriate for the ship.
-		if(mustRecall || (strandedWithHelper && !it->GetPersonality().IsDerelict()))
+		case AIRules::TurnAction::CHECK_RECALL:
+			// If this ship has decided to recall all of its fighters because combat has ceased,
+			// it comes to a stop to facilitate their reboarding process.
+			turn.mustRecall = false;
+			if(!target && it->HasBays() && !(it->IsYours() ?
+					turn.thisIsLaunching : it->Commands().Has(Command::DEPLOY)))
+				for(const weak_ptr<Ship> &ptr : it->GetEscorts())
+				{
+					shared_ptr<const Ship> escort = ptr.lock();
+					// Note: HasDeployOrder is always `false` for NPC ships, as it is solely used for player ships.
+					if(escort && escort->CanBeCarried() && !escort->HasDeployOrder() && escort->GetSystem() == it->GetSystem()
+							&& !escort->IsDisabled() && it->BaysFree(escort->Attributes().Category()))
+					{
+						turn.mustRecall = true;
+						break;
+					}
+				}
+			return TurnResult::CONTINUE;
+
+		case AIRules::TurnAction::MOVE:
 		{
+			// Construct movement / navigation commands as appropriate for the ship,
+			// using the first movement rule that applies.
+			if(!turn.movementRules)
+				return TurnResult::CONTINUE;
+			const auto &rules = turn.movementRules->MovementRules();
+			for(size_t i = 0; i < rules.size(); ++i)
+				if(ConditionsHold(rules[i].conditions, turn, state))
+				{
+					bool moved = DoMovementAction(rules[i].action, turn);
+					RecordRuleUse(*turn.movementRules, "movement", i, rules[i].description, moved);
+					if(moved)
+						break;
+				}
+			return TurnResult::CONTINUE;
+		}
+
+		case AIRules::TurnAction::SCATTER:
+			// Force ships that are overlapping each other to "scatter".
+			// About once per second they check which ships they are close to and might need to scatter away from,
+			// as ships that were close to each other recently are likely to still be close to each other now.
+			state.scatterTurn = (state.scatterTurn + 1) & 63;
+			DoScatter(*it, command, state.scatterTurn == step);
+			return TurnResult::CONTINUE;
+	}
+	return TurnResult::CONTINUE;
+}
+
+
+
+// Returns false if the action did not apply, so the next movement rule should be tried.
+bool AI::DoMovementAction(AIRules::MovementAction action, ShipTurn &turn)
+{
+	Ship &ship = *turn.it;
+	Command &command = turn.command;
+	const shared_ptr<Ship> &parent = turn.parent;
+	switch(action)
+	{
+		case AIRules::MovementAction::STOP_AND_WAIT:
 			// Stopping to let fighters board or to be refueled takes priority
 			// even over following orders from the player.
-			if(it->Velocity().Length() > VELOCITY_ZERO || !target)
-				Stop(*it, command);
+			if(ship.Velocity().Length() > VELOCITY_ZERO || !turn.target)
+				Stop(ship, command);
 			else
 			{
-				command.SetTurn(TurnToward(*it, TargetAim(*it, firingCommands)));
-				it->SetVelocity({0., 0.});
+				command.SetTurn(TurnToward(ship, TargetAim(ship, firingCommands)));
+				ship.SetVelocity({0., 0.});
 			}
-		}
-		else if(FollowOrders(*it, command))
-		{
+			return true;
+		case AIRules::MovementAction::FOLLOW_ORDERS:
+			if(!FollowOrders(ship, command))
+				return false;
 			// If this is an escort and it followed orders, its only final task
 			// is to convert completed MOVE_TO orders into HOLD_POSITION orders.
-			UpdateOrders(*it);
-		}
-		// Hostile "escorts" (i.e. NPCs that are trailing you) only revert to
-		// escort behavior when in a different system from you. Otherwise,
-		// the behavior depends on what the parent is doing, whether there
-		// are hostile targets nearby, and whether the escort has any
-		// immediate needs (like refueling).
-		else if(!parent)
-			MoveIndependent(*it, command);
-		else if(parent->GetSystem() != it->GetSystem())
-		{
-			if(personality.IsStaying() || !it->MaxFuel())
-				MoveIndependent(*it, command);
-			else
-				MoveEscort(*it, command);
-		}
-		// From here down, we're only dealing with ships that have a "parent"
-		// which is in the same system as them.
-		else if(parent->GetGovernment()->IsEnemy(gov))
-		{
-			// Fight your target, if you have one.
-			if(target)
-				MoveIndependent(*it, command);
-			// Otherwise try to find and fight your parent. If your parent
-			// can't be both targeted and pursued, then don't follow them.
-			else if(parent->IsTargetable() && CanPursue(*it, *parent))
-				MoveEscort(*it, command);
-			else
-				MoveIndependent(*it, command);
-		}
-		else if(parent->IsDisabled() && !it->CanBeCarried())
-		{
-			// Your parent is disabled, and is in this system. If you have enemy
-			// targets present, fight them. Otherwise, repair your parent.
-			if(target)
-				MoveIndependent(*it, command);
-			else if(!parent->GetPersonality().IsDerelict())
-				it->SetShipToAssist(parent);
-			else
-				CircleAround(*it, command, *parent);
-		}
-		else if(personality.IsStaying())
-			MoveIndependent(*it, command);
-		// This is a friendly escort. If the parent is getting ready to
-		// jump, always follow.
-		else if(parent->Commands().Has(Command::JUMP) && !strandedWithHelper)
-			MoveEscort(*it, command);
-		// Timid ships always stay near their parent. Injured player
-		// escorts will stay nearby until they have repaired a bit.
-		else if((personality.IsTimid() || (it->IsYours() && healthRemaining < RETREAT_HEALTH))
-				&& parent->Position().Distance(it->Position()) > 500.)
-			MoveEscort(*it, command);
-		// Otherwise, attack targets depending on your hunting attribute.
-		else if(target && (targetDistance < 2000. || personality.IsHunting()))
-			MoveIndependent(*it, command);
-		// This ship does not feel like fighting.
-		else
-			MoveEscort(*it, command);
-
-		// Force ships that are overlapping each other to "scatter".
-		// About once per second they check which ships they are close to and might need to scatter away from,
-		// as ships that were close to each other recently are likely to still be close to each other now.
-		scatterTurn = (scatterTurn + 1) & 63;
-		DoScatter(*it, command, scatterTurn == step);
-
-		it->SetCommands(command);
-		it->SetCommands(firingCommands);
+			UpdateOrders(ship);
+			return true;
+		case AIRules::MovementAction::INDEPENDENT:
+			MoveIndependent(ship, command);
+			return true;
+		case AIRules::MovementAction::ESCORT:
+			if(!parent)
+				return false;
+			MoveEscort(ship, command);
+			return true;
+		case AIRules::MovementAction::ASSIST_PARENT:
+			// Repair your parent.
+			if(!parent)
+				return false;
+			ship.SetShipToAssist(parent);
+			return true;
+		case AIRules::MovementAction::CIRCLE_PARENT:
+			if(!parent)
+				return false;
+			CircleAround(ship, command, *parent);
+			return true;
 	}
+	return false;
 }
 
 

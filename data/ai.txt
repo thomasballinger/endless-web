@@ -1,0 +1,174 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Rules that decide what every AI-controlled ship does each step.
+#
+# The "turn" list runs from top to bottom every step. Each entry names an
+# action; the lines under it are conditions that must all be true for the
+# action to run. A condition is a fact about the ship ("present", "has target"),
+# optionally preceded by "not", or "personality <trait>". Some actions end the
+# ship's turn (for example "swarm"), so later rules don't run.
+#
+# The "move" action runs the "movement" list, which picks how the ship
+# navigates: the first entry whose conditions hold, and whose action applies,
+# is used. ("follow orders" doesn't apply when the ship has no orders.)
+#
+# A rule set named "player escorts" can override either list for ships the
+# player owns; any list it leaves out comes from "default".
+#
+# Conditions are checked just before each action runs, after earlier actions
+# have had their effects. (For example, "ask for help" can change whether a ship
+# is "stranded", which is why it has a single "needs help" condition instead of
+# separate rules for stranded and disabled ships.)
+#
+# This rule set reproduces the AI's built-in behavior exactly. Reordering or
+# changing it changes how every ship in the game behaves.
+
+ai "default"
+	turn
+		# Stranded or disabled ships call for help.
+		"ask for help"
+			"needs help"
+			not personality derelict
+		"act disabled"
+			disabled
+		# Overheated ships are effectively disabled, and cannot fire, cloak, etc.
+		"end turn"
+			overheated
+		"prepare commands"
+		cloak
+			not yours
+		cloak
+			yours
+			not "player cloaking"
+		"update fleet and targets"
+		"collect flotsam"
+			present
+			yours
+			"has flotsam target"
+		"track scans"
+			present
+			not yours
+		"choose target"
+			present
+			not personality swarming
+		"aim and fire"
+			present
+		# Ships that are jumping, launching or landing can't do anything else.
+		"wait in transit"
+			"in transit"
+		"consider fleeing"
+		"react to damage"
+			"heavily damaged"
+		assist
+		"assess situation"
+		swarm
+			present
+			personality swarming
+			not "stranded with helper"
+		"act secretive"
+			present
+			personality secretive
+		surveil
+			present
+			personality surveillance
+			not "stranded with helper"
+			"scan permission"
+		surveil
+			present
+			personality surveillance
+			not "stranded with helper"
+			not "scan permission"
+			special
+		harvest
+			present
+			personality harvests
+		# Attacking a hostile ship, fleeing and stopping to be refueled are more important than mining.
+		mine
+			present
+			personality mining
+			not "should flee"
+			not "has target"
+			not "stranded with helper"
+			"mining allowed"
+		"act carried"
+			"can be carried"
+		"check recall"
+		move
+		scatter
+	movement
+		# Stopping to let fighters board or to be refueled takes priority
+		# even over following orders from the player.
+		"stop and wait"
+			"must recall"
+		"stop and wait"
+			"stranded with helper"
+			not personality derelict
+		"follow orders"
+		independent
+			not "has parent"
+		# A parent in another system is followed, unless this ship stays put
+		# or can't jump.
+		independent
+			"parent elsewhere"
+			personality staying
+		independent
+			"parent elsewhere"
+			not "has fuel capacity"
+		escort
+			"parent elsewhere"
+		# Hostile "escorts" (NPCs trailing you) fight their target if they
+		# have one, otherwise they pursue their "parent".
+		independent
+			"parent hostile"
+			"has target"
+		escort
+			"parent hostile"
+			"parent targetable"
+			"can pursue parent"
+		independent
+			"parent hostile"
+		# A disabled parent in this system: fight enemies, otherwise repair it.
+		independent
+			"parent disabled"
+			not "can be carried"
+			"has target"
+		"assist parent"
+			"parent disabled"
+			not "can be carried"
+			not "parent derelict"
+		"circle parent"
+			"parent disabled"
+			not "can be carried"
+		independent
+			personality staying
+		# If the parent is getting ready to jump, always follow.
+		escort
+			"parent jumping"
+			not "stranded with helper"
+		# Timid ships always stay near their parent. Injured player escorts
+		# stay nearby until they have repaired a bit.
+		escort
+			personality timid
+			"parent far"
+		escort
+			yours
+			injured
+			"parent far"
+		# Otherwise, attack targets depending on the hunting personality.
+		independent
+			"target near"
+		independent
+			"has target"
+			personality hunting
+		escort
