@@ -30,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 class DataNode;
 class Effect;
+class MissileGuidance;
 class Outfit;
 class Sound;
 class Sprite;
@@ -174,6 +175,8 @@ public:
 	bool HasBlindspot() const;
 	bool ThrottleControl() const;
 	bool Leading() const;
+	// The script that steers this weapon's projectiles, or null to use the default.
+	const MissileGuidance *Guidance() const;
 
 	// These values include all submunitions:
 	// Normal damage types:
@@ -276,6 +279,7 @@ private:
 	bool blindspot = false;
 	bool throttleControl = false;
 	bool leading = false;
+	const MissileGuidance *guidance = nullptr;
 
 	// Attributes.
 	int lifetime = 0;
@@ -465,6 +469,7 @@ inline bool Weapon::Homing() const { return homing; }
 inline bool Weapon::HasBlindspot() const { return blindspot; }
 inline bool Weapon::ThrottleControl() const { return throttleControl; }
 inline bool Weapon::Leading() const { return leading; }
+inline const MissileGuidance *Weapon::Guidance() const { return guidance; }
 
 inline double Weapon::ShieldDamage() const { return TotalDamage(SHIELD_DAMAGE); }
 inline double Weapon::HullDamage() const { return TotalDamage(HULL_DAMAGE); }

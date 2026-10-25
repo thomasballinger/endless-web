@@ -215,6 +215,8 @@ target_sources(EndlessSkyLib PRIVATE
 	Messages.h
 	Minable.cpp
 	Minable.h
+	MissileGuidance.cpp
+	MissileGuidance.h
 	MiniMap.cpp
 	MiniMap.h
 	Mission.cpp
@@ -475,6 +477,8 @@ target_sources(EndlessSkyLib PRIVATE
 	test/TestData.cpp
 	test/TestData.h
 	text/Alignment.h
+	script/Script.cpp
+	script/Script.h
 	text/Clipboard.cpp
 	text/Clipboard.h
 	text/DisplayText.cpp

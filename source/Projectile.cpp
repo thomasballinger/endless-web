@@ -20,7 +20,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Effect.h"
 #include "Entity.h"
 #include "FighterHitHelper.h"
+#include "GameData.h"
+#include "Logger.h"
 #include "Minable.h"
+#include "MissileGuidance.h"
 #include "pi.h"
 #include "Random.h"
 #include "Ship.h"
@@ -29,6 +32,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace std;
 
@@ -218,75 +222,9 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 		// 180 degrees away from its target.
 		if(!Random::Int(ceil(180 / turn)))
 			confusionDirection = Random::Int(2) ? -1 : 1;
+		// A homing projectile's guidance script decides how it steers.
 		if(homing)
-		{
-			// Vector d is the direction we want to turn towards.
-			Point d;
-			bool isFacingAway = false;
-			if(currentTarget)
-			{
-				d = currentTarget->Position() - position;
-				isFacingAway = d.Dot(angle.Unit()) < 0.;
-			}
-
-			// The very dumbest of homing missiles lose their target if pointed
-			// away from it.
-			if(isFacingAway && weapon->HasBlindspot())
-				target.reset();
-			else if(currentTarget && hasLock)
-			{
-				Point unit = d.Unit();
-				double drag = weapon->Drag();
-				double trueVelocity = drag ? accel / drag : velocity.Length();
-				double stepsToReach = d.Length() / trueVelocity;
-				// At the highest homing level, compensate for target motion.
-				if(weapon->Leading())
-				{
-					if(unit.Dot(currentTarget->Velocity()) < 0.)
-					{
-						// If the target is moving toward this projectile, the intercept
-						// course is where the target and the projectile have the same
-						// velocity normal to the distance between them.
-						Point normal(unit.Y(), -unit.X());
-						double vN = normal.Dot(currentTarget->Velocity());
-						double vT = sqrt(max(0., trueVelocity * trueVelocity - vN * vN));
-						d = vT * unit + vN * normal;
-					}
-					else
-					{
-						// Adjust the target's position based on where it will be when we
-						// reach it (assuming we're pointed right towards it).
-						d += stepsToReach * currentTarget->Velocity();
-						stepsToReach = d.Length() / trueVelocity;
-					}
-					unit = d.Unit();
-				}
-
-				double cross = angle.Unit().Cross(unit);
-
-				double desiredTurn = TO_DEG * asin(cross);
-				if(fabs(desiredTurn) > turn)
-					turn = copysign(turn, desiredTurn);
-				else
-					turn = desiredTurn;
-
-				// Levels 3 and 4 stop accelerating when facing away.
-				if(weapon->ThrottleControl())
-				{
-					double stepsToFace = desiredTurn / turn;
-
-					// If you are facing away from the target, stop accelerating.
-					if(stepsToFace * 1.5 > stepsToReach)
-						accel = 0.;
-				}
-			}
-			// Turn in a random direction if this weapon is confused.
-			else if(isConfused)
-				turn *= confusionDirection;
-			// If a weapon is homing but has no target, do not turn it.
-			else
-				turn = 0.;
-		}
+			Steer(currentTarget, turn, accel);
 
 		if(turn)
 			angle += Angle(turn);
@@ -318,6 +256,64 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 	if(lifetime < weapon->FadeOut())
 		alpha = static_cast<double>(lifetime) / weapon->FadeOut();
 }
+
+
+// Run this projectile's guidance script to decide how far to turn this step,
+// and how much to accelerate.
+void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
+{
+	const MissileGuidance *guidance = weapon->Guidance();
+	if(!guidance)
+		guidance = GameData::Guidance().Find("default");
+	if(!guidance || !guidance->IsValid())
+	{
+		static bool warned = false;
+		if(!warned)
+			Logger::Log("A homing weapon has no valid \"guidance\" script; its projectiles will not steer.",
+				Logger::Level::ERROR);
+		warned = true;
+		turn = 0.;
+		return;
+	}
+
+	// Projectiles only move on one thread at a time, so these can be reused.
+	static vector<script::Value> variables;
+	const script::Program &program = guidance->Program();
+	variables.resize(program.SlotCount());
+	using Variable = MissileGuidance::Variable;
+	variables[Variable::POSITION] = script::Value(position);
+	variables[Variable::VELOCITY] = script::Value(velocity);
+	variables[Variable::FACING] = script::Value(angle.Unit());
+	variables[Variable::HAS_TARGET] = script::Value(currentTarget != nullptr);
+	variables[Variable::TARGET_POSITION] = script::Value(currentTarget ? currentTarget->Position() : Point());
+	variables[Variable::TARGET_VELOCITY] = script::Value(currentTarget ? currentTarget->Velocity() : Point());
+	variables[Variable::HAS_LOCK] = script::Value(hasLock);
+	variables[Variable::CONFUSED] = script::Value(isConfused);
+	variables[Variable::CONFUSION_DIRECTION] = script::Value(static_cast<double>(confusionDirection));
+	variables[Variable::MAX_TURN] = script::Value(weapon->Turn());
+	variables[Variable::ACCELERATION] = script::Value(weapon->Acceleration());
+	variables[Variable::DRAG] = script::Value(weapon->Drag());
+	variables[Variable::BLINDSPOT] = script::Value(weapon->HasBlindspot());
+	variables[Variable::LEADING] = script::Value(weapon->Leading());
+	variables[Variable::THROTTLE_CONTROL] = script::Value(weapon->ThrottleControl());
+	variables[Variable::TURN] = script::Value(turn);
+	variables[Variable::THRUST] = script::Value(accel);
+
+	uint32_t effects = 0;
+	const script::Value &newTurn = variables[Variable::TURN];
+	const script::Value &newThrust = variables[Variable::THRUST];
+	if(!program.Run(variables, effects) || newTurn.GetType() != script::Value::Type::NUMBER
+			|| newThrust.GetType() != script::Value::Type::NUMBER)
+	{
+		turn = 0.;
+		return;
+	}
+	if(effects & (1u << MissileGuidance::DROP_TARGET))
+		target.reset();
+	turn = newTurn.Number();
+	accel = newThrust.Number();
+}
+
 
 
 

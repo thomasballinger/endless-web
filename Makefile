@@ -86,6 +86,7 @@ LINK_FLAGS = $(COMMON_FLAGS)\
 # Also exclude ZipFile.cpp (no minizip in emscripten)
 CPPS := $(filter-out source/ZipFile.cpp,$(shell ls source/*.cpp)) \
 	$(shell ls source/text/*.cpp) \
+	$(shell ls source/script/*.cpp) \
 	$(shell ls source/ship/*.cpp) \
 	$(shell ls source/audio/*.cpp) \
 	$(shell ls source/audio/player/*.cpp) \

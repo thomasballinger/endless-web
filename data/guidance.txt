@@ -1,0 +1,93 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Guidance scripts steer homing projectiles. Each step, a homing projectile's
+# script decides how many degrees to turn ("turn") and how much to accelerate
+# ("thrust"). A weapon chooses its script with a "guidance" attribute; homing
+# weapons without one use "default".
+#
+# Scripts are written one expression per line, in prefix notation, with
+# parentheses for nested expressions. Indented lines are the block of the line
+# above them. Statements:
+#   let <name> <expression>      define a variable (visible to the end of its block)
+#   set <name> <expression>      change a variable or an output
+#   if / elif / else             choose a block
+#   drop-target                  forget the current target
+#   stop                         end the script for this step
+# Expressions: numbers, true, false, pi, to-deg, to-rad, variables, and
+#   + - * /  < > <= >= == !=  and or not  (if c a b)
+#   abs sqrt asin acos sin cos atan2 min max copysign
+#   (vec x y) x y dot cross unit length
+# Arithmetic works on numbers, and +, -, * and / also on vectors where it
+# makes sense.
+#
+# Inputs (read only):
+#   position velocity facing                 this projectile (facing is a unit vector)
+#   has-target target-position target-velocity
+#   has-lock confused confusion-direction    the seeker's state (direction is 1 or -1)
+#   max-turn acceleration drag               the weapon's attributes
+#   blindspot leading throttle-control       the weapon's homing attributes
+# Outputs (start at the weapon's turn rate and acceleration):
+#   turn thrust
+
+# This reproduces the built-in behavior of every homing weapon exactly. The
+# weapon's homing attributes (blindspot, leading, throttle control) select
+# which parts of it apply.
+guidance "default"
+	# d is the direction to turn towards.
+	let d (vec 0 0)
+	let facing-away false
+	if has-target
+		set d (- target-position position)
+		set facing-away (< (dot d facing) 0)
+
+	# The very dumbest of homing missiles lose their target if pointed away from it.
+	if (and facing-away blindspot)
+		drop-target
+	elif (and has-target has-lock)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ thrust drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		# At the highest homing level, compensate for target motion.
+		if leading
+			if (< (dot direction target-velocity) 0)
+				# If the target is moving toward this projectile, the intercept
+				# course is where the target and the projectile have the same
+				# velocity normal to the distance between them.
+				let normal (vec (y direction) (- (x direction)))
+				let normal-speed (dot normal target-velocity)
+				let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+				set d (+ (* closing-speed direction) (* normal-speed normal))
+			else
+				# Aim where the target will be when this projectile reaches it.
+				set d (+ d (* steps-to-reach target-velocity))
+				set steps-to-reach (/ (length d) true-velocity)
+			set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		# Stop accelerating when facing away from the target.
+		if throttle-control
+			let steps-to-face (/ desired-turn turn)
+			if (> (* steps-to-face 1.5) steps-to-reach)
+				set thrust 0
+	# Turn in a random direction if this weapon is confused.
+	elif confused
+		set turn (* turn confusion-direction)
+	# If a weapon is homing but has no target, do not turn it.
+	else
+		set turn 0

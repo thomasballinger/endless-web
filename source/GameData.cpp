@@ -630,6 +630,13 @@ const Set<Message> &GameData::Messages()
 
 
 
+const Set<MissileGuidance> &GameData::Guidance()
+{
+	return objects.guidance;
+}
+
+
+
 const Set<Minable> &GameData::Minables()
 {
 	return objects.minables;

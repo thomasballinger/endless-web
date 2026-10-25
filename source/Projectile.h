@@ -123,6 +123,8 @@ public:
 private:
 	void CheckLock(const Entity &target);
 	void CheckConfused(const Entity &target);
+	// Run the guidance script to set this step's turn and acceleration.
+	void Steer(const Entity *currentTarget, double &turn, double &accel);
 
 
 private:

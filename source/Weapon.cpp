@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataNode.h"
 #include "Effect.h"
 #include "GameData.h"
+#include "MissileGuidance.h"
 #include "Outfit.h"
 #include "image/SpriteSet.h"
 
@@ -74,6 +75,8 @@ void Weapon::Load(const DataNode &node)
 			canCollideAsteroids = false;
 		else if(key == "no minable collisions")
 			canCollideMinables = false;
+		else if(key == "guidance" && child.Size() >= 2)
+			guidance = GameData::Guidance().Get(child.Token(1));
 		else if(key == "homing")
 		{
 			homing = true;
