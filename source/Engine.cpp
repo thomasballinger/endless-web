@@ -77,6 +77,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 
 using namespace std;
@@ -1649,6 +1652,27 @@ void Engine::CalculateStep()
 
 	const Ship *flagship = player.Flagship();
 	const System *playerSystem = player.GetSystem();
+
+	// DETERMINISM PROBE (local experiment, not for commit): print a hash of
+	// all ship kinematics every 60 steps when ES_STATE_HASH is set.
+	static const bool printStateHash = getenv("ES_STATE_HASH");
+	static uint64_t probeStep = 0;
+	if(printStateHash && !(++probeStep % 60))
+	{
+		uint64_t h = 1469598103934665603ull;
+		auto mix = [&h](double d) { uint64_t b; memcpy(&b, &d, sizeof(b)); h = (h ^ b) * 1099511628211ull; };
+		for(const shared_ptr<Ship> &ship : ships)
+		{
+			mix(ship->Position().X());
+			mix(ship->Position().Y());
+			mix(ship->Velocity().X());
+			mix(ship->Velocity().Y());
+			mix(ship->Facing().Degrees());
+		}
+		printf("STATEHASH %llu ships=%zu %016llx\n", static_cast<unsigned long long>(probeStep), ships.size(),
+			static_cast<unsigned long long>(h));
+		fflush(stdout);
+	}
 
 	if(timePaused)
 	{
