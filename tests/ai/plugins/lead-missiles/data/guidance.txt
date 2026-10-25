@@ -1,0 +1,18 @@
+# Example: every missile leads its target, and coasts once it's lined up.
+guidance "default"
+	if (not (and has-target has-lock))
+		set turn 0
+		stop
+
+	# Aim where the target will be by the time we get there.
+	let speed (max 1 (length velocity))
+	let eta (/ (length (- target-position position)) speed)
+	let aim (+ target-position (* eta target-velocity))
+
+	let to-aim (- aim position)
+	let bearing (* to-deg (atan2 (cross facing to-aim) (dot facing to-aim)))
+	set turn (max (- max-turn) (min max-turn bearing))
+
+	# Save fuel: only burn when roughly pointed at the aim point.
+	if (> (abs bearing) 30)
+		set thrust 0

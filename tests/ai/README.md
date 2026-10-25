@@ -57,3 +57,6 @@ player idle for about 12,000 steps:
 
 - `loyal-escorts`: overrides the movement rules for the player's escorts so
   they stay with the flagship instead of chasing enemies.
+- `pursuit-missiles`: replaces the default missile guidance with pure pursuit.
+- `lead-missiles`: replaces it with simple target leading that coasts when
+  not lined up. Both are short examples of the guidance script language.
