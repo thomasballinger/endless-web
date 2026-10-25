@@ -1654,8 +1654,8 @@ void Engine::CalculateStep()
 	const Ship *flagship = player.Flagship();
 	const System *playerSystem = player.GetSystem();
 
-	// When ES_STATE_HASH is set, print a hash of all ship kinematics every 60
-	// steps. tests/ai/compare-runs.sh uses this to check that runs with the same
+	// When ES_STATE_HASH is set, print a hash of all ship and projectile
+	// kinematics every 60 steps. tests/ai/compare-runs.sh uses this to check that runs with the same
 	// --rngseed are identical, and that AI changes don't alter behavior.
 	static const bool printStateHash = getenv("ES_STATE_HASH");
 	static uint64_t probeStep = 0;
@@ -1671,8 +1671,23 @@ void Engine::CalculateStep()
 			mix(ship->Velocity().Y());
 			mix(ship->Facing().Degrees());
 		}
-		printf("STATEHASH %llu ships=%zu %016llx\n", static_cast<unsigned long long>(probeStep), ships.size(),
-			static_cast<unsigned long long>(h));
+		// Projectiles are hashed separately, so that a difference in missile
+		// guidance is easy to tell apart from one in ship behavior.
+		uint64_t shipHash = h;
+		h = 1469598103934665603ull;
+		size_t homing = 0;
+		for(const Projectile &projectile : projectiles)
+		{
+			mix(projectile.Position().X());
+			mix(projectile.Position().Y());
+			mix(projectile.Velocity().X());
+			mix(projectile.Velocity().Y());
+			mix(projectile.Facing().Degrees());
+			homing += projectile.GetWeapon().Homing();
+		}
+		printf("STATEHASH %llu ships=%zu %016llx projectiles=%zu homing=%zu %016llx\n",
+			static_cast<unsigned long long>(probeStep), ships.size(), static_cast<unsigned long long>(shipHash),
+			projectiles.size(), homing, static_cast<unsigned long long>(h));
 		fflush(stdout);
 	}
 	// With ES_STATE_DETAIL=<first>-<last> as well, print every ship's state on
