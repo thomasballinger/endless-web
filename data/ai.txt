@@ -21,10 +21,12 @@
 #
 # The "move" action runs the "movement" list, which picks how the ship
 # navigates: the first entry whose conditions hold, and whose action applies,
-# is used. ("follow orders" doesn't apply when the ship has no orders.)
+# is used. ("follow orders" doesn't apply when the ship has no orders.) The
+# "escort" movement action runs the "escort" list the same way, to decide how
+# to follow the ship's parent.
 #
-# A rule set named "player escorts" can override either list for ships the
-# player owns; any list it leaves out comes from "default".
+# A rule set named "player escorts" can override any of these lists for ships
+# the player owns; any list it leaves out comes from "default".
 #
 # Conditions are checked just before each action runs, after earlier actions
 # have had their effects. (For example, "ask for help" can change whether a ship
@@ -172,3 +174,85 @@ ai "default"
 			"has target"
 			personality hunting
 		escort
+	# How a ship follows its parent: used by the "escort" movement action. The
+	# first entry whose conditions hold, and whose action applies, is used.
+	# ("route to parent" and "route to parent's destination" only choose a
+	# destination, so the entries after them decide how to get there.)
+	escort
+		# A cloaked parent of another government can't be followed.
+		independent
+			"parent hidden"
+		# Head for a parent in another system, unless this ship stays put.
+		"route to parent"
+			"parent elsewhere"
+			not personality staying
+			"has fuel capacity"
+		"land at target"
+			"parent elsewhere"
+			not personality staying
+			"has fuel capacity"
+			"has landing target"
+		jump
+			"parent elsewhere"
+			not personality staying
+			"has fuel capacity"
+			"has jump target"
+			"jumps remaining"
+		# Refuel so that when the parent returns, this ship is ready to rendezvous with it.
+		refuel
+			"parent elsewhere"
+			not personality staying
+			"has fuel capacity"
+			"can refuel here"
+			"fuel not full"
+		park
+			"parent elsewhere"
+			not personality staying
+			"has fuel capacity"
+		# If the parent is in this system and about to jump, follow it.
+		"route to parent's destination"
+			"parent jumping"
+			"parent has destination"
+			not personality staying
+			"has fuel capacity"
+		"jump with parent"
+			"parent jumping"
+			"parent has destination"
+			not personality staying
+			"has fuel capacity"
+			"has jump target"
+		refuel
+			"parent jumping"
+			"parent has destination"
+			not personality staying
+			"has fuel capacity"
+			"needs fuel"
+			"can refuel here"
+		"approach landing target"
+			"parent jumping"
+			"parent has destination"
+			not personality staying
+			"has fuel capacity"
+			"has landing target"
+		park
+			"parent jumping"
+			"parent has destination"
+			not personality staying
+			"has fuel capacity"
+			"needs fuel"
+		"keep station"
+			"parent jumping"
+			"parent has destination"
+			not personality staying
+			"has fuel capacity"
+		# An escort that is out of fuel refuels without waiting for its parent to land.
+		refuel
+			"can refuel here"
+			"needs fuel"
+		"land with parent"
+			"parent landing"
+			not "parent elsewhere"
+			"parent planet here"
+		"hold for boarding"
+			"parent boarding me"
+		"move with parent"

@@ -163,13 +163,12 @@ private:
 	bool ConditionsHold(const std::vector<AIRules::Condition> &conditions, const ShipTurn &turn,
 		const StepState &state);
 	TurnResult DoTurnAction(AIRules::TurnAction action, ShipTurn &turn, StepState &state);
-	bool DoMovementAction(AIRules::MovementAction action, ShipTurn &turn);
+	bool DoMovementAction(AIRules::MovementAction action, ShipTurn &turn, const StepState &state);
 
 	bool FollowOrders(Ship &ship, Command &command);
 	void MoveInFormation(Ship &ship, Command &command);
 	void MoveIndependent(Ship &ship, Command &command);
 	void MoveWithParent(Ship &ship, Command &command, const Ship &parent);
-	void MoveEscort(Ship &ship, Command &command);
 	static void Refuel(Ship &ship, Command &command);
 	static bool CanRefuel(const Ship &ship, const StellarObject *target);
 	// Set the ship's target system or planet in order to reach the

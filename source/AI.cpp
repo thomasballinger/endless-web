@@ -751,6 +751,7 @@ public:
 	bool isStranded;
 	bool thisIsLaunching;
 	const AIRules *movementRules = nullptr;
+	const AIRules *escortRules = nullptr;
 
 	Command command;
 	shared_ptr<Ship> parent;
@@ -761,6 +762,13 @@ public:
 	double targetDistance = numeric_limits<double>::infinity();
 	bool strandedWithHelper = false;
 	bool mustRecall = false;
+
+	// Taken when the "escort" list starts, since its actions can change them.
+	bool inEscortList = false;
+	bool needsFuel = false;
+	bool canRefuelHere = false;
+	const Planet *parentPlanet = nullptr;
+	bool parentPlanetHere = false;
 };
 
 
@@ -927,6 +935,9 @@ void AI::TakeTurn(ShipTurn &turn, StepState &state)
 	if(!turnRules)
 		return;
 	turn.movementRules = movementRules;
+	turn.escortRules = state.defaultRules;
+	if(ship.IsYours() && state.escortRules && state.escortRules->HasEscortRules())
+		turn.escortRules = state.escortRules;
 
 	TurnResult result = TurnResult::CONTINUE;
 	const auto &rules = turnRules->TurnRules();
@@ -1046,6 +1057,43 @@ bool AI::ConditionsHold(const vector<AIRules::Condition> &conditions, const Ship
 				break;
 			case AIRules::Predicate::PARENT_FAR:
 				holds = parent && parent->Position().Distance(ship.Position()) > 500.;
+				break;
+			case AIRules::Predicate::PARENT_HIDDEN:
+				// A cloaked parent of another government can't be followed, except by
+				// NPCs with the "escort" personality following the player.
+				holds = parent && parent->Cloaking() == 1 && ship.GetGovernment() != parent->GetGovernment()
+					&& !(parent->GetGovernment() && parent->GetGovernment()->IsPlayer()
+						&& turn.personality.IsEscort() && !turn.personality.IsUninterested());
+				break;
+			case AIRules::Predicate::PARENT_HAS_DESTINATION:
+				holds = parent && parent->GetTargetSystem();
+				break;
+			case AIRules::Predicate::PARENT_LANDING:
+				holds = parent && (parent->Commands().Has(Command::LAND) || parent->IsLanding());
+				break;
+			case AIRules::Predicate::PARENT_PLANET_HERE:
+				holds = turn.parentPlanetHere;
+				break;
+			case AIRules::Predicate::PARENT_BOARDING_ME:
+				holds = parent && parent->Commands().Has(Command::BOARD) && parent->GetTargetShip().get() == &ship;
+				break;
+			case AIRules::Predicate::NEEDS_FUEL:
+				holds = turn.needsFuel;
+				break;
+			case AIRules::Predicate::CAN_REFUEL_HERE:
+				holds = turn.canRefuelHere;
+				break;
+			case AIRules::Predicate::FUEL_NOT_FULL:
+				holds = ship.FuelFraction() < 1.;
+				break;
+			case AIRules::Predicate::HAS_LANDING_TARGET:
+				holds = ship.GetTargetStellar();
+				break;
+			case AIRules::Predicate::HAS_JUMP_TARGET:
+				holds = ship.GetTargetSystem();
+				break;
+			case AIRules::Predicate::JUMPS_REMAINING:
+				holds = ship.JumpsRemaining();
 				break;
 			case AIRules::Predicate::PERSONALITY:
 				holds = turn.personality.Has(condition.trait);
@@ -1462,7 +1510,7 @@ AI::TurnResult AI::DoTurnAction(AIRules::TurnAction action, ShipTurn &turn, Step
 			for(size_t i = 0; i < rules.size(); ++i)
 				if(ConditionsHold(rules[i].conditions, turn, state))
 				{
-					bool moved = DoMovementAction(rules[i].action, turn);
+					bool moved = DoMovementAction(rules[i].action, turn, state);
 					RecordRuleUse(*turn.movementRules, "movement", i, rules[i].description, moved);
 					if(moved)
 						break;
@@ -1484,7 +1532,7 @@ AI::TurnResult AI::DoTurnAction(AIRules::TurnAction action, ShipTurn &turn, Step
 
 
 // Returns false if the action did not apply, so the next movement rule should be tried.
-bool AI::DoMovementAction(AIRules::MovementAction action, ShipTurn &turn)
+bool AI::DoMovementAction(AIRules::MovementAction action, ShipTurn &turn, const StepState &state)
 {
 	Ship &ship = *turn.it;
 	Command &command = turn.command;
@@ -1513,9 +1561,146 @@ bool AI::DoMovementAction(AIRules::MovementAction action, ShipTurn &turn)
 			MoveIndependent(ship, command);
 			return true;
 		case AIRules::MovementAction::ESCORT:
+		{
+			// Follow the parent using the first "escort" rule that applies.
+			if(!parent || turn.inEscortList || !turn.escortRules)
+				return false;
+			turn.needsFuel = ship.NeedsFuel();
+			turn.canRefuelHere = ship.MaxFuel() && ship.GetSystem()->HasFuelFor(ship);
+			// Check if the parent already landed, or has a target planet that is in the parent's system.
+			turn.parentPlanet = (parent->GetPlanet() ? parent->GetPlanet() :
+				(parent->GetTargetStellar() ? parent->GetTargetStellar()->GetPlanet() : nullptr));
+			turn.parentPlanetHere = (turn.parentPlanet && turn.parentPlanet->IsInSystem(parent->GetSystem()));
+			turn.inEscortList = true;
+			bool moved = false;
+			const auto &rules = turn.escortRules->EscortRules();
+			for(size_t i = 0; i < rules.size() && !moved; ++i)
+				if(ConditionsHold(rules[i].conditions, turn, state))
+				{
+					moved = DoMovementAction(rules[i].action, turn, state);
+					RecordRuleUse(*turn.escortRules, "escort", i, rules[i].description, moved);
+				}
+			turn.inEscortList = false;
+			return moved;
+		}
+		case AIRules::MovementAction::ROUTE_TO_PARENT:
 			if(!parent)
 				return false;
-			MoveEscort(ship, command);
+			if(ship.GetTargetStellar())
+			{
+				// An escort with an out-of-system parent only lands to
+				// refuel or use a wormhole to route toward the parent.
+				const Planet *targetPlanet = ship.GetTargetStellar()->GetPlanet();
+				if(!targetPlanet || !targetPlanet->CanLand(ship)
+						|| !ship.GetTargetStellar()->HasSprite()
+						|| (!targetPlanet->IsWormhole() && ship.FuelFraction() == 1.))
+					ship.SetTargetStellar(nullptr);
+			}
+			// If the ship has no destination or the destination is unreachable, route to the parent's system.
+			if(!ship.GetTargetStellar() && (!ship.GetTargetSystem()
+					|| !ship.JumpNavigation().JumpFuel(ship.GetTargetSystem())))
+				SelectRoute(ship, parent->GetSystem());
+			// This only chooses where to go, so the next rule decides how to move.
+			return false;
+		case AIRules::MovementAction::LAND_AT_TARGET:
+			if(!ship.GetTargetStellar())
+				return false;
+			MoveToPlanet(ship, command);
+			command |= Command::LAND;
+			return true;
+		case AIRules::MovementAction::JUMP:
+			PrepareForHyperspace(ship, command);
+			command |= Command::JUMP;
+			// If this ship is a parent to members of its fleet,
+			// it should wait for them before jumping.
+			if(!EscortsReadyToJump(ship))
+				command |= Command::WAIT;
+			return true;
+		case AIRules::MovementAction::REFUEL:
+			Refuel(ship, command);
+			return true;
+		case AIRules::MovementAction::PARK:
+			// Wait at the system's center, which maximizes solar collection.
+			MoveTo(ship, command, Point(), Point(), 40., 0.1);
+			return true;
+		case AIRules::MovementAction::ROUTE_TO_PARENT_DESTINATION:
+			if(parent && parent->GetTargetSystem() != ship.GetTargetSystem())
+				SelectRoute(ship, parent->GetTargetSystem());
+			// This only chooses where to go, so the next rule decides how to move.
+			return false;
+		case AIRules::MovementAction::JUMP_WITH_PARENT:
+			if(!parent)
+				return false;
+			PrepareForHyperspace(ship, command);
+			command |= Command::JUMP;
+			if(!(parent->IsEnteringHyperspace() || parent->IsReadyToJump()) || !EscortsReadyToJump(ship))
+				command |= Command::WAIT;
+			return true;
+		case AIRules::MovementAction::APPROACH_LANDING_TARGET:
+			if(!parent || !ship.GetTargetStellar())
+				return false;
+			MoveToPlanet(ship, command);
+			if(parent->IsEnteringHyperspace())
+				command |= Command::LAND;
+			return true;
+		case AIRules::MovementAction::KEEP_STATION:
+			// Protect the parent until it jumps away.
+			if(!parent)
+				return false;
+			KeepStation(ship, command, *parent);
+			return true;
+		case AIRules::MovementAction::LAND_WITH_PARENT:
+		{
+			const Planet *parentPlanet = turn.parentPlanet;
+			if(!parent || !parentPlanet)
+				return false;
+			if(parentPlanet->CanLand(ship))
+			{
+				ship.SetTargetSystem(nullptr);
+				ship.SetTargetStellar(parent->GetTargetStellar());
+				if(parent->IsLanding())
+				{
+					MoveToPlanet(ship, command);
+					command |= Command::LAND;
+				}
+				else
+					MoveWithParent(ship, command, *parent);
+			}
+			else if(parentPlanet->IsWormhole())
+			{
+				const auto *wormhole = parentPlanet->GetWormhole();
+				SelectRoute(ship, &wormhole->WormholeDestination(*ship.GetSystem()));
+
+				if(ship.GetTargetSystem())
+				{
+					PrepareForHyperspace(ship, command);
+					if(parent->IsLanding())
+						command |= Command::JUMP;
+				}
+				else if(ship.GetTargetStellar())
+				{
+					MoveToPlanet(ship, command);
+					if(parent->IsLanding())
+						command |= Command::LAND;
+				}
+				else if(turn.needsFuel)
+					// Return to the system center to maximize solar collection rate.
+					MoveTo(ship, command, Point(), Point(), 40., 0.1);
+				else
+					// This ship has no route to the parent's destination system, so protect it until it jumps away.
+					MoveWithParent(ship, command, *parent);
+			}
+			else
+				MoveWithParent(ship, command, *parent);
+			return true;
+		}
+		case AIRules::MovementAction::HOLD_FOR_BOARDING:
+			Stop(ship, command, .2);
+			return true;
+		case AIRules::MovementAction::MOVE_WITH_PARENT:
+			if(!parent)
+				return false;
+			MoveWithParent(ship, command, *parent);
 			return true;
 		case AIRules::MovementAction::ASSIST_PARENT:
 			// Repair your parent.
@@ -2476,158 +2661,6 @@ void AI::MoveWithParent(Ship &ship, Command &command, const Ship &parent)
 
 
 
-// TODO: Function should be const, but formation flying needed write access to the FormationPositioner.
-void AI::MoveEscort(Ship &ship, Command &command)
-{
-	const Ship &parent = *ship.GetParent();
-	const System *currentSystem = ship.GetSystem();
-	bool hasFuelCapacity = ship.MaxFuel();
-	bool needsFuel = ship.NeedsFuel();
-	bool isStaying = ship.GetPersonality().IsStaying() || !hasFuelCapacity;
-	bool parentIsHere = (currentSystem == parent.GetSystem());
-	// Check if the parent already landed, or has a target planet that is in the parent's system.
-	const Planet *parentPlanet = (parent.GetPlanet() ? parent.GetPlanet() :
-		(parent.GetTargetStellar() ? parent.GetTargetStellar()->GetPlanet() : nullptr));
-	bool planetIsHere = (parentPlanet && parentPlanet->IsInSystem(parent.GetSystem()));
-	bool systemHasFuel = hasFuelCapacity && currentSystem->HasFuelFor(ship);
-
-	if(parent.Cloaking() == 1 && (ship.GetGovernment() != parent.GetGovernment()))
-	{
-		if(parent.GetGovernment() && parent.GetGovernment()->IsPlayer() &&
-			ship.GetPersonality().IsEscort() && !ship.GetPersonality().IsUninterested())
-		{
-			// NPCs with the "escort" personality that are not uninterested
-			// act as if they were escorts, following the cloaked flagship.
-		}
-		else
-		{
-			MoveIndependent(ship, command);
-			return;
-		}
-	}
-
-	// Non-staying escorts should route to their parent ship's system if not already in it.
-	if(!parentIsHere && !isStaying)
-	{
-		if(ship.GetTargetStellar())
-		{
-			// An escort with an out-of-system parent only lands to
-			// refuel or use a wormhole to route toward the parent.
-			const Planet *targetPlanet = ship.GetTargetStellar()->GetPlanet();
-			if(!targetPlanet || !targetPlanet->CanLand(ship)
-					|| !ship.GetTargetStellar()->HasSprite()
-					|| (!targetPlanet->IsWormhole() && ship.FuelFraction() == 1.))
-				ship.SetTargetStellar(nullptr);
-		}
-
-		// If the ship has no destination or the destination is unreachable, route to the parent's system.
-		if(!ship.GetTargetStellar() && (!ship.GetTargetSystem() || !ship.JumpNavigation().JumpFuel(ship.GetTargetSystem())))
-		{
-			// Route to the parent ship's system and check whether
-			// the ship should land (refuel or wormhole) or jump.
-			SelectRoute(ship, parent.GetSystem());
-		}
-
-		// Perform the action that this ship previously decided on.
-		if(ship.GetTargetStellar())
-		{
-			MoveToPlanet(ship, command);
-			command |= Command::LAND;
-		}
-		else if(ship.GetTargetSystem() && ship.JumpsRemaining())
-		{
-			PrepareForHyperspace(ship, command);
-			command |= Command::JUMP;
-			// If this ship is a parent to members of its fleet,
-			// it should wait for them before jumping.
-			if(!EscortsReadyToJump(ship))
-				command |= Command::WAIT;
-		}
-		else if(systemHasFuel && ship.FuelFraction() < 1.)
-			// Refuel so that when the parent returns, this ship is ready to rendezvous with it.
-			Refuel(ship, command);
-		else
-			// This ship has no route to the parent's system, so park at the system's center.
-			MoveTo(ship, command, Point(), Point(), 40., 0.1);
-	}
-	// If the parent is in-system and planning to jump, non-staying escorts should follow suit.
-	else if(parent.Commands().Has(Command::JUMP) && parent.GetTargetSystem() && !isStaying)
-	{
-		if(parent.GetTargetSystem() != ship.GetTargetSystem())
-			SelectRoute(ship, parent.GetTargetSystem());
-
-		if(ship.GetTargetSystem())
-		{
-			PrepareForHyperspace(ship, command);
-			command |= Command::JUMP;
-			if(!(parent.IsEnteringHyperspace() || parent.IsReadyToJump()) || !EscortsReadyToJump(ship))
-				command |= Command::WAIT;
-		}
-		else if(needsFuel && systemHasFuel)
-			Refuel(ship, command);
-		else if(ship.GetTargetStellar())
-		{
-			MoveToPlanet(ship, command);
-			if(parent.IsEnteringHyperspace())
-				command |= Command::LAND;
-		}
-		else if(needsFuel)
-			// Return to the system center to maximize solar collection rate.
-			MoveTo(ship, command, Point(), Point(), 40., 0.1);
-		else
-			// This ship has no route to the parent's destination system, so protect it until it jumps away.
-			KeepStation(ship, command, parent);
-	}
-	// If an escort is out of fuel, they should refuel without waiting for the
-	// "parent" to land (because the parent may not be planning on landing).
-	else if(systemHasFuel && needsFuel)
-		Refuel(ship, command);
-	else if((parent.Commands().Has(Command::LAND) || parent.IsLanding()) && parentIsHere && planetIsHere)
-	{
-		if(parentPlanet->CanLand(ship))
-		{
-			ship.SetTargetSystem(nullptr);
-			ship.SetTargetStellar(parent.GetTargetStellar());
-			if(parent.IsLanding())
-			{
-				MoveToPlanet(ship, command);
-				command |= Command::LAND;
-			}
-			else
-				MoveWithParent(ship, command, parent);
-		}
-		else if(parentPlanet->IsWormhole())
-		{
-			const auto *wormhole = parentPlanet->GetWormhole();
-			SelectRoute(ship, &wormhole->WormholeDestination(*currentSystem));
-
-			if(ship.GetTargetSystem())
-			{
-				PrepareForHyperspace(ship, command);
-				if(parent.IsLanding())
-					command |= Command::JUMP;
-			}
-			else if(ship.GetTargetStellar())
-			{
-				MoveToPlanet(ship, command);
-				if(parent.IsLanding())
-					command |= Command::LAND;
-			}
-			else if(needsFuel)
-				// Return to the system center to maximize solar collection rate.
-				MoveTo(ship, command, Point(), Point(), 40., 0.1);
-			else
-				// This ship has no route to the parent's destination system, so protect it until it jumps away.
-				MoveWithParent(ship, command, parent);
-		}
-		else
-			MoveWithParent(ship, command, parent);
-	}
-	else if(parent.Commands().Has(Command::BOARD) && parent.GetTargetShip().get() == &ship)
-		Stop(ship, command, .2);
-	else
-		MoveWithParent(ship, command, parent);
-}
 
 
 

@@ -57,6 +57,18 @@ namespace {
 		{"escort", AIRules::MovementAction::ESCORT},
 		{"assist parent", AIRules::MovementAction::ASSIST_PARENT},
 		{"circle parent", AIRules::MovementAction::CIRCLE_PARENT},
+		{"route to parent", AIRules::MovementAction::ROUTE_TO_PARENT},
+		{"land at target", AIRules::MovementAction::LAND_AT_TARGET},
+		{"jump", AIRules::MovementAction::JUMP},
+		{"refuel", AIRules::MovementAction::REFUEL},
+		{"park", AIRules::MovementAction::PARK},
+		{"route to parent's destination", AIRules::MovementAction::ROUTE_TO_PARENT_DESTINATION},
+		{"jump with parent", AIRules::MovementAction::JUMP_WITH_PARENT},
+		{"approach landing target", AIRules::MovementAction::APPROACH_LANDING_TARGET},
+		{"keep station", AIRules::MovementAction::KEEP_STATION},
+		{"land with parent", AIRules::MovementAction::LAND_WITH_PARENT},
+		{"hold for boarding", AIRules::MovementAction::HOLD_FOR_BOARDING},
+		{"move with parent", AIRules::MovementAction::MOVE_WITH_PARENT},
 	};
 
 	const map<string, AIRules::Predicate> PREDICATES = {
@@ -90,6 +102,17 @@ namespace {
 		{"parent derelict", AIRules::Predicate::PARENT_DERELICT},
 		{"parent jumping", AIRules::Predicate::PARENT_JUMPING},
 		{"parent far", AIRules::Predicate::PARENT_FAR},
+		{"parent hidden", AIRules::Predicate::PARENT_HIDDEN},
+		{"parent has destination", AIRules::Predicate::PARENT_HAS_DESTINATION},
+		{"parent landing", AIRules::Predicate::PARENT_LANDING},
+		{"parent planet here", AIRules::Predicate::PARENT_PLANET_HERE},
+		{"parent boarding me", AIRules::Predicate::PARENT_BOARDING_ME},
+		{"needs fuel", AIRules::Predicate::NEEDS_FUEL},
+		{"can refuel here", AIRules::Predicate::CAN_REFUEL_HERE},
+		{"fuel not full", AIRules::Predicate::FUEL_NOT_FULL},
+		{"has landing target", AIRules::Predicate::HAS_LANDING_TARGET},
+		{"has jump target", AIRules::Predicate::HAS_JUMP_TARGET},
+		{"jumps remaining", AIRules::Predicate::JUMPS_REMAINING},
 	};
 
 
@@ -192,6 +215,11 @@ void AIRules::Load(const DataNode &node)
 			LoadRules(child, MOVEMENT_ACTIONS, movementRules);
 			hasMovementRules = true;
 		}
+		else if(key == "escort")
+		{
+			LoadRules(child, MOVEMENT_ACTIONS, escortRules);
+			hasEscortRules = true;
+		}
 		else
 			child.PrintTrace("Skipping unrecognized attribute:");
 	}
@@ -220,6 +248,13 @@ bool AIRules::HasMovementRules() const
 
 
 
+bool AIRules::HasEscortRules() const
+{
+	return hasEscortRules;
+}
+
+
+
 const vector<AIRules::Rule<AIRules::TurnAction>> &AIRules::TurnRules() const
 {
 	return turnRules;
@@ -230,4 +265,11 @@ const vector<AIRules::Rule<AIRules::TurnAction>> &AIRules::TurnRules() const
 const vector<AIRules::Rule<AIRules::MovementAction>> &AIRules::MovementRules() const
 {
 	return movementRules;
+}
+
+
+
+const vector<AIRules::Rule<AIRules::MovementAction>> &AIRules::EscortRules() const
+{
+	return escortRules;
 }

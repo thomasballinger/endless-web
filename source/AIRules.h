@@ -27,10 +27,12 @@ class DataNode;
 // step, loaded from an "ai" node in the game data. Each rule names a built-in
 // action and lists conditions that must all hold for the action to run.
 //
-// A rule set has two lists. The "turn" rules run in order every step; some
+// A rule set has three lists. The "turn" rules run in order every step; some
 // actions end the ship's turn early. One of those actions, "move", runs the
 // "movement" rules, which choose how the ship navigates: the first movement
-// rule whose conditions hold and whose action succeeds wins.
+// rule whose conditions hold and whose action succeeds wins. The "escort"
+// movement action runs the "escort" list the same way, to decide how to
+// follow the ship's parent.
 class AIRules {
 public:
 	// Actions available to "turn" rules.
@@ -68,7 +70,20 @@ public:
 		INDEPENDENT,
 		ESCORT,
 		ASSIST_PARENT,
-		CIRCLE_PARENT
+		CIRCLE_PARENT,
+		// Actions for following a parent, used by the "escort" list.
+		ROUTE_TO_PARENT,
+		LAND_AT_TARGET,
+		JUMP,
+		REFUEL,
+		PARK,
+		ROUTE_TO_PARENT_DESTINATION,
+		JUMP_WITH_PARENT,
+		APPROACH_LANDING_TARGET,
+		KEEP_STATION,
+		LAND_WITH_PARENT,
+		HOLD_FOR_BOARDING,
+		MOVE_WITH_PARENT
 	};
 
 	// Facts about the ship and its situation that conditions can test.
@@ -103,6 +118,17 @@ public:
 		PARENT_DERELICT,
 		PARENT_JUMPING,
 		PARENT_FAR,
+		PARENT_HIDDEN,
+		PARENT_HAS_DESTINATION,
+		PARENT_LANDING,
+		PARENT_PLANET_HERE,
+		PARENT_BOARDING_ME,
+		NEEDS_FUEL,
+		CAN_REFUEL_HERE,
+		FUEL_NOT_FULL,
+		HAS_LANDING_TARGET,
+		HAS_JUMP_TARGET,
+		JUMPS_REMAINING,
 		PERSONALITY
 	};
 
@@ -130,14 +156,18 @@ public:
 	const std::string &Name() const;
 	bool HasTurnRules() const;
 	bool HasMovementRules() const;
+	bool HasEscortRules() const;
 	const std::vector<Rule<TurnAction>> &TurnRules() const;
 	const std::vector<Rule<MovementAction>> &MovementRules() const;
+	const std::vector<Rule<MovementAction>> &EscortRules() const;
 
 
 private:
 	std::string name;
 	bool hasTurnRules = false;
 	bool hasMovementRules = false;
+	bool hasEscortRules = false;
 	std::vector<Rule<TurnAction>> turnRules;
 	std::vector<Rule<MovementAction>> movementRules;
+	std::vector<Rule<MovementAction>> escortRules;
 };
