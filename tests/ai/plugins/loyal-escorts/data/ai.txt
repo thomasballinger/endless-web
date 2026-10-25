@@ -1,0 +1,29 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Example plugin: the player's escorts stay with the flagship instead of
+# chasing nearby enemies, unless the player gives them orders. They still
+# shoot at anything in range, since only the movement rules are replaced; the
+# turn rules come from the "default" rule set.
+
+ai "player escorts"
+	movement
+		"stop and wait"
+			"must recall"
+		"stop and wait"
+			"stranded with helper"
+			not personality derelict
+		"follow orders"
+		escort
+			"has parent"
+		independent

@@ -20,8 +20,9 @@
 # Each VARIANT is "label" or "label:VAR=value VAR2=value ...". Every variant is
 # run once with its environment variables set, and its hashes are compared to
 # the first variant's. A variant can set BINARY=path to run a different build,
-# e.g. to compare a refactored AI against the previous commit, or
-# RESOURCES=path to use different game data. With no
+# e.g. to compare a refactored AI against the previous commit,
+# RESOURCES=path to use different game data, or PLUGIN=path to install a
+# plugin directory (such as one under tests/ai/plugins). With no
 # variants, the scenario is simply run twice.
 #
 # Environment:
@@ -67,6 +68,7 @@ run_variant() {
 	fi
 	local binary=$BINARY
 	local resources=$RESOURCES
+	local plugins=()
 	local word
 	for word in $envs; do
 		if [[ "$word" == BINARY=* ]]; then
@@ -75,11 +77,18 @@ run_variant() {
 		elif [[ "$word" == RESOURCES=* ]]; then
 			resources=${word#RESOURCES=}
 			envs=${envs//$word/}
+		elif [[ "$word" == PLUGIN=* ]]; then
+			plugins+=("${word#PLUGIN=}")
+			envs=${envs//$word/}
 		fi
 	done
 	local config="$OUT/config-$label"
 	rm -rf "$config"
 	cp -r "$CONFIG_TEMPLATE" "$config"
+	local plugin
+	for plugin in "${plugins[@]}"; do
+		cp -r "$plugin" "$config/plugins/"
+	done
 	# shellcheck disable=SC2086
 	env ES_STATE_HASH=1 $envs "${RUNNER[@]}" "$binary" --config "$config" --resources "$resources" \
 		--rngseed "$SEED" ${ES_EXTRA_ARGS:-} --test "$TEST_NAME" > "$OUT/$label.log" 2>&1

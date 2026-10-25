@@ -22,6 +22,7 @@ target_sources(EndlessSkyTests PRIVATE
 	unit/src/helpers/datanode-factory.cpp
 	unit/src/helpers/logger-output.cpp
 	unit/src/test_account.cpp
+	unit/src/test_aiRules.cpp
 	unit/src/test_angle.cpp
 	unit/src/test_bitset.cpp
 	unit/src/test_categoryList.cpp
