@@ -194,7 +194,7 @@ namespace {
 	const map<string, BuiltinInfo> BUILTINS = {
 		{"+", {Builtin::ADD, 2, -1}},
 		{"-", {Builtin::SUBTRACT, 1, 2}},
-		{"*", {Builtin::MULTIPLY, 2, 2}},
+		{"*", {Builtin::MULTIPLY, 2, -1}},
 		{"/", {Builtin::DIVIDE, 2, 2}},
 		{"<", {Builtin::LESS, 2, 2}},
 		{">", {Builtin::GREATER, 2, 2}},
@@ -213,8 +213,8 @@ namespace {
 		{"sin", {Builtin::SIN, 1, 1}},
 		{"cos", {Builtin::COS, 1, 1}},
 		{"atan2", {Builtin::ATAN2, 2, 2}},
-		{"min", {Builtin::MIN, 2, 2}},
-		{"max", {Builtin::MAX, 2, 2}},
+		{"min", {Builtin::MIN, 2, -1}},
+		{"max", {Builtin::MAX, 2, -1}},
 		{"copysign", {Builtin::COPYSIGN, 2, 2}},
 		{"clamp", {Builtin::CLAMP, 3, 3}},
 		{"signbit", {Builtin::SIGNBIT, 1, 1}},
@@ -445,6 +445,10 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			const string &variable = line.items[1].atom;
 			if(!CompileExpression(line.items[2], child, statement.expression))
 			{
+				// Still define the variable, so that this one mistake isn't
+				// reported again everywhere the variable is used.
+				if(keyword != "set" && Lookup(variable) < 0 && !CONSTANTS.contains(variable))
+					scopes.back()[variable] = slotCount++;
 				ok = false;
 				continue;
 			}
@@ -871,8 +875,8 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 		return Evaluate(arguments[condition.Boolean() ? 1 : 2], variables, steps, result);
 	}
 
-	// Keep the first few arguments on the stack; only "+", "and" and "or"
-	// take more than four, and rarely.
+	// Keep the first few arguments on the stack; only "+", "*", "min", "max",
+	// "and" and "or" take more than four, and rarely.
 	const size_t count = arguments.size();
 	Value values[4];
 	vector<Value> more(count > 4 ? count - 4 : 0);
@@ -929,14 +933,20 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 				return typeError("-");
 			return true;
 		case Builtin::MULTIPLY:
-			if(isNumbers())
-				result = Value(a.Number() * b.Number());
-			else if(a.GetType() == Type::NUMBER && b.GetType() == Type::VECTOR)
-				result = Value(a.Number() * b.Vector());
-			else if(a.GetType() == Type::VECTOR && b.GetType() == Type::NUMBER)
-				result = Value(a.Vector() * b.Number());
-			else
-				return typeError("*");
+			// Multiply from left to right, so (* a b c) is exactly (* (* a b) c).
+			result = a;
+			for(size_t i = 1; i < count; ++i)
+			{
+				const Value &value = argument(i);
+				if(result.GetType() == Type::NUMBER && value.GetType() == Type::NUMBER)
+					result = Value(result.Number() * value.Number());
+				else if(result.GetType() == Type::NUMBER && value.GetType() == Type::VECTOR)
+					result = Value(result.Number() * value.Vector());
+				else if(result.GetType() == Type::VECTOR && value.GetType() == Type::NUMBER)
+					result = Value(result.Vector() * value.Number());
+				else
+					return typeError("*");
+			}
 			return true;
 		case Builtin::DIVIDE:
 			if(isNumbers())
@@ -1024,10 +1034,20 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 				return typeError("math function");
 			if(expression.builtin == Builtin::ATAN2)
 				result = Value(atan2(a.Number(), b.Number()));
-			else if(expression.builtin == Builtin::MIN)
-				result = Value(min(a.Number(), b.Number()));
-			else if(expression.builtin == Builtin::MAX)
-				result = Value(max(a.Number(), b.Number()));
+			else if(expression.builtin == Builtin::MIN || expression.builtin == Builtin::MAX)
+			{
+				// Like "*", from left to right.
+				const bool isMin = (expression.builtin == Builtin::MIN);
+				double extreme = isMin ? min(a.Number(), b.Number()) : max(a.Number(), b.Number());
+				for(size_t i = 2; i < count; ++i)
+				{
+					const Value &value = argument(i);
+					if(value.GetType() != Type::NUMBER)
+						return typeError("math function");
+					extreme = isMin ? min(extreme, value.Number()) : max(extreme, value.Number());
+				}
+				result = Value(extreme);
+			}
 			else
 				result = Value(copysign(a.Number(), b.Number()));
 			return true;

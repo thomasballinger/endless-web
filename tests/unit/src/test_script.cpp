@@ -77,6 +77,20 @@ SCENARIO( "Running scripts", "[Script]" ) {
 			CHECK( result.out.Number() == 8. );
 		}
 	}
+	GIVEN( "\"*\", \"min\" and \"max\" with more than two arguments" ) {
+		THEN( "they work from left to right, exactly like nested calls" ) {
+			const double a = .1;
+			CHECK( Run("program test\n\tset out (* a 3 7 .3)\n", a).out.Number() == a * 3. * 7. * .3 );
+			CHECK( Run("program test\n\tset out (min 4 a -2 9)\n", a).out.Number() == -2. );
+			CHECK( Run("program test\n\tset out (max 4 a -2 9)\n", a).out.Number() == 9. );
+			const Point v(1.5, -2.);
+			auto vector = Run("program test\n\tset out (x (* 2 v 3))\n", 0., v);
+			REQUIRE( vector.ran );
+			CHECK( vector.out.Number() == (2. * v * 3.).X() );
+			CHECK_FALSE( Run("program test\n\tset out (x (* v 2 v))\n", 0., v).ran );
+			CHECK_FALSE( Run("program test\n\tset out (min 1 2 v)\n", 0., v).ran );
+		}
+	}
 	GIVEN( "vector math" ) {
 		Point v(3., 4.);
 		auto result = Run("program test\n\tset out (cross (unit v) (* 2 (vec 0 1)))\n", 0., v);
@@ -142,6 +156,8 @@ SCENARIO( "Script errors", "[Script]" ) {
 			CHECK_FALSE( Run("program test\n\telse\n\t\tset out 1\n").valid );
 			CHECK_FALSE( Run("program test\n\tset out (sqrt 1 2)\n").valid );
 			CHECK_FALSE( Run("program test\n\tlet a 1\n").valid );
+			// A variable whose definition has an error is still invalid to use.
+			CHECK_FALSE( Run("program test\n\tlet x (sqrt 1 2)\n\tset out x\n").valid );
 		}
 		THEN( "a variable can't be used outside the block that defines it" ) {
 			CHECK_FALSE( Run("program test\n\tif true\n\t\tlet x 1\n\tset out x\n").valid );

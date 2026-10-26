@@ -43,7 +43,8 @@
 #   abs sqrt asin acos sin cos atan2 min max copysign (clamp x low high)
 #   (vec x y) x y dot cross unit length
 # Arithmetic works on numbers, and +, -, * and / also on vectors where it
-# makes sense.
+# makes sense. +, *, min, max, and, and or take any number of arguments, and
+# work from left to right: (* a b c) is the same as (* (* a b) c).
 #
 # Inputs (read only):
 #   position velocity facing                 this projectile (facing is a unit vector)
