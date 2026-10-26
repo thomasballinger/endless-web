@@ -162,6 +162,75 @@ SCENARIO( "Script errors", "[Script]" ) {
 		}
 	}
 }
+
+SCENARIO( "Clamping numbers", "[Script]" ) {
+	std::string text = "program test\n\tset out (clamp a -1 2)\n";
+	THEN( "values are limited to the range" ) {
+		CHECK( Run(text, -5.).out.Number() == -1. );
+		CHECK( Run(text, .5).out.Number() == .5 );
+		CHECK( Run(text, 7.).out.Number() == 2. );
+	}
+	THEN( "a value that is not a number stays that way" ) {
+		CHECK( std::isnan(Run(text, std::nan("")).out.Number()) );
+	}
+}
+
+SCENARIO( "Remembering values between runs", "[Script]" ) {
+	static const script::Interface interface = MakeInterface();
+	auto load = [](const std::string &text) {
+		script::Program program;
+		program.Load(AsDataNode(text), interface);
+		return program;
+	};
+	auto run = [](const script::Program &program, double a, script::Memory *memory) {
+		std::vector<script::Value> variables(program.SlotCount());
+		variables[0] = script::Value(a);
+		variables[1] = script::Value(Point());
+		variables[2] = script::Value(0.);
+		uint32_t effects = 0;
+		REQUIRE( program.Run(variables, effects, memory) );
+		return variables[2].Number();
+	};
+	GIVEN( "a counter in memory" ) {
+		const script::Program program = load(
+R"(program test
+	memory count a
+	set count (+ count 1)
+	set out count
+)");
+		REQUIRE( program.IsValid() );
+		THEN( "the initial value is only used on the first run" ) {
+			script::Memory memory;
+			CHECK( run(program, 10., &memory) == 11. );
+			CHECK( run(program, 10., &memory) == 12. );
+			CHECK( run(program, 10., &memory) == 13. );
+		}
+		THEN( "each memory is separate" ) {
+			script::Memory first;
+			script::Memory second;
+			run(program, 0., &first);
+			run(program, 0., &first);
+			CHECK( run(program, 0., &second) == 1. );
+			CHECK( run(program, 0., &first) == 3. );
+		}
+		THEN( "without a memory, it starts over every run" ) {
+			CHECK( run(program, 5., nullptr) == 6. );
+			CHECK( run(program, 5., nullptr) == 6. );
+		}
+		THEN( "clearing a memory starts it over" ) {
+			script::Memory memory;
+			run(program, 0., &memory);
+			memory.Clear();
+			CHECK( run(program, 0., &memory) == 1. );
+		}
+	}
+	GIVEN( "a memory declared inside a block" ) {
+		const script::Program program = load("program test\n\tif true\n\t\tmemory x 0\n");
+		THEN( "the program is invalid" ) {
+			CHECK( !program.IsValid() );
+		}
+	}
+}
 // #endregion unit tests
 
 

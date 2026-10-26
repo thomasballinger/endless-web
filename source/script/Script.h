@@ -102,6 +102,20 @@ private:
 
 
 
+// Values that a program keeps from one run to the next ("memory" statements),
+// for one object such as one projectile.
+class Memory {
+public:
+	void Clear();
+
+private:
+	friend class Program;
+	std::vector<Value> values;
+	std::vector<bool> isSet;
+};
+
+
+
 class Program {
 public:
 	Program();
@@ -127,8 +141,10 @@ public:
 
 	// Run the program. The first Interface::VariableCount() entries of
 	// variables hold inputs and outputs; effects receives one bit per effect
-	// that was triggered. Returns false, and stops, on a runtime error.
-	bool Run(std::vector<Value> &variables, uint32_t &effects) const;
+	// that was triggered. The values of "memory" statements are kept in the
+	// given memory between runs; with none, they start over every run.
+	// Returns false, and stops, on a runtime error.
+	bool Run(std::vector<Value> &variables, uint32_t &effects, Memory *memory = nullptr) const;
 
 
 private:

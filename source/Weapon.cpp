@@ -648,3 +648,10 @@ double Weapon::Inaccuracy() const
 {
 	return inaccuracy;
 }
+
+
+
+void Weapon::SetGuidance(const MissileGuidance *guidance)
+{
+	this->guidance = guidance;
+}

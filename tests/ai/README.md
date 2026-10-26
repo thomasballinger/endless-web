@@ -14,6 +14,22 @@ same simulation. That requires:
 - AI decisions that don't depend on where objects are in memory (for example,
   `governmentRosters` is sorted by government name, not by address).
 
+Two more things made runs differ only rarely, depending on timing and on
+where the memory allocator happened to put things:
+
+- Sound pitch was randomized with the simulation's random numbers, on the
+  main thread, while the simulation runs on another. It now uses the
+  cosmetic generator.
+- Fleets choosing which system to arrive from, and ships choosing a system to
+  travel to, picked from sets of systems ordered by memory address. They now
+  pick from the systems in name order (`System::InNameOrder`).
+
+To check for this kind of problem, compare normal runs with runs that use a
+different memory layout, e.g. `"a1:MALLOC_ARENA_MAX=1"` or
+`"notcache:GLIBC_TUNABLES=glibc.malloc.tcache_count=0"`. (One run of Ne-20
+with `MALLOC_ARENA_MAX=1` still differed once in about twenty, so there may be
+another, rarer case left.)
+
 Headless runs (integration tests) and drawn runs (`--debug`, `record.sh`)
 are also the same. Two things used to differ: without uploading images,
 sprites had no frames, so nothing was animated and only the first frame's
@@ -117,6 +133,40 @@ player idle for about 12,000 steps:
   up. Only those weapons can read `target-velocity` and set `thrust`, so the
   others keep their default guidance. Both are short examples of the guidance
   script language.
+- `pn-missiles`: proportional navigation, which turns so that the line of
+  sight to the target stops rotating. It uses `memory` to keep the line of
+  sight from the step before. It is named "proportional navigation" and also
+  replaces the four defaults.
+
+## The guidance bench
+
+`endless-sky --resources . --config tests/integration/config --guidance-bench
+"Sidewinder Missile Launcher"` fires that weapon's projectiles at a target
+ship flying along fixed paths (holding still ahead, fleeing, approaching,
+crossing, jinking, circling, beside, behind), 20 shots each, and prints how
+many hit and how quickly. The projectiles are the game's own, so the seeker
+and the guidance script behave as in a battle; only the target follows a set
+path. It takes a few seconds, so it is the quick way to see what an edited
+script does. Options: `--bench-guidance NAME` uses another guidance script
+(if the weapon has the capabilities it needs), `--bench-target MODEL` changes
+the target, `--bench-shots N` the number of shots, and `--bench-replay FILE`
+writes every shot's path as JSON. Don't pass `--rngseed`: each shot is seeded
+separately.
+
+For the Sidewinder Missile Launcher, against an Argosy, 20 shots each:
+
+| Scenario | Default | Pursuit | Proportional navigation |
+|---|---|---|---|
+| Behind, holding still | 0 | 20 | 20 |
+| Jinking | 18 | 19 | 3 |
+| Crossing | 19 (137 steps) | 19 (157) | 19 (146) |
+| Total of 160 | 135 | 156 | 140 |
+
+The default never hits a target directly behind it: the built-in steering
+turns by `asin(cross(facing, direction))`, which is 0 for a target exactly
+behind, so the missile never turns around. Proportional navigation fixes
+that, but a target that reverses every second fools it, because it steers by
+how the line of sight moved since the last step.
 
 ## Keeping scripts in sync with the C++ code
 
@@ -134,5 +184,6 @@ Behavior that moved from C++ into scripts is checked two ways:
   script statement ran, which shows what a scenario does not cover. (The
   "leading" script and blind spots are not used by any weapon in the game
   data; the unit test covers those.) The reference build must include the
-  headless sprite fix (`ImageSet::Upload`), or runs will differ for that
-  reason alone.
+  fixes that changed runs since: the headless sprite fix
+  (`ImageSet::Upload`), the cosmetic sound pitch, and choosing systems in name
+  order. Otherwise runs will differ for those reasons alone.

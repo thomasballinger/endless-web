@@ -376,7 +376,7 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	input.drag = weapon->Drag();
 
 	MissileGuidance::Output output;
-	if(!guidance->Run(input, output))
+	if(!guidance->Run(input, output, &guidanceMemory))
 	{
 		turn = 0.;
 		return;

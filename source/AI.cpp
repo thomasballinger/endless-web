@@ -2583,7 +2583,7 @@ void AI::MoveIndependent(Ship &ship, Command &command)
 			planets.push_back(&origin->Objects().front());
 		}
 
-		set<const System *>::const_iterator it = links.begin();
+		auto it = links.begin();
 		int choice = Random::Int(totalWeight);
 		if(choice < systemTotalWeight)
 		{

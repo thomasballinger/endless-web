@@ -242,6 +242,10 @@ public:
 	std::vector<std::string> FlightCheck() const;
 
 	void SetPosition(Point position);
+	// Put this ship in the given state of motion without changing anything
+	// else about it, unlike Place(). This is for tools such as the guidance
+	// bench that move a ship along a fixed path.
+	void SetKinematics(Point position, Point velocity, Angle facing);
 	void SetVelocity(Point velocity);
 	// When creating a new ship, you must set the following:
 	void Place(Point position = Point(), Point velocity = Point(), Angle angle = Angle(), bool isDeparting = true);

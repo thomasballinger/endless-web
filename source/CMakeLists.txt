@@ -159,6 +159,8 @@ target_sources(EndlessSkyLib PRIVATE
 	GameWindow.h
 	Government.cpp
 	Government.h
+	GuidanceBench.cpp
+	GuidanceBench.h
 	HailPanel.cpp
 	HailPanel.h
 	Hardpoint.cpp

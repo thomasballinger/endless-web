@@ -1,0 +1,46 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Example: proportional navigation. Instead of pointing at the target, turn
+# so that the line of sight to the target stops rotating; then the missile
+# and the target are on a collision course. This needs no target velocity,
+# so every homing weapon can use it, but it does need to remember the line of
+# sight from the step before.
+guidance "proportional navigation" "basic" "throttle control" "leading" "leading and throttle control"
+	# The direction to the target on the last step (zero if there was none).
+	memory last-sight (vec 0 0)
+
+	if (not has-lock)
+		set last-sight (vec 0 0)
+		if confused
+			set turn (* max-turn confusion-direction)
+		else
+			set turn 0
+		stop
+
+	let sight (unit (- target-position position))
+	# How far off the nose the target is, from -180 to 180 degrees.
+	let off-nose (* to-deg (atan2 (cross facing sight) (dot facing sight)))
+	# How many degrees the line of sight turned since the last step.
+	let sight-rate 0
+	if (!= (length last-sight) 0)
+		set sight-rate (* to-deg (asin (cross last-sight sight)))
+	set last-sight sight
+
+	if (> (abs off-nose) 60)
+		# Too far off course to navigate: turn towards the target first.
+		set turn (copysign max-turn off-nose)
+	else
+		# Turn four times as fast as the line of sight, plus a little
+		# towards the target so that a target dead ahead is not ignored.
+		set turn (clamp (+ (* 4 sight-rate) (* .05 off-nose)) (- max-turn) max-turn)

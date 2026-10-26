@@ -31,12 +31,16 @@
 # above them. Statements:
 #   let <name> <expression>      define a variable (visible to the end of its block)
 #   set <name> <expression>      change a variable or an output
+#   memory <name> <expression>   define a variable that keeps its value from one
+#                                step to the next, for each projectile; the
+#                                expression is only its starting value (only
+#                                allowed outside of any block)
 #   if / elif / else             choose a block
 #   drop-target                  forget the current target
 #   stop                         end the script for this step
 # Expressions: numbers, true, false, pi, to-deg, to-rad, variables, and
 #   + - * /  < > <= >= == !=  and or not  (if c a b)
-#   abs sqrt asin acos sin cos atan2 min max copysign
+#   abs sqrt asin acos sin cos atan2 min max copysign (clamp x low high)
 #   (vec x y) x y dot cross unit length
 # Arithmetic works on numbers, and +, -, * and / also on vectors where it
 # makes sense.

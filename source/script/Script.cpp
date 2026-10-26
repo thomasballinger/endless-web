@@ -153,7 +153,7 @@ namespace {
 		ADD, SUBTRACT, MULTIPLY, DIVIDE,
 		LESS, GREATER, LESS_EQUAL, GREATER_EQUAL, EQUAL, NOT_EQUAL,
 		NOT, AND, OR, IF,
-		ABS, SQRT, ASIN, ACOS, SIN, COS, ATAN2, MIN, MAX, COPYSIGN,
+		ABS, SQRT, ASIN, ACOS, SIN, COS, ATAN2, MIN, MAX, COPYSIGN, CLAMP,
 		VEC, X, Y, DOT, CROSS, UNIT, LENGTH
 	};
 
@@ -190,6 +190,7 @@ namespace {
 		{"min", {Builtin::MIN, 2, 2}},
 		{"max", {Builtin::MAX, 2, 2}},
 		{"copysign", {Builtin::COPYSIGN, 2, 2}},
+		{"clamp", {Builtin::CLAMP, 3, 3}},
 		{"vec", {Builtin::VEC, 2, 2}},
 		{"x", {Builtin::X, 1, 1}},
 		{"y", {Builtin::Y, 1, 1}},
@@ -301,11 +302,13 @@ public:
 	class Block;
 	class Statement {
 	public:
-		enum class Kind { ASSIGN, IF, EFFECT, STOP };
+		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY };
 		Kind kind = Kind::STOP;
 		int slot = -1;
 		Expression expression;
 		int effect = -1;
+		// For MEMORY: which of the program's memory values this is.
+		int memory = -1;
 		// For IF: the condition and block of the "if" and each "elif", then
 		// an optional "else" block with no condition.
 		vector<Expression> conditions;
@@ -323,7 +326,7 @@ public:
 
 public:
 	bool Compile(const DataNode &node, const Interface &interface);
-	bool Run(vector<Value> &variables, uint32_t &effects) const;
+	bool Run(vector<Value> &variables, uint32_t &effects, Memory *memory) const;
 
 
 private:
@@ -332,7 +335,8 @@ private:
 	int Lookup(const string &name) const;
 
 	enum class Result { CONTINUE, STOP, ERROR };
-	Result RunBlock(const Block &block, vector<Value> &variables, uint32_t &effects, int &steps) const;
+	Result RunBlock(const Block &block, vector<Value> &variables, uint32_t &effects, Memory *memory,
+		int &steps) const;
 	bool Evaluate(const Expression &expression, vector<Value> &variables, int &steps, Value &result) const;
 	bool Fail(const string &message) const;
 	void CountStatement(const Statement &statement) const;
@@ -347,6 +351,8 @@ public:
 	vector<bool> reads;
 	vector<bool> writes;
 	vector<bool> triggers;
+	// The variable slot of each "memory" value.
+	vector<int> memorySlots;
 
 
 private:
@@ -367,6 +373,7 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 	reads.assign(slotCount, false);
 	writes.assign(slotCount, false);
 	triggers.assign(interface.EffectCount(), false);
+	memorySlots.clear();
 	scopes.assign(1, {});
 	body = Block();
 	valid = CompileBlock(node, body);
@@ -397,7 +404,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		Statement statement;
 		statement.description = Describe(child);
 		statement.index = statementCount++;
-		if(keyword == "let" || keyword == "set")
+		if(keyword == "let" || keyword == "set" || keyword == "memory")
 		{
 			if(argumentCount != 2 || !line.items[1].IsAtom() || child.HasChildren())
 			{
@@ -412,7 +419,29 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				continue;
 			}
 			statement.kind = Statement::Kind::ASSIGN;
-			if(keyword == "let")
+			if(keyword == "memory")
+			{
+				// Memory is kept for the whole program, so it can only be
+				// declared in the top-level block.
+				if(scopes.size() != 2)
+				{
+					child.PrintTrace("\"memory\" can only be used outside of any block:");
+					ok = false;
+					continue;
+				}
+				if(Lookup(variable) >= 0 || CONSTANTS.contains(variable))
+				{
+					child.PrintTrace("\"" + variable + "\" is already defined:");
+					ok = false;
+					continue;
+				}
+				statement.kind = Statement::Kind::MEMORY;
+				statement.slot = slotCount++;
+				statement.memory = static_cast<int>(memorySlots.size());
+				memorySlots.push_back(statement.slot);
+				scopes.back()[variable] = statement.slot;
+			}
+			else if(keyword == "let")
 			{
 				if(Lookup(variable) >= 0 || CONSTANTS.contains(variable))
 				{
@@ -632,20 +661,35 @@ void Program::Implementation::CountStatement(const Statement &statement) const
 
 
 
-bool Program::Implementation::Run(vector<Value> &variables, uint32_t &effects) const
+bool Program::Implementation::Run(vector<Value> &variables, uint32_t &effects, Memory *memory) const
 {
 	if(!valid)
 		return false;
 	if(static_cast<int>(variables.size()) < slotCount)
 		variables.resize(slotCount);
+	// Restore the values remembered from the last run.
+	if(memory)
+	{
+		memory->values.resize(memorySlots.size());
+		memory->isSet.resize(memorySlots.size(), false);
+		for(size_t i = 0; i < memorySlots.size(); ++i)
+			if(memory->isSet[i])
+				variables[memorySlots[i]] = memory->values[i];
+	}
 	int steps = 0;
-	return RunBlock(body, variables, effects, steps) != Result::ERROR;
+	if(RunBlock(body, variables, effects, memory, steps) == Result::ERROR)
+		return false;
+	if(memory)
+		for(size_t i = 0; i < memorySlots.size(); ++i)
+			if(memory->isSet[i])
+				memory->values[i] = variables[memorySlots[i]];
+	return true;
 }
 
 
 
 Program::Implementation::Result Program::Implementation::RunBlock(const Block &block, vector<Value> &variables,
-	uint32_t &effects, int &steps) const
+	uint32_t &effects, Memory *memory, int &steps) const
 {
 	for(const Statement &statement : block.statements)
 	{
@@ -685,7 +729,7 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 					chosen = statement.blocks.size() - 1;
 				if(chosen < statement.blocks.size())
 				{
-					Result result = RunBlock(statement.blocks[chosen], variables, effects, steps);
+					Result result = RunBlock(statement.blocks[chosen], variables, effects, memory, steps);
 					if(result != Result::CONTINUE)
 						return result;
 				}
@@ -696,6 +740,19 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 				break;
 			case Statement::Kind::STOP:
 				return Result::STOP;
+			case Statement::Kind::MEMORY:
+			{
+				// The initial value is only used on the first run.
+				if(memory && memory->isSet[statement.memory])
+					break;
+				Value value;
+				if(!Evaluate(statement.expression, variables, steps, value))
+					return Result::ERROR;
+				variables[statement.slot] = value;
+				if(memory)
+					memory->isSet[statement.memory] = true;
+				break;
+			}
 		}
 	}
 	return Result::CONTINUE;
@@ -910,6 +967,20 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			else
 				result = Value(copysign(a.Number(), b.Number()));
 			return true;
+		case Builtin::CLAMP:
+		{
+			const Value &c = extra.front();
+			if(!isNumbers() || c.GetType() != Type::NUMBER)
+				return typeError("clamp");
+			// A value that is not a number stays that way.
+			double x = a.Number();
+			if(x < b.Number())
+				x = b.Number();
+			else if(x > c.Number())
+				x = c.Number();
+			result = Value(x);
+			return true;
+		}
 		case Builtin::VEC:
 			if(!isNumbers())
 				return typeError("vec");
@@ -1022,9 +1093,17 @@ bool Program::Triggers(int effect) const
 
 
 
-bool Program::Run(vector<Value> &variables, uint32_t &effects) const
+bool Program::Run(vector<Value> &variables, uint32_t &effects, Memory *memory) const
 {
-	return implementation->Run(variables, effects);
+	return implementation->Run(variables, effects, memory);
+}
+
+
+
+void Memory::Clear()
+{
+	values.clear();
+	isSet.clear();
 }
 
 } // namespace script

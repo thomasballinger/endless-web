@@ -30,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "GameLoadingPanel.h"
 #include "GameVersion.h"
 #include "GameWindow.h"
+#include "GuidanceBench.h"
 #include "Interface.h"
 #include "Logger.h"
 #include "MainPanel.h"
@@ -116,6 +117,7 @@ int main(int argc, char *argv[])
 	bool noTestMute = false;
 	uint64_t nWorkerThreads = 0;
 	string testToRunName;
+	GuidanceBench::Options benchOptions;
 
 	// Whether the game has encountered errors while loading.
 	bool hasErrors = false;
@@ -157,7 +159,18 @@ int main(int argc, char *argv[])
 			Random::SetFixedSeed(std::stoull(*it));
 		else if(arg == "--tq-threads" && *++it)
 			nWorkerThreads = std::stoull(*it);
+		else if(arg == "--guidance-bench" && *++it)
+			benchOptions.outfit = *it;
+		else if(arg == "--bench-guidance" && *++it)
+			benchOptions.guidance = *it;
+		else if(arg == "--bench-target" && *++it)
+			benchOptions.target = *it;
+		else if(arg == "--bench-shots" && *++it)
+			benchOptions.trials = max(1, stoi(*it));
+		else if(arg == "--bench-replay" && *++it)
+			benchOptions.replayPath = *it;
 	}
+	const bool runBench = !benchOptions.outfit.empty();
 
 	if(nWorkerThreads)
 		TaskQueue::SetWorkerThreadCount(nWorkerThreads);
@@ -179,6 +192,9 @@ int main(int argc, char *argv[])
 	// Whether we are running an integration test.
 	const bool isTesting = !testToRunName.empty();
 	bool isConsoleOnly = loadOnly || printTests || printData;
+	// The guidance bench needs sprites, for their collision masks, but
+	// doesn't upload them or open a window.
+	checkAssets |= runBench;
 
 	Logger::Session logSession{isConsoleOnly || isTesting};
 
@@ -219,13 +235,14 @@ int main(int argc, char *argv[])
 		{
 			if(checkAssets)
 			{
-				Audio::LoadSounds(GameData::Sources());
+				if(!runBench)
+					Audio::LoadSounds(GameData::Sources());
 				while(GameData::GetProgress() < 1.)
 				{
 					queue.ProcessSyncTasks();
 					this_thread::yield();
 				}
-				if(GameData::IsLoaded())
+				if(GameData::IsLoaded() && !runBench)
 				{
 					// Now that we have finished loading all the basic sprites and sounds, we can look for invalid file paths,
 					// e.g. due to capitalization errors or other typos.
@@ -236,6 +253,8 @@ int main(int argc, char *argv[])
 
 			// Set the game's initial internal state.
 			GameData::FinishLoading();
+			if(runBench)
+				return GuidanceBench::Run(benchOptions) ? 0 : 1;
 
 			// Reference check the universe, as known to the player. If no player found,
 			// then check the default state of the universe.
@@ -677,6 +696,12 @@ void PrintHelp()
 	cerr << "    --parse-assets: load all game data, images, and sounds,"
 		" and the latest save game, and inspect data for errors." << endl;
 	cerr << "    --tests: print table of available tests, then exit." << endl;
+	cerr << "    --guidance-bench <outfit>: fire the given homing weapon at a target flying"
+		" along fixed paths, and report how often it hits. Options:" << endl;
+	cerr << "        --bench-guidance <name>: use this guidance script instead of the weapon's own." << endl;
+	cerr << "        --bench-target <ship model>: the ship to fire at (default: Argosy)." << endl;
+	cerr << "        --bench-shots <n>: how many shots to fire in each scenario (default: 20)." << endl;
+	cerr << "        --bench-replay <file>: write the path of every shot to this file as JSON." << endl;
 	cerr << "    --test <name>: run given test from resources directory." << endl;
 	cerr << "    --nomute: don't mute the game while running tests." << endl;
 	cerr << "    --rng-seed <seed>: every time the pseudo-random number generator is seeded,"

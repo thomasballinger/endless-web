@@ -120,7 +120,8 @@ public:
 
 	// Run the script. The turn and thrust are limited to what the weapon can
 	// do. Returns false, with no turn, if the script fails.
-	bool Run(const Input &input, Output &output) const;
+	// The memory holds the script's "memory" values for one projectile.
+	bool Run(const Input &input, Output &output, script::Memory *memory = nullptr) const;
 
 
 private:

@@ -1738,6 +1738,15 @@ void Ship::SetPosition(Point position)
 
 
 
+void Ship::SetKinematics(Point position, Point velocity, Angle facing)
+{
+	this->position = position;
+	this->velocity = velocity;
+	angle = facing;
+}
+
+
+
 void Ship::SetVelocity(Point velocity)
 {
 	this->velocity = velocity;

@@ -129,7 +129,7 @@ string MissileGuidance::MissingCapability(bool leading, bool throttleControl) co
 
 
 
-bool MissileGuidance::Run(const Input &input, Output &output) const
+bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *memory) const
 {
 	// Each thread reuses its own variables.
 	thread_local vector<script::Value> variables;
@@ -153,7 +153,7 @@ bool MissileGuidance::Run(const Input &input, Output &output) const
 	const script::Value &turn = variables[TURN];
 	const script::Value &thrust = variables[THRUST];
 	output = Output();
-	if(!program.Run(variables, effects) || turn.GetType() != script::Value::Type::NUMBER
+	if(!program.Run(variables, effects, memory) || turn.GetType() != script::Value::Type::NUMBER
 			|| thrust.GetType() != script::Value::Type::NUMBER)
 		return false;
 

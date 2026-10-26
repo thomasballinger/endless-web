@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Angle.h"
 #include "Point.h"
+#include "script/Script.h"
 
 #include <cstdint>
 #include <memory>
@@ -148,6 +149,8 @@ private:
 	uint16_t hitsRemaining = 1U;
 	bool hasLock = true;
 	bool isConfused = false;
+	// What this projectile's guidance script remembers between steps.
+	script::Memory guidanceMemory;
 	// A positive value means this projectile will turn to the right;
 	// a negative value means this projectile will turn left.
 	int confusionDirection = 0;

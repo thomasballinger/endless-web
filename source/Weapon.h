@@ -177,6 +177,8 @@ public:
 	bool Leading() const;
 	// The script that steers this weapon's projectiles, or null to use the default.
 	const MissileGuidance *Guidance() const;
+	// Use a different guidance script (e.g. to compare scripts on the bench).
+	void SetGuidance(const MissileGuidance *guidance);
 
 	// These values include all submunitions:
 	// Normal damage types:
