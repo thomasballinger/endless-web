@@ -33,6 +33,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <random>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace { // test namespace
 
@@ -573,6 +574,26 @@ TEST_CASE( "The move to maneuver matches the built-in AI code", "[ShipManeuver]"
 	CHECK( forward > 0 );
 	CHECK( back > 0 );
 	CHECK( kept > 0 );
+}
+
+// Not run by default: "endless-sky-tests [.maneuver-speed]" times the scripts.
+TEST_CASE( "Maneuver script speed", "[.maneuver-speed]" ) {
+	const ShipManeuver *keepStation = LoadManeuver("keep station");
+	const ShipManeuver *moveTo = LoadManeuver("move to");
+	REQUIRE( keepStation );
+	REQUIRE( moveTo );
+	SituationGenerator generator(3);
+	std::vector<Situation> situations;
+	for(int i = 0; i < 1000; ++i)
+		situations.push_back(generator.Next());
+	double total = 0.;
+	for(int round = 0; round < 20; ++round)
+		for(const Situation &s : situations)
+		{
+			TestContext context(s);
+			total += Scripted(*keepStation, s).turn + Scripted(*moveTo, s, &context).turn;
+		}
+	CHECK( !std::isnan(total) );
 }
 
 TEST_CASE( "Ship functions need a ship", "[ShipManeuver]" ) {
