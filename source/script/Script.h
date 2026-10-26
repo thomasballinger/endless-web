@@ -86,6 +86,9 @@ public:
 	int AddEffect(const std::string &name);
 
 	int VariableCount() const;
+	int EffectCount() const;
+	const std::string &VariableName(int variable) const;
+	const std::string &EffectName(int effect) const;
 	int Find(const std::string &name) const;
 	bool IsOutput(int variable) const;
 	int FindEffect(const std::string &name) const;
@@ -114,6 +117,13 @@ public:
 
 	// Number of variable slots Run() needs, including the interface's.
 	int SlotCount() const;
+
+	// Whether the program reads or sets one of the interface's variables, or
+	// triggers one of its effects, anywhere in its code. A host can use these
+	// to only allow a program where it has the capabilities the program uses.
+	bool Reads(int variable) const;
+	bool Writes(int variable) const;
+	bool Triggers(int effect) const;
 
 	// Run the program. The first Interface::VariableCount() entries of
 	// variables hold inputs and outputs; effects receives one bit per effect

@@ -42,6 +42,7 @@ target_sources(EndlessSkyTests PRIVATE
 	unit/src/test_orderedMap.cpp
 	unit/src/test_point.cpp
 	unit/src/test_random.cpp
+	unit/src/test_guidance.cpp
 	unit/src/test_script.cpp
 	unit/src/test_scrollVar.cpp
 	unit/src/test_set.cpp

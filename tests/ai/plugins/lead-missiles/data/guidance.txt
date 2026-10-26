@@ -1,6 +1,6 @@
 # Example: every missile leads its target, and coasts once it's lined up.
-guidance "default"
-	if (not (and has-target has-lock))
+guidance "leading and throttle control"
+	if (not has-lock)
 		set turn 0
 		stop
 

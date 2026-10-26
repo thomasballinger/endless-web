@@ -445,7 +445,12 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 		else if(key == "ai" && hasValue)
 			aiRules.Get(node.Token(1))->Load(node);
 		else if(key == "guidance" && hasValue)
-			guidance.Get(node.Token(1))->Load(node);
+		{
+			// One script may be given several names, e.g. to replace several
+			// of the default scripts at once.
+			for(int i = 1; i < node.Size(); ++i)
+				guidance.Get(node.Token(i))->Load(node, node.Token(i));
+		}
 		else if(key == "formation" && hasValue)
 		{
 			FormationPattern *formation = formations.Get(node.Token(1));

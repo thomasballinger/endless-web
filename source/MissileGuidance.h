@@ -15,17 +15,29 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "Point.h"
 #include "script/Script.h"
 
 #include <string>
 
 class DataNode;
+class Weapon;
 
 
 
 // A script that steers a homing projectile each step, loaded from a
-// "guidance" node in the game data. A weapon names its guidance program with
-// a "guidance" attribute; homing weapons without one use "default".
+// "guidance" node in the game data.
+//
+// What a script may do depends on the weapon's homing attributes, which act as
+// the capabilities of its guidance hardware:
+//  - Only "leading" weapons can measure their target's velocity.
+//  - Only weapons with "throttle control" can change their thrust.
+//  - A "blindspot" seeker cannot see behind the projectile. That is enforced
+//    by the game before the script runs: the projectile loses its target.
+// Each combination of capabilities has a default script that reproduces the
+// game's built-in behavior. A weapon may name another script with a
+// "guidance" attribute, which is used only if the weapon has every capability
+// the script needs.
 //
 // The script only decides how to steer. Whether the seeker has a lock or is
 // confused is still decided by the weapon's tracking attributes, and is given
@@ -39,24 +51,22 @@ public:
 		POSITION,
 		VELOCITY,
 		FACING,
-		// Whether the projectile has a target, and where it is.
-		HAS_TARGET,
+		// Whether the seeker can see its target, and where the target is. The
+		// target's position and velocity are zero if it cannot.
+		HAS_LOCK,
 		TARGET_POSITION,
 		TARGET_VELOCITY,
-		// The state of the seeker.
-		HAS_LOCK,
+		// Whether the seeker is confused, and which way a confused projectile
+		// turns: 1 or -1.
 		CONFUSED,
-		// Which way a confused projectile turns: 1 or -1.
 		CONFUSION_DIRECTION,
 		// The weapon's attributes.
 		MAX_TURN,
 		ACCELERATION,
 		DRAG,
-		BLINDSPOT,
-		LEADING,
-		THROTTLE_CONTROL,
 		// Outputs: degrees to turn this step, and acceleration to apply. They
-		// start at the weapon's maximum turn rate and acceleration.
+		// start at the weapon's maximum turn rate and acceleration, and are
+		// limited to those after the script runs.
 		TURN,
 		THRUST
 	};
@@ -65,17 +75,55 @@ public:
 		DROP_TARGET
 	};
 
+	// What the projectile knows when its script runs.
+	class Input {
+	public:
+		Point position;
+		Point velocity;
+		Point facing;
+		bool hasLock = false;
+		Point targetPosition;
+		Point targetVelocity;
+		bool confused = false;
+		int confusionDirection = 1;
+		double maxTurn = 0.;
+		double acceleration = 0.;
+		double drag = 0.;
+	};
+	// What the script decided.
+	class Output {
+	public:
+		double turn = 0.;
+		double thrust = 0.;
+		bool dropTarget = false;
+	};
+
 	static const script::Interface &GetInterface();
+
+	// The script that reproduces the built-in behavior of the given weapon.
+	static const MissileGuidance *Default(const Weapon &weapon);
+	// The name of the default script for a weapon with the given capabilities.
+	static std::string DefaultName(bool leading, bool throttleControl);
 
 
 public:
-	void Load(const DataNode &node);
+	void Load(const DataNode &node, const std::string &name);
 
 	const std::string &Name() const;
 	bool IsValid() const;
 	const script::Program &Program() const;
 
+	// Describe a capability this script uses that the weapon lacks, or return
+	// an empty string if the weapon may use this script.
+	std::string MissingCapability(const Weapon &weapon) const;
+	std::string MissingCapability(bool leading, bool throttleControl) const;
+
+	// Run the script. The turn and thrust are limited to what the weapon can
+	// do. Returns false, with no turn, if the script fails.
+	bool Run(const Input &input, Output &output) const;
+
 
 private:
+	std::string name;
 	script::Program program;
 };

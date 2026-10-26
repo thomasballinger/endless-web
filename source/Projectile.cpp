@@ -32,6 +32,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <set>
+#include <string>
 #include <vector>
 
 using namespace std;
@@ -262,58 +264,72 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 // and how much to accelerate.
 void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 {
+	// A seeker with a blind spot can't see a target behind the projectile, so
+	// it loses the target. The guidance script does not run that step, so the
+	// projectile turns at its full turn rate, as it always has.
+	if(currentTarget && weapon->HasBlindspot()
+			&& (currentTarget->Position() - position).Dot(angle.Unit()) < 0.)
+	{
+		target.reset();
+		return;
+	}
+
 	const MissileGuidance *guidance = weapon->Guidance();
+	if(guidance && guidance->IsValid())
+	{
+		string missing = guidance->MissingCapability(*weapon);
+		if(!missing.empty())
+		{
+			// Only complain once about each script and missing capability.
+			static set<string> warned;
+			if(warned.insert(guidance->Name() + missing).second)
+				Logger::Log("A weapon can't use guidance \"" + guidance->Name() + "\" because " + missing
+					+ ". Weapons without that use their default guidance instead.", Logger::Level::WARNING);
+			guidance = nullptr;
+		}
+	}
 	if(!guidance)
-		guidance = GameData::Guidance().Find("default");
-	if(!guidance || !guidance->IsValid())
+		guidance = MissileGuidance::Default(*weapon);
+	// A plugin could replace a default script with one that needs more than
+	// the weapons using it have.
+	if(!guidance || !guidance->IsValid() || !guidance->MissingCapability(*weapon).empty())
 	{
 		static bool warned = false;
 		if(!warned)
-			Logger::Log("A homing weapon has no valid \"guidance\" script; its projectiles will not steer.",
-				Logger::Level::ERROR);
+			Logger::Log("A homing weapon has no valid \"guidance\" script that it is able to use;"
+				" its projectiles will not steer.", Logger::Level::ERROR);
 		warned = true;
 		turn = 0.;
 		return;
 	}
 
-	// Projectiles only move on one thread at a time, so these can be reused.
-	static vector<script::Value> variables;
-	const script::Program &program = guidance->Program();
-	variables.resize(program.SlotCount());
-	using Variable = MissileGuidance::Variable;
-	variables[Variable::POSITION] = script::Value(position);
-	variables[Variable::VELOCITY] = script::Value(velocity);
-	variables[Variable::FACING] = script::Value(angle.Unit());
-	variables[Variable::HAS_TARGET] = script::Value(currentTarget != nullptr);
-	variables[Variable::TARGET_POSITION] = script::Value(currentTarget ? currentTarget->Position() : Point());
-	variables[Variable::TARGET_VELOCITY] = script::Value(currentTarget ? currentTarget->Velocity() : Point());
-	variables[Variable::HAS_LOCK] = script::Value(hasLock);
-	variables[Variable::CONFUSED] = script::Value(isConfused);
-	variables[Variable::CONFUSION_DIRECTION] = script::Value(static_cast<double>(confusionDirection));
-	variables[Variable::MAX_TURN] = script::Value(weapon->Turn());
-	variables[Variable::ACCELERATION] = script::Value(weapon->Acceleration());
-	variables[Variable::DRAG] = script::Value(weapon->Drag());
-	variables[Variable::BLINDSPOT] = script::Value(weapon->HasBlindspot());
-	variables[Variable::LEADING] = script::Value(weapon->Leading());
-	variables[Variable::THROTTLE_CONTROL] = script::Value(weapon->ThrottleControl());
-	variables[Variable::TURN] = script::Value(turn);
-	variables[Variable::THRUST] = script::Value(accel);
+	MissileGuidance::Input input;
+	input.position = position;
+	input.velocity = velocity;
+	input.facing = angle.Unit();
+	input.hasLock = currentTarget && hasLock;
+	if(input.hasLock)
+	{
+		input.targetPosition = currentTarget->Position();
+		input.targetVelocity = currentTarget->Velocity();
+	}
+	input.confused = isConfused;
+	input.confusionDirection = confusionDirection;
+	input.maxTurn = turn;
+	input.acceleration = accel;
+	input.drag = weapon->Drag();
 
-	uint32_t effects = 0;
-	const script::Value &newTurn = variables[Variable::TURN];
-	const script::Value &newThrust = variables[Variable::THRUST];
-	if(!program.Run(variables, effects) || newTurn.GetType() != script::Value::Type::NUMBER
-			|| newThrust.GetType() != script::Value::Type::NUMBER)
+	MissileGuidance::Output output;
+	if(!guidance->Run(input, output))
 	{
 		turn = 0.;
 		return;
 	}
-	if(effects & (1u << MissileGuidance::DROP_TARGET))
+	if(output.dropTarget)
 		target.reset();
-	turn = newTurn.Number();
-	accel = newThrust.Number();
+	turn = output.turn;
+	accel = output.thrust;
 }
-
 
 
 

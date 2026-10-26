@@ -16,6 +16,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "MissileGuidance.h"
 
 #include "DataNode.h"
+#include "GameData.h"
+#include "Weapon.h"
+
+#include <vector>
 
 using namespace std;
 
@@ -27,18 +31,14 @@ namespace {
 		interface.AddInput("position");
 		interface.AddInput("velocity");
 		interface.AddInput("facing");
-		interface.AddInput("has-target");
+		interface.AddInput("has-lock");
 		interface.AddInput("target-position");
 		interface.AddInput("target-velocity");
-		interface.AddInput("has-lock");
 		interface.AddInput("confused");
 		interface.AddInput("confusion-direction");
 		interface.AddInput("max-turn");
 		interface.AddInput("acceleration");
 		interface.AddInput("drag");
-		interface.AddInput("blindspot");
-		interface.AddInput("leading");
-		interface.AddInput("throttle-control");
 		interface.AddOutput("turn");
 		interface.AddOutput("thrust");
 		interface.AddEffect("drop-target");
@@ -56,8 +56,34 @@ const script::Interface &MissileGuidance::GetInterface()
 
 
 
-void MissileGuidance::Load(const DataNode &node)
+const MissileGuidance *MissileGuidance::Default(const Weapon &weapon)
 {
+	// There are only four defaults, so remember where each one is.
+	static const MissileGuidance *defaults[2][2] = {};
+	const MissileGuidance *&guidance = defaults[weapon.Leading()][weapon.ThrottleControl()];
+	if(!guidance)
+		guidance = GameData::Guidance().Find(DefaultName(weapon.Leading(), weapon.ThrottleControl()));
+	return guidance;
+}
+
+
+
+string MissileGuidance::DefaultName(bool leading, bool throttleControl)
+{
+	if(leading && throttleControl)
+		return "leading and throttle control";
+	if(leading)
+		return "leading";
+	if(throttleControl)
+		return "throttle control";
+	return "basic";
+}
+
+
+
+void MissileGuidance::Load(const DataNode &node, const string &name)
+{
+	this->name = name;
 	program = script::Program();
 	program.Load(node, GetInterface());
 }
@@ -66,7 +92,7 @@ void MissileGuidance::Load(const DataNode &node)
 
 const string &MissileGuidance::Name() const
 {
-	return program.Name();
+	return name;
 }
 
 
@@ -81,4 +107,69 @@ bool MissileGuidance::IsValid() const
 const script::Program &MissileGuidance::Program() const
 {
 	return program;
+}
+
+
+
+string MissileGuidance::MissingCapability(const Weapon &weapon) const
+{
+	return MissingCapability(weapon.Leading(), weapon.ThrottleControl());
+}
+
+
+
+string MissileGuidance::MissingCapability(bool leading, bool throttleControl) const
+{
+	if(!leading && program.Reads(TARGET_VELOCITY))
+		return "it reads \"target-velocity\", which requires \"leading\"";
+	if(!throttleControl && program.Writes(THRUST))
+		return "it sets \"thrust\", which requires \"throttle control\"";
+	return "";
+}
+
+
+
+bool MissileGuidance::Run(const Input &input, Output &output) const
+{
+	// Each thread reuses its own variables.
+	thread_local vector<script::Value> variables;
+	variables.resize(program.SlotCount());
+	const bool locked = input.hasLock;
+	variables[POSITION] = script::Value(input.position);
+	variables[VELOCITY] = script::Value(input.velocity);
+	variables[FACING] = script::Value(input.facing);
+	variables[HAS_LOCK] = script::Value(locked);
+	variables[TARGET_POSITION] = script::Value(locked ? input.targetPosition : Point());
+	variables[TARGET_VELOCITY] = script::Value(locked ? input.targetVelocity : Point());
+	variables[CONFUSED] = script::Value(input.confused);
+	variables[CONFUSION_DIRECTION] = script::Value(static_cast<double>(input.confusionDirection));
+	variables[MAX_TURN] = script::Value(input.maxTurn);
+	variables[ACCELERATION] = script::Value(input.acceleration);
+	variables[DRAG] = script::Value(input.drag);
+	variables[TURN] = script::Value(input.maxTurn);
+	variables[THRUST] = script::Value(input.acceleration);
+
+	uint32_t effects = 0;
+	const script::Value &turn = variables[TURN];
+	const script::Value &thrust = variables[THRUST];
+	output = Output();
+	if(!program.Run(variables, effects) || turn.GetType() != script::Value::Type::NUMBER
+			|| thrust.GetType() != script::Value::Type::NUMBER)
+		return false;
+
+	output.dropTarget = effects & (1u << DROP_TARGET);
+	// The script can't turn or accelerate faster than the weapon is able to,
+	// or thrust backwards. (A turn that is not a number is passed through,
+	// as the built-in guidance does.)
+	output.turn = turn.Number();
+	if(output.turn > input.maxTurn)
+		output.turn = input.maxTurn;
+	else if(output.turn < -input.maxTurn)
+		output.turn = -input.maxTurn;
+	output.thrust = thrust.Number();
+	if(output.thrust > input.acceleration)
+		output.thrust = input.acceleration;
+	else if(output.thrust < 0.)
+		output.thrust = 0.;
+	return true;
 }

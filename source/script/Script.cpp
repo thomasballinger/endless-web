@@ -106,6 +106,21 @@ int Interface::VariableCount() const
 	return static_cast<int>(variables.size());
 }
 
+int Interface::EffectCount() const
+{
+	return static_cast<int>(effects.size());
+}
+
+const string &Interface::VariableName(int variable) const
+{
+	return variables.at(variable);
+}
+
+const string &Interface::EffectName(int effect) const
+{
+	return effects.at(effect);
+}
+
 int Interface::Find(const string &name) const
 {
 	for(size_t i = 0; i < variables.size(); ++i)
@@ -328,6 +343,10 @@ public:
 	bool valid = false;
 	int slotCount = 0;
 	Block body;
+	// Which of the interface's variables and effects the program refers to.
+	vector<bool> reads;
+	vector<bool> writes;
+	vector<bool> triggers;
 
 
 private:
@@ -345,6 +364,9 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 {
 	this->interface = &interface;
 	slotCount = interface.VariableCount();
+	reads.assign(slotCount, false);
+	writes.assign(slotCount, false);
+	triggers.assign(interface.EffectCount(), false);
 	scopes.assign(1, {});
 	body = Block();
 	valid = CompileBlock(node, body);
@@ -416,6 +438,8 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 					ok = false;
 					continue;
 				}
+				if(statement.slot < interface->VariableCount())
+					writes[statement.slot] = true;
 			}
 		}
 		else if(keyword == "if")
@@ -489,6 +513,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				continue;
 			}
 			statement.kind = Statement::Kind::EFFECT;
+			triggers[statement.effect] = true;
 		}
 		block.statements.push_back(std::move(statement));
 	}
@@ -530,6 +555,8 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 			node.PrintTrace("Unknown variable \"" + source.atom + "\":");
 			return false;
 		}
+		if(expression.slot < interface->VariableCount())
+			reads[expression.slot] = true;
 		return true;
 	}
 
@@ -967,6 +994,30 @@ const string &Program::Name() const
 int Program::SlotCount() const
 {
 	return implementation->slotCount;
+}
+
+
+
+bool Program::Reads(int variable) const
+{
+	const auto &reads = implementation->reads;
+	return variable >= 0 && variable < static_cast<int>(reads.size()) && reads[variable];
+}
+
+
+
+bool Program::Writes(int variable) const
+{
+	const auto &writes = implementation->writes;
+	return variable >= 0 && variable < static_cast<int>(writes.size()) && writes[variable];
+}
+
+
+
+bool Program::Triggers(int effect) const
+{
+	const auto &triggers = implementation->triggers;
+	return effect >= 0 && effect < static_cast<int>(triggers.size()) && triggers[effect];
 }
 
 

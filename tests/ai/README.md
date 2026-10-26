@@ -57,6 +57,29 @@ player idle for about 12,000 steps:
 
 - `loyal-escorts`: overrides the movement rules for the player's escorts so
   they stay with the flagship instead of chasing enemies.
-- `pursuit-missiles`: replaces the default missile guidance with pure pursuit.
-- `lead-missiles`: replaces it with simple target leading that coasts when
-  not lined up. Both are short examples of the guidance script language.
+- `pursuit-missiles`: replaces all four default missile guidance scripts with
+  pure pursuit.
+- `lead-missiles`: replaces the guidance of weapons with "leading" and
+  "throttle control" with simple target leading that coasts when not lined
+  up. Only those weapons can read `target-velocity` and set `thrust`, so the
+  others keep their default guidance. Both are short examples of the guidance
+  script language.
+
+## Keeping scripts in sync with the C++ code
+
+Behavior that moved from C++ into scripts is checked two ways:
+
+- **Against the old C++ code, in isolation.** `tests/unit/src/test_guidance.cpp`
+  holds a copy of the homing code that `data/guidance.txt` replaced, and runs
+  it and the default script for every combination of homing attributes on
+  20,000 generated situations each, requiring bit-identical results. When an
+  upstream change touches projectile steering, copy the new code into
+  `BuiltInHoming()` and edit the scripts until the test passes.
+- **Against an old build, in the whole game.** `compare-runs.sh` with
+  `BINARY=` runs a scenario with a build from before the change and compares
+  state hashes. With `ES_SCRIPT_STATS=1` the log also shows how often each
+  script statement ran, which shows what a scenario does not cover. (In the
+  scenarios, the "throttle control" script never sees a lock, because the
+  weapons that use it track optically and sprites have no area in headless
+  runs; the "leading" script and blind spots are not used by any weapon in the
+  game data. The unit test covers those.)
