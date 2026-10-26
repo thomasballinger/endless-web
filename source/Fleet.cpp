@@ -237,7 +237,8 @@ void Fleet::Enter(const System &system, list<shared_ptr<Ship>> &ships, const Pla
 		if(hasJump || hasHyper)
 		{
 			bool isWelcomeHere = !system.GetGovernment()->IsEnemy(government);
-			for(const System *neighbor : (hasJump ? system.JumpNeighbors(jumpDistance) : system.Links()))
+			for(const System *neighbor : System::InNameOrder(hasJump ? system.JumpNeighbors(jumpDistance)
+					: system.Links()))
 			{
 				if(!unrestricted && government->IsRestrictedFrom(*neighbor))
 					continue;
@@ -448,7 +449,7 @@ const System *Fleet::Enter(const System &system, Ship &ship, const System *sourc
 	if(!source)
 	{
 		vector<const System *> validSystems;
-		for(const System *link : system.Links())
+		for(const System *link : System::InNameOrder(system.Links()))
 			if(!ship.IsRestrictedFrom(*link))
 				validSystems.emplace_back(link);
 		auto it = validSystems.cbegin();

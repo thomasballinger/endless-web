@@ -2532,8 +2532,8 @@ void AI::MoveIndependent(Ship &ship, Command &command)
 
 		vector<int> systemWeights;
 		int totalWeight = 0;
-		const set<const System *> &links = ship.JumpNavigation().HasJumpDrive()
-			? origin->JumpNeighbors(ship.JumpNavigation().JumpRange()) : origin->Links();
+		const vector<const System *> links = System::InNameOrder(ship.JumpNavigation().HasJumpDrive()
+			? origin->JumpNeighbors(ship.JumpNavigation().JumpRange()) : origin->Links());
 		if(jumps)
 		{
 			for(const System *link : links)

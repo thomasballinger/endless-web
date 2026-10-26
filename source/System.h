@@ -103,6 +103,10 @@ public:
 
 	// Get a list of systems you can travel to through hyperspace from here.
 	const std::set<const System *> &Links() const;
+	// The given systems sorted by name. Sets of systems are ordered by where
+	// the systems are in memory, which can differ from one run of the game to
+	// the next, so anything chosen at random from them must use this order.
+	static std::vector<const System *> InNameOrder(const std::set<const System *> &systems);
 	// Get a list of systems that can be jumped to from here with the given
 	// jump distance, whether or not there is a direct hyperspace link to them.
 	// If this system has its own jump range, then it will always return the

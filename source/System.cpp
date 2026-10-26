@@ -774,6 +774,16 @@ const set<string> &System::Attributes() const
 
 
 // Get a list of systems you can travel to through hyperspace from here.
+vector<const System *> System::InNameOrder(const set<const System *> &systems)
+{
+	vector<const System *> sorted(systems.begin(), systems.end());
+	sort(sorted.begin(), sorted.end(), [](const System *a, const System *b)
+		{ return a->TrueName() < b->TrueName(); });
+	return sorted;
+}
+
+
+
 const set<const System *> &System::Links() const
 {
 	return accessibleLinks;

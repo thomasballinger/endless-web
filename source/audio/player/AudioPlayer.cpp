@@ -226,7 +226,9 @@ void AudioPlayer::ConfigureSource()
 	if(!alSource)
 		return;
 
-	alSourcef(alSource, AL_PITCH, 1. + (Random::Real() - Random::Real()) * .04);
+	// This runs on the main thread while the simulation runs on another, so it
+	// must not take numbers from the simulation's random sequence.
+	alSourcef(alSource, AL_PITCH, 1. + (Random::CosmeticReal() - Random::CosmeticReal()) * .04);
 	alSourcef(alSource, AL_REFERENCE_DISTANCE, 1.);
 	alSourcef(alSource, AL_ROLLOFF_FACTOR, 1.);
 	alSourcei(alSource, AL_LOOPING, 0);
