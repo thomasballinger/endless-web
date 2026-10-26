@@ -202,13 +202,18 @@ Behavior that moved from C++ into scripts is then checked two ways:
   `data/maneuvers.txt`, on 50,000 generated situations each: "keep station"
   (which escorts use to stay with their parent) against a copy of the old
   `AI::KeepStation`, "circle around" against `AI::CircleAround` and
-  `AI::TurnToward`, and "move to" against `AI::MoveTo`. "move to" asks the
-  game where the ship would stop and how to turn it (`AI::StoppingPoint` and
-  `AI::TurnToward` stay in C++), so the test gives the script and the copy of
-  `MoveTo` the same versions of those. In Sol traffic, "keep station" runs
-  about 100,000 times, "move to" about 105,000 and "circle around" about
-  1,500; "move to" never uses a cruise speed there, so only the unit test
-  covers that branch.
+  `AI::TurnToward`, "move to" against `AI::MoveTo`, and "pick up" (flying
+  into flotsam) against `AI::PickUp`. "move to" and "pick up" ask the game
+  where the ship would stop and how to turn it (`AI::StoppingPoint` and
+  `AI::TurnToward` stay in C++), so the test gives the scripts and the copies
+  the same versions of those. In Sol traffic, "keep station" runs about
+  100,000 times, "move to" about 105,000 and "circle around" about 1,500;
+  "move to" never uses a cruise speed there, so only the unit test covers
+  that branch. "pick up" runs about 3,000 times across the scenarios but
+  never uses the afterburner or chases flotsam it cannot catch, which the unit
+  test also covers. `AI::PickUp` also checked whether forward thrust was
+  commanded before it ran; the script leaves that out, because facing
+  closely enough to use the afterburner already means thrusting forward.
 - **Against the old C++ code, in isolation.** `tests/unit/src/test_guidance.cpp`
   holds a copy of the homing code that `data/guidance.txt` replaced, and runs
   it and the default script for every combination of homing attributes on

@@ -339,6 +339,39 @@ Steering BuiltInMoveTo(const Situation &s, const ShipManeuver::Context &context)
 	return command;
 }
 
+// AI::PickUp from before the "pick up" maneuver script replaced it, changed
+// only to read from a Situation and use the context's ship calculations.
+Steering BuiltInPickUp(const Situation &s, const ShipManeuver::Context &context)
+{
+	Steering command;
+	command.turn = s.commandTurn;
+	// Figure out the target's velocity relative to the ship.
+	Point p = s.targetPosition - s.position;
+	Point v = s.targetVelocity - s.velocity;
+	double vMax = s.maxVelocity;
+
+	// Estimate where the target will be by the time we reach it.
+	double time = AI::RendezvousTime(p, v, vMax);
+	if(std::isnan(time))
+		time = p.Length() / vMax;
+	double degreesToTurn = TO_DEG * acos(std::min(1., std::max(-1., p.Unit().Dot(s.facing.Unit()))));
+	time += degreesToTurn / s.turnRate;
+	p += v * time;
+
+	// Move toward the target.
+	command.turn = context.TurnToward(p);
+	double dp = p.Unit().Dot(s.facing.Unit());
+	if(dp > .7)
+		command.forward = true;
+
+	// Use the afterburner if it will not cause you to miss your target.
+	double squareDistance = p.LengthSquared();
+	if(command.forward && s.shouldUseAfterburner)
+		if(dp > std::max(.9, std::min(.9999, 1. - squareDistance / 10000000.)))
+			command.afterburner = true;
+	return command;
+}
+
 Steering Scripted(const ShipManeuver &maneuver, const Situation &s, const ShipManeuver::Context *context = nullptr)
 {
 	ShipManeuver::Input input;
@@ -574,6 +607,45 @@ TEST_CASE( "The move to maneuver matches the built-in AI code", "[ShipManeuver]"
 	CHECK( forward > 0 );
 	CHECK( back > 0 );
 	CHECK( kept > 0 );
+}
+
+TEST_CASE( "The pick up maneuver matches the built-in AI code", "[ShipManeuver]" ) {
+	const ShipManeuver *maneuver = LoadManeuver("pick up");
+	REQUIRE( maneuver );
+
+	SituationGenerator generator(13);
+	int mismatches = 0;
+	int forward = 0;
+	int afterburner = 0;
+	int neverMeets = 0;
+	for(int i = 0; i < 50000 && mismatches < 5; ++i)
+	{
+		Situation s = generator.Next();
+		// Sometimes the flotsam drifts away faster than the ship can fly.
+		if(generator.Next().shouldUseAfterburner)
+			s.targetVelocity = s.velocity + (s.targetPosition - s.position).Unit() * (s.maxVelocity * 1.5);
+		TestContext context(s);
+		const Steering expected = BuiltInPickUp(s, context);
+		const Steering actual = Scripted(*maneuver, s, &context);
+		Point p = s.targetPosition - s.position;
+		neverMeets += std::isnan(AI::RendezvousTime(p, s.targetVelocity - s.velocity, s.maxVelocity));
+		forward += expected.forward;
+		afterburner += expected.afterburner;
+		if(!Same(expected.turn, actual.turn) || expected.forward != actual.forward
+				|| expected.afterburner != actual.afterburner || actual.back || actual.arrived)
+		{
+			++mismatches;
+			UNSCOPED_INFO( Describe(s) << " command turn " << s.commandTurn );
+			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " afterburner "
+				<< expected.afterburner << "; got turn " << actual.turn << " forward " << actual.forward
+				<< " afterburner " << actual.afterburner );
+		}
+	}
+	CHECK( mismatches == 0 );
+	// Make sure the generated situations reach every branch.
+	CHECK( forward > 0 );
+	CHECK( afterburner > 0 );
+	CHECK( neverMeets > 0 );
 }
 
 // Not run by default: "endless-sky-tests [.maneuver-speed]" times the scripts.

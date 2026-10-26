@@ -103,6 +103,11 @@ public:
 
 
 private:
+	// The calculations about a ship that maneuver scripts can ask for.
+	class ManeuverContext;
+
+
+private:
 	class RouteCacheKey {
 	public:
 		/// The route cache key is generated from all information that can influence pathfinding.

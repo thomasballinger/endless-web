@@ -29,8 +29,8 @@ class DataNode;
 // whether to thrust forward or back, or use the afterburner. The AI runs the
 // maneuver named "keep station" to hold a ship near a moving target (e.g. an
 // escort near its parent), "circle around" to stay close to a target without
-// matching its velocity, and "move to" to fly to a point and arrive there with
-// a given velocity.
+// matching its velocity, "move to" to fly to a point and arrive there with a
+// given velocity, and "pick up" to fly into flotsam to collect it.
 class ShipManeuver {
 public:
 	// Variables available to maneuver scripts, in the order they are added to

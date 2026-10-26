@@ -121,12 +121,6 @@ namespace {
 		return target.IsTargetable();
 	}
 
-	double AngleDiff(double a, double b)
-	{
-		a = abs(a - b);
-		return min(a, 360. - a);
-	}
-
 	// What a maneuver script knows about the ship it is flying.
 	ShipManeuver::Input ManeuverInput(const Ship &ship)
 	{
@@ -497,6 +491,30 @@ namespace {
 		bool prioritize = false;
 	};
 }
+
+
+
+// The calculations about a ship that maneuver scripts can ask for: where it
+// would stop, and how to turn it.
+class AI::ManeuverContext : public ShipManeuver::Context {
+public:
+	explicit ManeuverContext(const Ship &ship) : ship(ship) {}
+
+	Point StoppingPoint(const Point &targetVelocity, bool &shouldReverse) const override
+	{
+		return AI::StoppingPoint(ship, targetVelocity, shouldReverse);
+	}
+
+	double TurnToward(const Point &vector) const override
+	{
+		return AI::TurnToward(ship, vector);
+	}
+
+
+private:
+	const Ship &ship;
+};
+
 
 
 
@@ -2945,30 +2963,13 @@ bool AI::MoveToPlanet(const Ship &ship, Command &command, double cruiseSpeed)
 bool AI::MoveTo(const Ship &ship, Command &command, const Point &targetPosition,
 	const Point &targetVelocity, double radius, double slow, double cruiseSpeed)
 {
-	// The "move to" script can ask where this ship would stop, and how to turn it.
-	class ShipContext : public ShipManeuver::Context {
-	public:
-		explicit ShipContext(const Ship &ship) : ship(ship) {}
-		Point StoppingPoint(const Point &targetVelocity, bool &shouldReverse) const override
-		{
-			return AI::StoppingPoint(ship, targetVelocity, shouldReverse);
-		}
-		double TurnToward(const Point &vector) const override
-		{
-			return AI::TurnToward(ship, vector);
-		}
-
-	private:
-		const Ship &ship;
-	};
-
 	ShipManeuver::Input input = ManeuverInput(ship);
 	input.targetPosition = targetPosition;
 	input.targetVelocity = targetVelocity;
 	input.radius = radius;
 	input.slow = slow;
 	input.cruiseSpeed = cruiseSpeed;
-	ShipContext context(ship);
+	ManeuverContext context(ship);
 	ShipManeuver::Output output;
 	return RunManeuver("move to", input, command, output, &context) && output.arrived;
 }
@@ -3257,30 +3258,9 @@ void AI::MoveToAttack(const Ship &ship, Command &command, const Body &target, Fi
 
 void AI::PickUp(const Ship &ship, Command &command, const Body &target)
 {
-	// Figure out the target's velocity relative to the ship.
-	Point p = target.Position() - ship.Position();
-	Point v = target.Velocity() - ship.Velocity();
-	double vMax = ship.MaxVelocity();
-
-	// Estimate where the target will be by the time we reach it.
-	double time = RendezvousTime(p, v, vMax);
-	if(std::isnan(time))
-		time = p.Length() / vMax;
-	double degreesToTurn = TO_DEG * acos(min(1., max(-1., p.Unit().Dot(ship.Facing().Unit()))));
-	time += degreesToTurn / ship.TurnRate();
-	p += v * time;
-
-	// Move toward the target.
-	command.SetTurn(TurnToward(ship, p));
-	double dp = p.Unit().Dot(ship.Facing().Unit());
-	if(dp > .7)
-		command |= Command::FORWARD;
-
-	// Use the afterburner if it will not cause you to miss your target.
-	double squareDistance = p.LengthSquared();
-	if(command.Has(Command::FORWARD) && ship.ShouldUseAfterburner())
-		if(dp > max(.9, min(.9999, 1. - squareDistance / 10000000.)))
-			command |= Command::AFTERBURNER;
+	ManeuverContext context(ship);
+	ShipManeuver::Output output;
+	RunManeuver("pick up", ManeuverInput(ship, target), command, output, &context);
 }
 
 

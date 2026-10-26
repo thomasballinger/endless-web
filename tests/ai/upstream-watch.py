@@ -21,8 +21,9 @@ Usage:
 
 Each watched block is a piece of upstream C++ that data files on this branch
 reproduce (the homing code in data/guidance.txt, the AI's turn and escort
-logic in data/ai.txt, and station keeping in data/maneuvers.txt). The snapshots in tests/ai/upstream/ hold that code as it
-was when the scripts were written. When "check" reports a change, update the
+logic in data/ai.txt, and the ship maneuvers in data/maneuvers.txt). The
+snapshots in tests/ai/upstream/ hold that code as it was when the scripts were
+written. When "check" reports a change, update the
 scripts to match, re-run the listed checks, and then take a new snapshot.
 
 Run "git fetch upstream" first to compare against the latest upstream code.
@@ -60,6 +61,9 @@ WATCHED = [
     ('ai-turn-toward', 'source/AI.cpp', r'^double AI::TurnToward\(',
         'the turning part of the "circle around" maneuver in data/maneuvers.txt',
         'copy the new code into BuiltInTurnToward() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
+    ('ai-pick-up', 'source/AI.cpp', r'^void AI::PickUp\(',
+        'the "pick up" maneuver in data/maneuvers.txt',
+        'copy the new code into BuiltInPickUp() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
 ]
 
 

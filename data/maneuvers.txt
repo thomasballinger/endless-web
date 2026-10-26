@@ -33,7 +33,7 @@
 # and functions from the game:
 #   (rendezvous-time offset velocity speed)     steps to reach a moving point
 #   (heading v)                                 direction of v in degrees
-# and, only for "move to", three about the ship itself:
+# and, only for "move to" and "pick up", three about the ship itself:
 #   (stopping-point target-velocity)            where it would come to rest
 #   (stopping-reverse target-velocity)          whether reverse thrust stops it sooner
 #   (turn-toward v)                             the turn command that points it along v
@@ -188,3 +188,34 @@ maneuver "move to"
 	elif should-reverse
 		set turn (turn-toward velocity)
 		set back true
+
+# Fly into a piece of flotsam to collect it: aim where it will be by the time
+# the ship gets there, thrust when roughly facing it, and use the afterburner
+# when that won't make the ship overshoot. This reproduces the game's built-in
+# behavior exactly.
+maneuver "pick up"
+	# Where the flotsam is, and how it moves, relative to the ship.
+	let offset (- target-position position)
+	let drift (- target-velocity velocity)
+
+	# Estimate where it will be by the time the ship reaches it.
+	let time (rendezvous-time offset drift max-velocity)
+	if (is-nan time)
+		set time (/ (length offset) max-velocity)
+	let degrees-to-turn (* to-deg (acos (min 1 (max -1 (dot (unit offset) facing)))))
+	set time (+ time (/ degrees-to-turn turn-rate))
+	set offset (+ offset (* drift time))
+
+	set turn (turn-toward offset)
+	let alignment (dot (unit offset) facing)
+	if (> alignment .7)
+		set forward true
+
+	# The closer the flotsam, the more precisely the ship must face it before
+	# using the afterburner.
+	let square-distance (dot offset offset)
+	# (The game's code also checks whether forward thrust was commanded before
+	# this maneuver ran, but facing this closely means forward is set anyway.)
+	if (and forward should-use-afterburner)
+		if (> alignment (max .9 (min .9999 (- 1 (/ square-distance 10000000)))))
+			set afterburner true

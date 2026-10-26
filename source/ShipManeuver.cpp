@@ -122,7 +122,7 @@ namespace {
 		interface.AddInput("slow");
 		interface.AddInput("cruise-speed");
 		interface.AddInput("command-turn");
-		interface.AddOutput("turn");
+			interface.AddOutput("turn");
 		interface.AddOutput("forward");
 		interface.AddOutput("back");
 		interface.AddOutput("afterburner");
