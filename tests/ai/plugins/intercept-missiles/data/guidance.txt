@@ -1,0 +1,61 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Example: a guidance script written from scratch rather than copied from a
+# default. It flies the exact intercept course (the heading on which a missile
+# at its top speed meets a target that keeps its current velocity), and turns
+# by the full angle to that point, so it turns around for a target behind it.
+# It reads target-velocity and sets thrust, so only weapons with "leading" and
+# "throttle control" can use it; it replaces their default.
+guidance "intercept" "leading and throttle control"
+	if (not has-lock)
+		if confused
+			set turn (* turn confusion-direction)
+		else
+			set turn 0
+		stop
+
+	let d (- target-position position)
+	let speed (if (!= drag 0) (/ acceleration drag) (length velocity))
+	# The time t when |d + target-velocity * t| = speed * t, a quadratic.
+	let a (- (dot target-velocity target-velocity) (* speed speed))
+	let b (* 2 (dot d target-velocity))
+	let c (dot d d)
+	let time -1
+	if (< (abs a) .000001)
+		if (< b 0)
+			set time (/ (- c) b)
+	else
+		let discriminant (- (* b b) (* 4 a c))
+		if (>= discriminant 0)
+			let root (sqrt discriminant)
+			let early (/ (- (- b) root) (* 2 a))
+			let late (/ (+ (- b) root) (* 2 a))
+			set time (min early late)
+			if (< time 0)
+				set time (max early late)
+	# If it can't catch the target, chase it directly.
+	let aim (if (> time 0) (+ d (* target-velocity time)) d)
+
+	# Turn by the full angle to the aim point, so it turns around for a
+	# target behind it.
+	let desired-turn (* to-deg (atan2 (cross facing aim) (dot facing aim)))
+	if (> (abs desired-turn) turn)
+		set turn (copysign turn desired-turn)
+	else
+		set turn desired-turn
+
+	# Like the default: coast while there's still a long turn to make.
+	let steps-to-reach (/ (length aim) speed)
+	if (> (* (/ desired-turn turn) 1.5) steps-to-reach)
+		set thrust 0

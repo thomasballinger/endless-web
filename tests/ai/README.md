@@ -146,6 +146,12 @@ player idle for about 12,000 steps:
   sight to the target stops rotating. It uses `memory` to keep the line of
   sight from the step before. It is named "proportional navigation" and also
   replaces the four defaults.
+- `intercept-missiles`: a script written from scratch rather than copied
+  from a default. It solves for the exact intercept course and turns by the
+  full angle to it, so it also turns around for a target behind it. Like
+  `lead-missiles`, it only replaces the guidance of weapons with "leading"
+  and "throttle control". In the Al Dhanab scenario (seed 1) it runs about
+  17,600 times.
 
 ## The guidance bench
 
@@ -187,6 +193,27 @@ turns by `asin(cross(facing, direction))`, which is 0 for a target exactly
 behind, so the missile never turns around. Proportional navigation fixes
 that, but a target that reverses every second fools it, because it steers by
 how the line of sight moved since the last step.
+
+### Faster targets
+
+The Argosy is slow (5.2), so most scripts hit it. Faster, more agile targets
+separate them. Total hits out of 160 for the Sidewinder Missile Launcher,
+from `--bench-target`:
+
+| Target (speed) | Default | Full turn | Intercept | No lead | Proportional navigation |
+|---|---|---|---|---|---|
+| Sparrow (22.9) | 74 | 94 | 97 | 58 | 78 |
+| Dagger | 56 | 78 | 84 | 68 | 68 |
+| Hawk (15.5) | 53 | 70 | 76 | 55 | 79 |
+| Fury (13.4) | 38 | 52 | 58 | 36 | 58 |
+
+Against these, nothing catches a target fleeing or crossing straight ahead.
+"Intercept" (from `intercept-missiles`) gains on "full turn" in the jinking
+and circling scenarios: the default's lead is one step of an estimate,
+which is close enough against the Argosy (where intercept and the default
+hit with the same shots) but not against a target turning quickly.
+Proportional navigation does best against the circling Hawk (9 of 20, where
+the default hits 1).
 
 ### One-line edits
 
