@@ -16,6 +16,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
 #include <string>
+#include <vector>
 
 
 
@@ -33,13 +34,20 @@ public:
 	public:
 		// The outfit whose weapon to fire.
 		std::string outfit;
-		// A guidance script to use instead of the weapon's own, if any.
-		std::string guidance;
+		// Guidance scripts to use instead of the weapon's own. With more than
+		// one, the bench compares them side by side.
+		std::vector<std::string> guidance;
+		// Files to load more guidance scripts from, such as a script being
+		// written. Unless guidance is given, the bench compares the weapon's
+		// own script with every script in these files.
+		std::vector<std::string> scriptFiles;
 		// The ship model to fire at.
 		std::string target = "Argosy";
 		// How many projectiles to fire in each scenario.
 		int trials = 20;
-		// If not empty, write every projectile's path to this file as JSON.
+		// If not empty, write every projectile's path to this file as JSON. With
+		// several guidance scripts, each gets its own file, named by adding the
+		// script's name to this one.
 		std::string replayPath;
 	};
 

@@ -156,11 +156,22 @@ crossing, jinking, circling, beside, behind), 20 shots each, and prints how
 many hit and how quickly. The projectiles are the game's own, so the seeker
 and the guidance script behave as in a battle; only the target follows a set
 path. It takes a few seconds, so it is the quick way to see what an edited
-script does. Options: `--bench-guidance NAME` uses another guidance script
-(if the weapon has the capabilities it needs), `--bench-target MODEL` changes
-the target, `--bench-shots N` the number of shots, and `--bench-replay FILE`
-writes every shot's path as JSON. Don't pass `--rngseed`: each shot is seeded
-separately.
+script does. Options:
+
+- `--bench-guidance NAME` uses another guidance script (if the weapon has the
+  capabilities it needs). Give it more than once to compare scripts side by
+  side, one column each.
+- `--bench-script FILE` loads guidance scripts from a file, with no plugin to
+  install, and compares each with the weapon's own script. Each script is
+  loaded under its first name only, so it doesn't replace a default. This is
+  the quick way to try an edit: copy a script into a file, change it, rerun.
+- `--bench-target MODEL` changes the target, and `--bench-shots N` the number
+  of shots.
+- `--bench-replay FILE` writes every shot's path as JSON; when comparing,
+  each script gets its own file (`FILE` with the script's name added).
+
+Don't pass `--rngseed`: each shot is seeded separately, and the same shot in
+the same scenario gets the same seed whichever script steers it.
 
 For the Sidewinder Missile Launcher, against an Argosy, 20 shots each:
 
@@ -177,13 +188,43 @@ behind, so the missile never turns around. Proportional navigation fixes
 that, but a target that reverses every second fools it, because it steers by
 how the line of sight moved since the last step.
 
+### One-line edits
+
+`tests/ai/guidance-edits.txt` holds three copies of the default "leading and
+throttle control" script, each with one line changed. To compare them with
+the default:
+
+```sh
+endless-sky --resources . --config tests/integration/config \
+    --guidance-bench "Sidewinder Missile Launcher" \
+    --bench-script tests/ai/guidance-edits.txt
+```
+
+| Scenario (20 shots) | Default | Full turn | Full throttle | No lead |
+|---|---|---|---|---|
+| Behind, holding still | 0 | 20 (190 steps) | 0 | 0 |
+| Jinking | 18 (185 steps) | 18 (185) | 19 (179) | 19 (129) |
+| Crossing | 19 (137 steps) | 19 (137) | 19 (137) | 19 (158) |
+| Total of 160 | 135 | 155 | 136 | 136 |
+
+- **Full turn** computes the angle to the target with `atan2` of the cross and
+  dot products instead of `asin` of the cross product alone. A target behind
+  is then 180 degrees away rather than 0, so the missile turns around. Nothing
+  else changes: in every other scenario its shots are identical to the
+  default's.
+- **Full throttle** never cuts thrust to turn more tightly. For this weapon it
+  makes almost no difference.
+- **No lead** aims at the target rather than ahead of it. That does better
+  against a target that reverses every second (it isn't fooled into leading
+  the wrong way) and worse against one crossing in a straight line.
+
 ## Keeping scripts in sync with the C++ code
 
 `upstream-watch.py check` tells you when upstream has changed C++ that a script
 on this branch reproduces. `tests/ai/upstream/` holds a snapshot of each such
 block (the homing code in `Projectile::Move`, `AI::Step`,
-`AI::MoveEscort`, `AI::KeepStation`, `AI::CircleAround`, `AI::MoveTo` and
-`AI::TurnToward`) as it was when the scripts were written. After
+`AI::MoveEscort`, `AI::KeepStation`, `AI::CircleAround`, `AI::MoveTo`,
+`AI::PickUp` and `AI::TurnToward`) as it was when the scripts were written. After
 `git fetch upstream`, the check compares the same blocks at `upstream/master`.
 For each one that changed, it shows the diff and the commits involved, and
 says which scripts to update and how to verify them:

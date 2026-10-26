@@ -162,7 +162,9 @@ int main(int argc, char *argv[])
 		else if(arg == "--guidance-bench" && *++it)
 			benchOptions.outfit = *it;
 		else if(arg == "--bench-guidance" && *++it)
-			benchOptions.guidance = *it;
+			benchOptions.guidance.push_back(*it);
+		else if(arg == "--bench-script" && *++it)
+			benchOptions.scriptFiles.push_back(*it);
 		else if(arg == "--bench-target" && *++it)
 			benchOptions.target = *it;
 		else if(arg == "--bench-shots" && *++it)
@@ -698,10 +700,14 @@ void PrintHelp()
 	cerr << "    --tests: print table of available tests, then exit." << endl;
 	cerr << "    --guidance-bench <outfit>: fire the given homing weapon at a target flying"
 		" along fixed paths, and report how often it hits. Options:" << endl;
-	cerr << "        --bench-guidance <name>: use this guidance script instead of the weapon's own." << endl;
+	cerr << "        --bench-guidance <name>: use this guidance script instead of the weapon's own."
+		" Give it more than once to compare scripts side by side." << endl;
+	cerr << "        --bench-script <file>: load guidance scripts from this file, without a plugin, and"
+		" compare each with the weapon's own." << endl;
 	cerr << "        --bench-target <ship model>: the ship to fire at (default: Argosy)." << endl;
 	cerr << "        --bench-shots <n>: how many shots to fire in each scenario (default: 20)." << endl;
-	cerr << "        --bench-replay <file>: write the path of every shot to this file as JSON." << endl;
+	cerr << "        --bench-replay <file>: write the path of every shot to this file as JSON"
+		" (one file per script when comparing)." << endl;
 	cerr << "    --test <name>: run given test from resources directory." << endl;
 	cerr << "    --nomute: don't mute the game while running tests." << endl;
 	cerr << "    --rng-seed <seed>: every time the pseudo-random number generator is seeded,"
