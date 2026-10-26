@@ -29,6 +29,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <map>
 #include <random>
 #include <sstream>
 #include <string>
@@ -51,12 +52,14 @@ struct Situation {
 	double dragForce = 0.;
 	double reverseThrust = 0.;
 	double lastTurn = 0.;
+	bool shouldUseAfterburner = false;
 };
 
 struct Steering {
 	double turn = 0.;
 	bool forward = false;
 	bool back = false;
+	bool afterburner = false;
 };
 
 double AngleDiff(double a, double b)
@@ -166,6 +169,57 @@ Steering BuiltInKeepStation(const Situation &s)
 	return command;
 }
 
+// AI::TurnToward and AI::CircleAround from before the "circle around"
+// maneuver script replaced the latter, changed only to read from a Situation.
+double BuiltInTurnToward(const Situation &s, const Point &vector, const double precision = 0.9999)
+{
+	Point facing = s.facing.Unit();
+	double cross = vector.Cross(facing);
+
+	double dot = vector.Dot(facing);
+	if(dot > 0.)
+	{
+		// Is the facing direction aligned with the target direction with sufficient precision?
+		// The maximum angle between the two directions is given by: arccos(sqrt(precision)).
+		bool close = false;
+		if(precision < 1. && precision > 0. && dot * dot >= precision * vector.LengthSquared())
+			close = true;
+		double angle = asin(std::min(1., std::max(-1., cross / vector.Length()))) * TO_DEG;
+		// Is the angle between the facing and target direction smaller than
+		// the angle the ship can turn through in one step?
+		if(fabs(angle) < s.turnRate)
+		{
+			// If the ship is within one step of the target direction,
+			// and the facing is already sufficiently aligned with the target direction,
+			// don't turn any further.
+			if(close)
+				return 0.;
+			return -angle / s.turnRate;
+		}
+	}
+
+	bool left = cross < 0.;
+	return left - !left;
+}
+
+Steering BuiltInCircleAround(const Situation &s)
+{
+	Steering command;
+	Point direction = s.targetPosition - s.position;
+	command.turn = BuiltInTurnToward(s, direction);
+
+	double length = direction.Length();
+	if(length > 200. && s.facing.Unit().Dot(direction) >= 0.)
+	{
+		command.forward = true;
+
+		// If the ship is far away enough the ship should use the afterburner.
+		if(length > 750. && s.shouldUseAfterburner)
+			command.afterburner = true;
+	}
+	return command;
+}
+
 Steering Scripted(const ShipManeuver &maneuver, const Situation &s)
 {
 	ShipManeuver::Input input;
@@ -183,10 +237,11 @@ Steering Scripted(const ShipManeuver &maneuver, const Situation &s)
 	input.dragForce = s.dragForce;
 	input.reverseThrust = s.reverseThrust;
 	input.lastTurn = s.lastTurn;
+	input.shouldUseAfterburner = s.shouldUseAfterburner;
 	ShipManeuver::Output output;
 	if(!maneuver.Run(input, output))
-		return {std::nan(""), false, false};
-	return {output.turn, output.forward, output.back};
+		return {std::nan(""), false, false, false};
+	return {output.turn, output.forward, output.back, output.afterburner};
 }
 
 bool Same(double a, double b)
@@ -216,25 +271,23 @@ std::string Describe(const Situation &s)
 	return out.str();
 }
 
-// Load the game's maneuver scripts. Tests run from the "tests" directory.
-const ShipManeuver *LoadKeepStation()
+// Load one of the game's maneuver scripts. Tests run from the "tests" directory.
+const ShipManeuver *LoadManeuver(const std::string &name)
 {
-	static ShipManeuver maneuver;
-	static bool loaded = false;
-	if(loaded)
-		return maneuver.IsValid() ? &maneuver : nullptr;
-	loaded = true;
-	for(const char *path : {"../data/maneuvers.txt", "data/maneuvers.txt"})
-	{
-		if(!std::filesystem::exists(path))
-			continue;
-		DataFile file(path);
-		for(const DataNode &node : file)
-			if(node.Token(0) == "maneuver" && node.Size() >= 2 && node.Token(1) == "keep station")
-				maneuver.Load(node);
-		break;
-	}
-	return maneuver.IsValid() ? &maneuver : nullptr;
+	static std::map<std::string, ShipManeuver> maneuvers;
+	if(maneuvers.empty())
+		for(const char *path : {"../data/maneuvers.txt", "data/maneuvers.txt"})
+		{
+			if(!std::filesystem::exists(path))
+				continue;
+			DataFile file(path);
+			for(const DataNode &node : file)
+				if(node.Token(0) == "maneuver" && node.Size() >= 2)
+					maneuvers[node.Token(1)].Load(node);
+			break;
+		}
+	auto it = maneuvers.find(name);
+	return it != maneuvers.end() && it->second.IsValid() ? &it->second : nullptr;
 }
 
 // Generate situations like an escort near its parent, plus awkward ones:
@@ -267,6 +320,10 @@ public:
 		s.reverseThrust = Pick(2) ? 0. : Uniform(1., 300.);
 		int last = Int(6);
 		s.lastTurn = last == 0 ? 0. : last == 1 ? -0. : last == 2 ? (Pick(2) ? 1. : -1.) : Uniform(-1., 1.);
+		s.shouldUseAfterburner = Pick(2);
+		// Sometimes put the target exactly ahead or behind.
+		if(Pick(10))
+			s.targetPosition = s.position + s.facing.Unit() * (Pick(2) ? Uniform(1., 2000.) : -Uniform(1., 2000.));
 		return s;
 	}
 
@@ -288,7 +345,7 @@ private:
 
 // #region unit tests
 TEST_CASE( "The keep station maneuver matches the built-in AI code", "[ShipManeuver]" ) {
-	const ShipManeuver *maneuver = LoadKeepStation();
+	const ShipManeuver *maneuver = LoadManeuver("keep station");
 	REQUIRE( maneuver );
 
 	SituationGenerator generator(42);
@@ -315,6 +372,37 @@ TEST_CASE( "The keep station maneuver matches the built-in AI code", "[ShipManeu
 	// Make sure the generated situations reach every branch.
 	CHECK( forward > 0 );
 	CHECK( back > 0 );
+}
+
+TEST_CASE( "The circle around maneuver matches the built-in AI code", "[ShipManeuver]" ) {
+	const ShipManeuver *maneuver = LoadManeuver("circle around");
+	REQUIRE( maneuver );
+
+	SituationGenerator generator(7);
+	int mismatches = 0;
+	int stopped = 0;
+	int afterburner = 0;
+	for(int i = 0; i < 50000 && mismatches < 5; ++i)
+	{
+		const Situation s = generator.Next();
+		const Steering expected = BuiltInCircleAround(s);
+		const Steering actual = Scripted(*maneuver, s);
+		stopped += expected.turn == 0.;
+		afterburner += expected.afterburner;
+		if(!Same(expected.turn, actual.turn) || expected.forward != actual.forward || expected.back != actual.back
+				|| expected.afterburner != actual.afterburner)
+		{
+			++mismatches;
+			UNSCOPED_INFO( Describe(s) );
+			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " afterburner "
+				<< expected.afterburner << "; got turn " << actual.turn << " forward " << actual.forward
+				<< " afterburner " << actual.afterburner );
+		}
+	}
+	CHECK( mismatches == 0 );
+	// Make sure the generated situations reach every branch.
+	CHECK( stopped > 0 );
+	CHECK( afterburner > 0 );
 }
 // #endregion unit tests
 

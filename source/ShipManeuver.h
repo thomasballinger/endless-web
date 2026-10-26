@@ -25,9 +25,11 @@ class DataNode;
 
 
 // A script that flies a ship relative to another object for one step, loaded
-// from a "maneuver" node in the game data. The AI runs the maneuver named
-// "keep station" to hold a ship near a moving target (e.g. an escort near its
-// parent); it decides how far to turn and whether to thrust forward or back.
+// from a "maneuver" node in the game data. It decides how far to turn and
+// whether to thrust forward or back, or use the afterburner. The AI runs the
+// maneuver named "keep station" to hold a ship near a moving target (e.g. an
+// escort near its parent), and "circle around" to stay close to a target
+// without matching its velocity.
 class ShipManeuver {
 public:
 	// Variables available to maneuver scripts, in the order they are added to
@@ -52,11 +54,16 @@ public:
 		REVERSE_THRUST,
 		// The turn command the ship gave on the last step, from -1 to 1.
 		LAST_TURN,
+		// Whether the ship has an afterburner and enough fuel, energy and
+		// cooling to use it.
+		SHOULD_USE_AFTERBURNER,
 		// Outputs: the turn command (in units of the ship's turn rate), and
-		// whether to thrust forward or in reverse. They start at 0 and false.
+		// whether to thrust forward, in reverse, or with the afterburner. They
+		// start at 0 and false.
 		TURN,
 		FORWARD,
-		BACK
+		BACK,
+		AFTERBURNER
 	};
 
 	// What the ship knows when the script runs.
@@ -76,6 +83,7 @@ public:
 		double dragForce = 0.;
 		double reverseThrust = 0.;
 		double lastTurn = 0.;
+		bool shouldUseAfterburner = false;
 	};
 	// What the script decided.
 	class Output {
@@ -83,6 +91,7 @@ public:
 		double turn = 0.;
 		bool forward = false;
 		bool back = false;
+		bool afterburner = false;
 	};
 
 	static const script::Interface &GetInterface();

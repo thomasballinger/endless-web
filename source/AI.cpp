@@ -60,6 +60,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstdlib>
 #include <limits>
 #include <ranges>
+#include <set>
+#include <string>
 #include <utility>
 
 using namespace std;
@@ -123,6 +125,49 @@ namespace {
 	{
 		a = abs(a - b);
 		return min(a, 360. - a);
+	}
+
+	// Fly the given ship relative to the given target with the named maneuver
+	// script (see data/maneuvers.txt).
+	void RunManeuver(const string &name, const Ship &ship, Command &command, const Body &target)
+	{
+		const ShipManeuver *maneuver = GameData::Maneuvers().Find(name);
+		if(!maneuver || !maneuver->IsValid())
+		{
+			static set<string> warned;
+			if(warned.insert(name).second)
+				Logger::Log("No valid \"" + name + "\" maneuver is defined; ships will not use it.",
+					Logger::Level::ERROR);
+			return;
+		}
+
+		ShipManeuver::Input input;
+		input.position = ship.Position();
+		input.velocity = ship.Velocity();
+		input.facing = ship.Facing().Unit();
+		input.facingDegrees = ship.Facing().Degrees();
+		input.targetPosition = target.Position();
+		input.targetVelocity = target.Velocity();
+		input.targetFacing = target.Facing().Unit();
+		input.maxVelocity = ship.MaxVelocity();
+		input.acceleration = ship.Acceleration();
+		input.turnRate = ship.TurnRate();
+		input.inertialMass = ship.InertialMass();
+		input.dragForce = ship.DragForce();
+		input.reverseThrust = ship.ReverseThrust();
+		input.lastTurn = ship.Commands().Turn();
+		input.shouldUseAfterburner = ship.ShouldUseAfterburner();
+
+		ShipManeuver::Output output;
+		if(!maneuver->Run(input, output))
+			return;
+		command.SetTurn(output.turn);
+		if(output.back)
+			command |= Command::BACK;
+		else if(output.forward)
+			command |= Command::FORWARD;
+		if(output.afterburner)
+			command |= Command::AFTERBURNER;
 	}
 
 	// Determine if all able, non-carried escorts are ready to jump with this
@@ -3073,18 +3118,7 @@ void AI::PrepareForHyperspace(const Ship &ship, Command &command)
 
 void AI::CircleAround(const Ship &ship, Command &command, const Body &target)
 {
-	Point direction = target.Position() - ship.Position();
-	command.SetTurn(TurnToward(ship, direction));
-
-	double length = direction.Length();
-	if(length > 200. && ship.Facing().Unit().Dot(direction) >= 0.)
-	{
-		command |= Command::FORWARD;
-
-		// If the ship is far away enough the ship should use the afterburner.
-		if(length > 750. && ship.ShouldUseAfterburner())
-			command |= Command::AFTERBURNER;
-	}
+	RunManeuver("circle around", ship, command, target);
 }
 
 
@@ -3104,44 +3138,7 @@ void AI::Swarm(const Ship &ship, Command &command, const Body &target)
 
 void AI::KeepStation(const Ship &ship, Command &command, const Body &target)
 {
-	// The "keep station" maneuver script decides how to fly.
-	static const ShipManeuver *maneuver = nullptr;
-	if(!maneuver)
-		maneuver = GameData::Maneuvers().Find("keep station");
-	if(!maneuver || !maneuver->IsValid())
-	{
-		static bool warned = false;
-		if(!warned)
-			Logger::Log("No valid \"keep station\" maneuver is defined; escorts will not keep station.",
-				Logger::Level::ERROR);
-		warned = true;
-		return;
-	}
-
-	ShipManeuver::Input input;
-	input.position = ship.Position();
-	input.velocity = ship.Velocity();
-	input.facing = ship.Facing().Unit();
-	input.facingDegrees = ship.Facing().Degrees();
-	input.targetPosition = target.Position();
-	input.targetVelocity = target.Velocity();
-	input.targetFacing = target.Facing().Unit();
-	input.maxVelocity = ship.MaxVelocity();
-	input.acceleration = ship.Acceleration();
-	input.turnRate = ship.TurnRate();
-	input.inertialMass = ship.InertialMass();
-	input.dragForce = ship.DragForce();
-	input.reverseThrust = ship.ReverseThrust();
-	input.lastTurn = ship.Commands().Turn();
-
-	ShipManeuver::Output output;
-	if(!maneuver->Run(input, output))
-		return;
-	command.SetTurn(output.turn);
-	if(output.back)
-		command |= Command::BACK;
-	else if(output.forward)
-		command |= Command::FORWARD;
+	RunManeuver("keep station", ship, command, target);
 }
 
 

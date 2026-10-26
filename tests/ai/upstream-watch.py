@@ -51,6 +51,12 @@ WATCHED = [
     ('ai-keep-station', 'source/AI.cpp', r'^void AI::KeepStation\(',
         'the "keep station" maneuver in data/maneuvers.txt',
         'copy the new code into BuiltInKeepStation() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
+    ('ai-circle-around', 'source/AI.cpp', r'^void AI::CircleAround\(',
+        'the "circle around" maneuver in data/maneuvers.txt',
+        'copy the new code into BuiltInCircleAround() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
+    ('ai-turn-toward', 'source/AI.cpp', r'^double AI::TurnToward\(',
+        'the turning part of the "circle around" maneuver in data/maneuvers.txt',
+        'copy the new code into BuiltInTurnToward() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
 ]
 
 

@@ -72,9 +72,11 @@ namespace {
 		interface.AddInput("drag-force");
 		interface.AddInput("reverse-thrust");
 		interface.AddInput("last-turn");
+		interface.AddInput("should-use-afterburner");
 		interface.AddOutput("turn");
 		interface.AddOutput("forward");
 		interface.AddOutput("back");
+		interface.AddOutput("afterburner");
 		interface.AddFunction("rendezvous-time", 3, RendezvousTime);
 		interface.AddFunction("heading", 1, Heading);
 		return interface;
@@ -132,17 +134,21 @@ bool ShipManeuver::Run(const Input &input, Output &output) const
 	variables[DRAG_FORCE] = Value(input.dragForce);
 	variables[REVERSE_THRUST] = Value(input.reverseThrust);
 	variables[LAST_TURN] = Value(input.lastTurn);
+	variables[SHOULD_USE_AFTERBURNER] = Value(input.shouldUseAfterburner);
 	variables[TURN] = Value(0.);
 	variables[FORWARD] = Value(false);
 	variables[BACK] = Value(false);
+	variables[AFTERBURNER] = Value(false);
 
 	uint32_t effects = 0;
 	output = Output();
 	if(!program.Run(variables, effects) || variables[TURN].GetType() != Value::Type::NUMBER
-			|| variables[FORWARD].GetType() != Value::Type::BOOLEAN || variables[BACK].GetType() != Value::Type::BOOLEAN)
+			|| variables[FORWARD].GetType() != Value::Type::BOOLEAN || variables[BACK].GetType() != Value::Type::BOOLEAN
+			|| variables[AFTERBURNER].GetType() != Value::Type::BOOLEAN)
 		return false;
 	output.turn = variables[TURN].Number();
 	output.forward = variables[FORWARD].Boolean();
 	output.back = variables[BACK].Boolean();
+	output.afterburner = variables[AFTERBURNER].Boolean();
 	return true;
 }

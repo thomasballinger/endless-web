@@ -18,10 +18,13 @@
 #   target-position target-velocity target-facing
 #   max-velocity acceleration turn-rate inertial-mass drag-force reverse-thrust
 #   last-turn                                   the turn command given last step
-# and these outputs (starting at 0, false and false):
-#   turn      how far to turn, in units of the ship's turn rate
-#   forward   whether to thrust forward
-#   back      whether to thrust in reverse
+#   should-use-afterburner                      whether it has the fuel, energy
+#                                               and cooling for its afterburner
+# and these outputs (starting at 0 or false):
+#   turn          how far to turn, in units of the ship's turn rate
+#   forward       whether to thrust forward
+#   back          whether to thrust in reverse
+#   afterburner   whether to use the afterburner
 # and two functions from the game:
 #   (rendezvous-time offset velocity speed)     steps to reach a moving point
 #   (heading v)                                 direction of v in degrees
@@ -102,3 +105,35 @@ maneuver "keep station"
 	let direction (+ (/ (* position-weight (dot position-delta ahead)) position-deadband) (/ (* velocity-weight (dot velocity-delta ahead)) velocity-deadband))
 	if (> direction thrust-deadband)
 		set forward true
+
+# Stay close to a target without matching its velocity: point at it, and fly
+# toward it when it is more than 200 units away and ahead of the ship (using
+# the afterburner beyond 750). Ships use this to hang around a ship they are
+# attacking, guarding or waiting for. This reproduces the game's built-in
+# behavior exactly.
+maneuver "circle around"
+	let direction (- target-position position)
+
+	# Turn toward the target. Inside one step's turn of the target direction,
+	# stop turning once the facing is within about 0.8 degrees of it.
+	let precision .9999
+	let side (cross direction facing)
+	let ahead (dot direction facing)
+	let turning-toward false
+	if (> ahead 0)
+		let close (and (< precision 1) (> precision 0) (>= (* ahead ahead) (* precision (dot direction direction))))
+		let angle (* (asin (min 1 (max -1 (/ side (length direction))))) to-deg)
+		if (< (abs angle) turn-rate)
+			set turning-toward true
+			if close
+				set turn 0
+			else
+				set turn (/ (- angle) turn-rate)
+	if (not turning-toward)
+		set turn (if (< side 0) 1 -1)
+
+	let distance (length direction)
+	if (and (> distance 200) (>= (dot facing direction) 0))
+		set forward true
+		if (and (> distance 750) should-use-afterburner)
+			set afterburner true
