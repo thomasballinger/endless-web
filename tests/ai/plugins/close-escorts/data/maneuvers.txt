@@ -1,0 +1,90 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Example: escorts that hold station more tightly. This is the game's "keep
+# station" maneuver with two numbers changed: it stops adjusting its position
+# within about 50 units of where it wants to be instead of 200, and it thrusts
+# for smaller corrections (a thrust deadband of .2 instead of .5).
+maneuver "keep station"
+	let max-time 600
+	let lead-time 500
+	let position-deadband 50
+	let velocity-deadband 1.5
+	let time-deadband 120
+	let thrust-deadband .2
+
+	# Where to be, relative to where the ship is now.
+	let velocity-delta (- target-velocity velocity)
+	let position-delta (- (+ target-position (* lead-time velocity-delta)) position)
+	let position-size (length position-delta)
+	let position-weight (/ position-size (+ position-size position-deadband))
+	# How fast to be going, relative to how fast the ship is going now.
+	set velocity-delta (- velocity-delta (* facing velocity-deadband))
+	let velocity-size (length velocity-delta)
+	let velocity-weight (/ velocity-size (+ velocity-size velocity-deadband))
+
+	# Roughly how long it will take to get to the target.
+	let position-time (rendezvous-time position-delta target-velocity max-velocity)
+	if (or (is-nan position-time) (> position-time max-time))
+		set position-time max-time
+	let rendezvous (+ position-delta (* target-velocity position-time))
+	let position-turn (abs (- facing-degrees (heading rendezvous)))
+	set position-time (+ position-time (/ (min position-turn (- 360 position-turn)) turn-rate))
+	set position-time (+ position-time (/ (length (- (* (unit rendezvous) max-velocity) velocity)) acceleration))
+	# If very close, stop trying to adjust.
+	set position-time (* position-time (* position-weight position-weight))
+
+	# Roughly how long it will take to match the target's velocity.
+	let velocity-time (/ (length velocity-delta) acceleration)
+	let velocity-turn (abs (- facing-degrees (heading velocity-delta)))
+	set velocity-time (+ velocity-time (/ (min velocity-turn (- 360 velocity-turn)) turn-rate))
+	set velocity-time (* velocity-time (* velocity-weight velocity-weight))
+
+	# Focus on matching position or velocity, whichever will take longer.
+	let total-time (+ position-time velocity-time time-deadband)
+	set position-weight (/ position-time total-time)
+	set velocity-weight (/ velocity-time total-time)
+	let facing-weight (/ time-deadband total-time)
+
+	# Face somewhere between the rendezvous point, the velocity change, and
+	# the target's own facing.
+	let facing-goal (+ (* (unit rendezvous) position-weight) (* (unit velocity-delta) velocity-weight) (* target-facing facing-weight))
+	let target-angle (- (heading facing-goal) facing-degrees)
+	if (> (abs target-angle) 180)
+		set target-angle (+ target-angle (if (< target-angle 0) 360 -360))
+	# Avoid "turn jitter" when position and velocity are well matched.
+	let changed-direction (!= (signbit last-turn) (signbit target-angle))
+	let target-turn (abs (/ target-angle turn-rate))
+	let previous-turn (abs last-turn)
+	if (and (!= previous-turn 0) (or changed-direction (and (< previous-turn 1) (> target-turn previous-turn))))
+		# Keep turning the same way, but limit how fast the turn speeds up.
+		let damped-turn (+ (if changed-direction 0 previous-turn) (min .025 target-turn))
+		set turn (copysign damped-turn target-angle)
+	elif (< target-turn 1)
+		set turn (copysign target-turn target-angle)
+	else
+		set turn target-angle
+
+	# Decide whether to thrust. Drag is left out for reverse thrust, because
+	# the estimate of how it applies can be quite inaccurate.
+	let drag (* velocity drag-force)
+	if (!= reverse-thrust 0)
+		let reverse (unit (* facing (/ (- reverse-thrust) inertial-mass)))
+		let direction (+ (/ (* position-weight (dot position-delta reverse)) position-deadband) (/ (* velocity-weight (dot velocity-delta reverse)) velocity-deadband))
+		if (> direction thrust-deadband)
+			set back true
+			stop
+	let ahead (unit (- (* facing acceleration) drag))
+	let direction (+ (/ (* position-weight (dot position-delta ahead)) position-deadband) (/ (* velocity-weight (dot velocity-delta ahead)) velocity-deadband))
+	if (> direction thrust-deadband)
+		set forward true

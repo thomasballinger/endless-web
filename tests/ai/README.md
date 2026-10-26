@@ -133,6 +133,12 @@ player idle for about 12,000 steps:
   up. Only those weapons can read `target-velocity` and set `thrust`, so the
   others keep their default guidance. Both are short examples of the guidance
   script language.
+- `close-escorts`: the "keep station" maneuver with two numbers changed (a
+  position deadband of 50 instead of 200, and a thrust deadband of .2 instead
+  of .5). In Sol traffic, the player's two escorts stay about four times
+  closer to the idle flagship (mean distance 103 and 108 instead of 445 and
+  431), but they never settle: their mean speed relative to the flagship goes
+  from 0.17 to about 1.9, because they keep making small corrections.
 - `pn-missiles`: proportional navigation, which turns so that the line of
   sight to the target stops rotating. It uses `memory` to keep the line of
   sight from the step before. It is named "proportional navigation" and also
