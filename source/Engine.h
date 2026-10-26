@@ -32,10 +32,10 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "MouseButton.h"
 #include "PlanetLabel.h"
 #include "Point.h"
-#include "Random.h"
 #include "Preferences.h"
 #include "Projectile.h"
 #include "Radar.h"
+#include "Random.h"
 #include "Rectangle.h"
 #include "TaskQueue.h"
 

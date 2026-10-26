@@ -90,7 +90,7 @@ def extract(text, pattern):
 
 
 def snapshot_path(name):
-    return os.path.join(SNAPSHOTS, name + '.cpp')
+    return os.path.join(SNAPSHOTS, name + '.snapshot')
 
 
 def read_snapshot(name):

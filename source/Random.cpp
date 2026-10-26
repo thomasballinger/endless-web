@@ -42,6 +42,10 @@ namespace {
 
 	uint64_t mainDraws = 0;
 
+	// Multiplying the top 53 bits of a 64-bit random number by this gives a
+	// double in [0, 1). (It is 2 to the power of -53.)
+	constexpr double UNIT = 1. / 9007199254740992.;
+
 	// The stream the simulation is taking numbers from on this thread, if any.
 	thread_local Random::Stream *currentStream = nullptr;
 
@@ -85,7 +89,7 @@ double Random::Stream::SeedFraction() const
 {
 	Stream copy;
 	copy.state = seed ^ 0x2545f4914f6cdd1dull;
-	return (copy() >> 11) * 0x1p-53;
+	return (copy() >> 11) * UNIT;
 }
 
 
@@ -209,7 +213,7 @@ uint32_t Random::Int(uint32_t upper_bound)
 double Random::Real()
 {
 	if(currentStream)
-		return ((*currentStream)() >> 11) * 0x1p-53;
+		return ((*currentStream)() >> 11) * UNIT;
 	lock_guard<mutex> lock(generatorMutex);
 	++mainDraws;
 	return real(gen);

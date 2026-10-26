@@ -18,8 +18,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 // Include only the tested class's header.
 #include "../../../source/MissileGuidance.h"
 
-// Include helpers for creating well-formed DataNodes and reading data files.
+// Include a helper for creating well-formed DataNodes.
 #include "datanode-factory.h"
+
 #include "../../../source/DataFile.h"
 #include "../../../source/DataNode.h"
 #include "../../../source/pi.h"
@@ -296,7 +297,7 @@ TEST_CASE( "Default guidance scripts match the built-in homing code", "[MissileG
 				UNSCOPED_INFO( Describe(s) );
 				UNSCOPED_INFO( "expected turn " << expected.turn << " accel " << expected.accel
 					<< " drop " << expected.dropTarget << "; got turn " << actual.turn
-					<< " accel " << actual.accel << " drop " << actual.dropTarget );
+					<< " accel " << actual.accel << " drop " << actual.dropTarget);
 			}
 		}
 		CHECK( mismatches == 0 );

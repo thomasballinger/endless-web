@@ -527,7 +527,7 @@ TEST_CASE( "The keep station maneuver matches the built-in AI code", "[ShipManeu
 			UNSCOPED_INFO( Describe(s) );
 			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " back "
 				<< expected.back << "; got turn " << actual.turn << " forward " << actual.forward
-				<< " back " << actual.back );
+				<< " back " << actual.back);
 		}
 	}
 	CHECK( mismatches == 0 );
@@ -558,7 +558,7 @@ TEST_CASE( "The circle around maneuver matches the built-in AI code", "[ShipMane
 			UNSCOPED_INFO( Describe(s) );
 			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " afterburner "
 				<< expected.afterburner << "; got turn " << actual.turn << " forward " << actual.forward
-				<< " afterburner " << actual.afterburner );
+				<< " afterburner " << actual.afterburner);
 		}
 	}
 	CHECK( mismatches == 0 );
@@ -595,10 +595,10 @@ TEST_CASE( "The move to maneuver matches the built-in AI code", "[ShipManeuver]"
 		{
 			++mismatches;
 			UNSCOPED_INFO( Describe(s) << " radius " << s.radius << " slow " << s.slow << " cruise "
-				<< s.cruiseSpeed << " top speed " << s.topSpeed << " command turn " << s.commandTurn );
+				<< s.cruiseSpeed << " top speed " << s.topSpeed << " command turn " << s.commandTurn);
 			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " back "
 				<< expected.back << " arrived " << expected.arrived << "; got turn " << actual.turn << " forward "
-				<< actual.forward << " back " << actual.back << " arrived " << actual.arrived );
+				<< actual.forward << " back " << actual.back << " arrived " << actual.arrived);
 		}
 	}
 	CHECK( mismatches == 0 );
@@ -638,7 +638,7 @@ TEST_CASE( "The pick up maneuver matches the built-in AI code", "[ShipManeuver]"
 			UNSCOPED_INFO( Describe(s) << " command turn " << s.commandTurn );
 			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " afterburner "
 				<< expected.afterburner << "; got turn " << actual.turn << " forward " << actual.forward
-				<< " afterburner " << actual.afterburner );
+				<< " afterburner " << actual.afterburner);
 		}
 	}
 	CHECK( mismatches == 0 );
