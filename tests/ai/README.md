@@ -170,7 +170,22 @@ how the line of sight moved since the last step.
 
 ## Keeping scripts in sync with the C++ code
 
-Behavior that moved from C++ into scripts is checked two ways:
+`upstream-watch.py check` tells you when upstream has changed C++ that a script
+on this branch reproduces. `tests/ai/upstream/` holds a snapshot of each such
+block (the homing code in `Projectile::Move`, `AI::Step`, and
+`AI::MoveEscort`) as it was when the scripts were written. After
+`git fetch upstream`, the check compares the same blocks at `upstream/master`.
+For each one that changed, it shows the diff and the commits involved, and
+says which scripts to update and how to verify them:
+
+```sh
+git fetch upstream
+tests/ai/upstream-watch.py check            # exits 1 if anything changed
+# ... update the scripts, run the checks it names ...
+tests/ai/upstream-watch.py snapshot upstream/master
+```
+
+Behavior that moved from C++ into scripts is then checked two ways:
 
 - **Against the old C++ code, in isolation.** `tests/unit/src/test_guidance.cpp`
   holds a copy of the homing code that `data/guidance.txt` replaced, and runs
