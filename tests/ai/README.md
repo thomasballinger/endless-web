@@ -24,6 +24,9 @@ where the memory allocator happened to put things:
   travel to, and surveillance ships choosing a system to visit, picked from
   sets of systems ordered by memory address. They now pick from the systems
   in name order (`System::InNameOrder`).
+- Ships patrolling outside a system chose their criss-crossing angle from
+  their own address in memory. They now use a hash of their name. (None of
+  the three scenarios reaches that code, so they never showed the problem.)
 
 To check for this kind of problem, compare normal runs with runs that use a
 different memory layout, e.g. `"a1:MALLOC_ARENA_MAX=1"` or

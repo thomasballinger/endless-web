@@ -3748,10 +3748,14 @@ void AI::DoPatrol(Ship &ship, Command &command) const
 		}
 		// Hacky way of differentiating ship behaviour without additional storage,
 		// while keeping it consistent for each ship. TODO: change when Ship::SetTargetLocation exists.
-		// This uses the pointer of the ship to choose a pseudo-random angle and instructs it to
+		// This uses the ship's name to choose a pseudo-random angle and instructs it to
 		// patrol the system in a criss-crossing pattern, where each turn is this specific angle.
-		intptr_t seed = reinterpret_cast<intptr_t>(&ship);
-		int behaviour = abs(seed % 23);
+		// (A hash of the name, unlike the ship's address in memory, is the same every time
+		// the game runs.)
+		uint64_t seed = 1469598103934665603ull;
+		for(char c : ship.GivenName())
+			seed = (seed ^ static_cast<unsigned char>(c)) * 1099511628211ull;
+		int behaviour = static_cast<int>(seed % 23);
 		Angle delta = Angle(360. / (behaviour / 2. + 2.) * (behaviour % 2 ? -1. : 1.));
 		Angle target = Angle(ship.Position()) + delta;
 		MoveTo(ship, command, target.Unit() * radius / 2, Point(), 10., 1.);
