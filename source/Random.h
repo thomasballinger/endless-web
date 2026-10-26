@@ -45,4 +45,11 @@ public:
 	static uint32_t Binomial(uint32_t t, double p = .5);
 	// Get a number from a normal distribution with standard or specified mean and stddev.
 	static double Normal(double mean = 0, double sigma = 1);
+
+	// Random numbers for things that only affect how the game looks, such as
+	// the star field. These come from a separate generator, so that drawing
+	// (which may or may not happen, e.g. in headless tests) can never change
+	// the sequence of random numbers the simulation sees.
+	static uint32_t CosmeticInt(uint32_t upper_bound);
+	static double CosmeticReal();
 };

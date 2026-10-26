@@ -1720,6 +1720,11 @@ void Engine::CalculateStep()
 				ship->Position().X(), ship->Position().Y(), ship->Velocity().X(), ship->Velocity().Y(),
 				ship->Facing().Degrees(), target ? target->GivenName().c_str() : "none");
 		}
+		for(const Projectile &projectile : projectiles)
+			printf("PROJECTILE %llu lifetime=%d pos=%.17g,%.17g vel=%.17g,%.17g facing=%.17g\n",
+				static_cast<unsigned long long>(probeStep), projectile.GetWeapon().Lifetime(),
+				projectile.Position().X(), projectile.Position().Y(), projectile.Velocity().X(),
+				projectile.Velocity().Y(), projectile.Facing().Degrees());
 		fflush(stdout);
 	}
 

@@ -85,7 +85,7 @@ void StarField::Init(int stars, int width)
 		bool overlaps = true;
 		while(overlaps)
 		{
-			next = Point(Random::Real() * HAZE_WRAP, Random::Real() * HAZE_WRAP);
+			next = Point(Random::CosmeticReal() * HAZE_WRAP, Random::CosmeticReal() * HAZE_WRAP);
 			overlaps = false;
 			for(const Body &other : haze[0])
 			{
@@ -385,13 +385,13 @@ void StarField::MakeStars(int stars, int width)
 	vector<int> temp;
 	temp.reserve(2 * stars);
 
-	int x = Random::Int(width);
-	int y = Random::Int(width);
+	int x = Random::CosmeticInt(width);
+	int y = Random::CosmeticInt(width);
 	for(int i = 0; i < stars; ++i)
 	{
 		for(int j = 0; j < 10; ++j)
 		{
-			int index = Random::Int(static_cast<uint32_t>(off.size())) & ~1;
+			int index = Random::CosmeticInt(static_cast<uint32_t>(off.size())) & ~1;
 			x += off[index];
 			y += off[index + 1];
 			x &= widthMod;
@@ -419,7 +419,7 @@ void StarField::MakeStars(int stars, int width)
 		int index = (x / TILE_SIZE) + (y / TILE_SIZE) * tileCols;
 
 		// Randomize its sub-pixel position and its size / brightness.
-		int random = Random::Int(4096);
+		int random = Random::CosmeticInt(4096);
 		float fx = (x & (TILE_SIZE - 1)) + (random & 15) * 0.0625f;
 		float fy = (y & (TILE_SIZE - 1)) + (random >> 8) * 0.0625f;
 		float size = (((random >> 4) & 15) + 20) * 0.0625f;

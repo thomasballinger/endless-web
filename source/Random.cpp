@@ -30,6 +30,11 @@ namespace {
 	uniform_real_distribution<double> real;
 	normal_distribution<double> normal;
 
+	mutex cosmeticMutex;
+	mt19937_64 cosmeticGen;
+	uniform_int_distribution<uint32_t> cosmeticUniform;
+	uniform_real_distribution<double> cosmeticReal;
+
 	bool useFixedSeed = false;
 	uint64_t fixedSeed = 0;
 }
@@ -105,4 +110,21 @@ double Random::Normal(double mean, double sigma)
 {
 	lock_guard<mutex> lock(generatorMutex);
 	return sigma * normal(gen) + mean;
+}
+
+
+
+uint32_t Random::CosmeticInt(uint32_t upper_bound)
+{
+	lock_guard<mutex> lock(cosmeticMutex);
+	const uint32_t x = cosmeticUniform(cosmeticGen);
+	return (static_cast<uint64_t>(x) * static_cast<uint64_t>(upper_bound)) >> 32;
+}
+
+
+
+double Random::CosmeticReal()
+{
+	lock_guard<mutex> lock(cosmeticMutex);
+	return cosmeticReal(cosmeticGen);
 }
