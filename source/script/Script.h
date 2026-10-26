@@ -86,9 +86,9 @@ public:
 	int AddOutput(const std::string &name);
 	int AddEffect(const std::string &name);
 	// A function the host provides, such as a game calculation scripts may
-	// use. It is called with the given number of arguments, and returns false
-	// (after setting an error message) if the arguments are not valid.
-	using Function = std::function<bool(const std::vector<Value> &arguments, Value &result, std::string &error)>;
+	// use. It is called with an array of the given number of arguments, and
+	// returns false (after setting an error message) if they are not valid.
+	using Function = std::function<bool(const Value *arguments, Value &result, std::string &error)>;
 	int AddFunction(const std::string &name, int argumentCount, Function function);
 
 	int VariableCount() const;

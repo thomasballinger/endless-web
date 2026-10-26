@@ -29,7 +29,7 @@ namespace {
 	// The ship being flown by the script that is running on this thread.
 	thread_local const ShipManeuver::Context *currentContext = nullptr;
 
-	bool NeedsVector(const vector<Value> &arguments, const char *name, string &error)
+	bool NeedsVector(const Value *arguments, const char *name, string &error)
 	{
 		if(arguments[0].GetType() == Value::Type::VECTOR && currentContext)
 			return true;
@@ -40,7 +40,7 @@ namespace {
 
 	// (stopping-point target-velocity): where the ship would come to rest
 	// relative to something moving at the given velocity.
-	bool StoppingPoint(const vector<Value> &arguments, Value &result, string &error)
+	bool StoppingPoint(const Value *arguments, Value &result, string &error)
 	{
 		if(!NeedsVector(arguments, "stopping-point", error))
 			return false;
@@ -51,7 +51,7 @@ namespace {
 
 	// (stopping-reverse target-velocity): whether reverse thrust stops the ship
 	// sooner than turning around.
-	bool StoppingReverse(const vector<Value> &arguments, Value &result, string &error)
+	bool StoppingReverse(const Value *arguments, Value &result, string &error)
 	{
 		if(!NeedsVector(arguments, "stopping-reverse", error))
 			return false;
@@ -62,7 +62,7 @@ namespace {
 	}
 
 	// (turn-toward v): the turn command that points the ship along v.
-	bool TurnToward(const vector<Value> &arguments, Value &result, string &error)
+	bool TurnToward(const Value *arguments, Value &result, string &error)
 	{
 		if(!NeedsVector(arguments, "turn-toward", error))
 			return false;
@@ -73,7 +73,7 @@ namespace {
 	// (rendezvous-time offset velocity speed): how many steps it takes
 	// something moving at the given speed to meet a point at the given offset
 	// that moves with the given velocity, or not a number if it never can.
-	bool RendezvousTime(const vector<Value> &arguments, Value &result, string &error)
+	bool RendezvousTime(const Value *arguments, Value &result, string &error)
 	{
 		if(arguments[0].GetType() != Value::Type::VECTOR || arguments[1].GetType() != Value::Type::VECTOR
 				|| arguments[2].GetType() != Value::Type::NUMBER)
@@ -87,7 +87,7 @@ namespace {
 
 	// (heading v): the direction of a vector in degrees, from -180 to 180, with
 	// 0 meaning "up", rounded the way the game rounds a ship's facing.
-	bool Heading(const vector<Value> &arguments, Value &result, string &error)
+	bool Heading(const Value *arguments, Value &result, string &error)
 	{
 		if(arguments[0].GetType() != Value::Type::VECTOR)
 		{

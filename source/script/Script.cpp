@@ -825,8 +825,12 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			break;
 		case Expression::Kind::HOST:
 		{
-			vector<Value> values(expression.arguments.size());
-			for(size_t i = 0; i < values.size(); ++i)
+			// Most functions take only a few arguments, so avoid allocating.
+			const size_t count = expression.arguments.size();
+			Value small[4];
+			vector<Value> large(count > 4 ? count : 0);
+			Value *values = count > 4 ? large.data() : small;
+			for(size_t i = 0; i < count; ++i)
 				if(!Evaluate(expression.arguments[i], variables, steps, values[i]))
 					return false;
 			string message;
@@ -867,14 +871,15 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 		return Evaluate(arguments[condition.Boolean() ? 1 : 2], variables, steps, result);
 	}
 
-	Value values[2];
-	vector<Value> extra;
-	for(size_t i = 0; i < arguments.size(); ++i)
-	{
-		Value &value = (i < 2 ? values[i] : (extra.emplace_back(), extra.back()));
-		if(!Evaluate(arguments[i], variables, steps, value))
+	// Keep the first few arguments on the stack; only "+", "and" and "or"
+	// take more than four, and rarely.
+	const size_t count = arguments.size();
+	Value values[4];
+	vector<Value> more(count > 4 ? count - 4 : 0);
+	auto argument = [&values, &more](size_t i) -> Value & { return i < 4 ? values[i] : more[i - 4]; };
+	for(size_t i = 0; i < count; ++i)
+		if(!Evaluate(arguments[i], variables, steps, argument(i)))
 			return false;
-	}
 	const Value &a = values[0];
 	const Value &b = values[1];
 	using Type = Value::Type;
@@ -894,8 +899,9 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 				result = Value(a.Vector() + b.Vector());
 			else
 				return typeError("+");
-			for(const Value &value : extra)
+			for(size_t i = 2; i < count; ++i)
 			{
+				const Value &value = argument(i);
 				if(result.GetType() == Type::NUMBER && value.GetType() == Type::NUMBER)
 					result = Value(result.Number() + value.Number());
 				else if(result.GetType() == Type::VECTOR && value.GetType() == Type::VECTOR)
@@ -1034,7 +1040,7 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			return true;
 		case Builtin::CLAMP:
 		{
-			const Value &c = extra.front();
+			const Value &c = values[2];
 			if(!isNumbers() || c.GetType() != Type::NUMBER)
 				return typeError("clamp");
 			// A value that is not a number stays that way.
