@@ -3548,8 +3548,8 @@ void AI::DoSurveillance(Ship &ship, Command &command, shared_ptr<Ship> &target)
 		// TODO: These ships cannot travel through wormholes?
 		if(ship.JumpsRemaining(false))
 		{
-			const auto &links = ship.JumpNavigation().HasJumpDrive() ?
-				system->JumpNeighbors(ship.JumpNavigation().JumpRange()) : system->Links();
+			const auto links = System::InNameOrder(ship.JumpNavigation().HasJumpDrive() ?
+				system->JumpNeighbors(ship.JumpNavigation().JumpRange()) : system->Links());
 			for(const System *link : links)
 				if(!ship.IsRestrictedFrom(*link))
 					targetSystems.push_back(link);

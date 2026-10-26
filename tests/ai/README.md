@@ -20,15 +20,15 @@ where the memory allocator happened to put things:
 - Sound pitch was randomized with the simulation's random numbers, on the
   main thread, while the simulation runs on another. It now uses the
   cosmetic generator.
-- Fleets choosing which system to arrive from, and ships choosing a system to
-  travel to, picked from sets of systems ordered by memory address. They now
-  pick from the systems in name order (`System::InNameOrder`).
+- Fleets choosing which system to arrive from, ships choosing a system to
+  travel to, and surveillance ships choosing a system to visit, picked from
+  sets of systems ordered by memory address. They now pick from the systems
+  in name order (`System::InNameOrder`).
 
 To check for this kind of problem, compare normal runs with runs that use a
 different memory layout, e.g. `"a1:MALLOC_ARENA_MAX=1"` or
-`"notcache:GLIBC_TUNABLES=glibc.malloc.tcache_count=0"`. (One run of Ne-20
-with `MALLOC_ARENA_MAX=1` still differed once in about twenty, so there may be
-another, rarer case left.)
+`"notcache:GLIBC_TUNABLES=glibc.malloc.tcache_count=0"`. All three scenarios
+now give the same result under each of those.
 
 Headless runs (integration tests) and drawn runs (`--debug`, `record.sh`)
 are also the same. Two things used to differ: without uploading images,
