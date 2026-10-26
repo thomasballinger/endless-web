@@ -51,6 +51,7 @@ class Interface;
 class MaskManager;
 class Minable;
 class MissileGuidance;
+class ShipManeuver;
 class Mission;
 class News;
 class Outfit;
@@ -144,6 +145,7 @@ public:
 	static const Set<Message> &Messages();
 	static const Set<Minable> &Minables();
 	static const Set<MissileGuidance> &Guidance();
+	static const Set<ShipManeuver> &Maneuvers();
 	static const Set<Mission> &Missions();
 	static const Set<News> &SpaceportNews();
 	static const Set<Outfit> &Outfits();

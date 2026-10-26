@@ -95,6 +95,13 @@ public:
 	static const StellarObject *FindLandingLocation(const Ship &ship, const bool refuel = true);
 
 
+	// Calculate how long it will take a projectile to reach a target given the
+	// target's relative position and velocity and the velocity of the
+	// projectile. If it cannot hit the target, this returns NaN. Maneuver
+	// scripts may also call this.
+	static double RendezvousTime(const Point &p, const Point &v, double vp);
+
+
 private:
 	class RouteCacheKey {
 	public:
@@ -226,11 +233,6 @@ private:
 	void AutoFire(const Ship &ship, FireCommand &command, bool secondary = true,
 		bool isFlagship = false, const std::set<const Outfit *> *includeSecondaries = nullptr) const;
 	void AutoFire(const Ship &ship, FireCommand &command, const Body &target) const;
-
-	// Calculate how long it will take a projectile to reach a target given the
-	// target's relative position and velocity and the velocity of the
-	// projectile. If it cannot hit the target, this returns NaN.
-	static double RendezvousTime(const Point &p, const Point &v, double vp);
 
 	// Only used by the player. Searches every asteroid within the player's
 	// asteroid scanning capabilities and sets the flagship's target to whichever

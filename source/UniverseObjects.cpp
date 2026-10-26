@@ -451,6 +451,8 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 			for(int i = 1; i < node.Size(); ++i)
 				guidance.Get(node.Token(i))->Load(node, node.Token(i));
 		}
+		else if(key == "maneuver" && hasValue)
+			maneuvers.Get(node.Token(1))->Load(node);
 		else if(key == "formation" && hasValue)
 		{
 			FormationPattern *formation = formations.Get(node.Token(1));

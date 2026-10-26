@@ -36,6 +36,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Message.h"
 #include "Minable.h"
 #include "MissileGuidance.h"
+#include "ShipManeuver.h"
 #include "Mission.h"
 #include "News.h"
 #include "Outfit.h"
@@ -130,6 +131,7 @@ private:
 	Set<Message> messages;
 	Set<Minable> minables;
 	Set<MissileGuidance> guidance;
+	Set<ShipManeuver> maneuvers;
 	Set<Mission> missions;
 	Set<News> news;
 	Set<Outfit> outfits;

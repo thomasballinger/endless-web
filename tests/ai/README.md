@@ -172,8 +172,8 @@ how the line of sight moved since the last step.
 
 `upstream-watch.py check` tells you when upstream has changed C++ that a script
 on this branch reproduces. `tests/ai/upstream/` holds a snapshot of each such
-block (the homing code in `Projectile::Move`, `AI::Step`, and
-`AI::MoveEscort`) as it was when the scripts were written. After
+block (the homing code in `Projectile::Move`, `AI::Step`,
+`AI::MoveEscort` and `AI::KeepStation`) as it was when the scripts were written. After
 `git fetch upstream`, the check compares the same blocks at `upstream/master`.
 For each one that changed, it shows the diff and the commits involved, and
 says which scripts to update and how to verify them:
@@ -187,6 +187,12 @@ tests/ai/upstream-watch.py snapshot upstream/master
 
 Behavior that moved from C++ into scripts is then checked two ways:
 
+- **Against the old C++ code, in isolation (maneuvers).**
+  `tests/unit/src/test_maneuver.cpp` does the same for the "keep station"
+  maneuver in `data/maneuvers.txt`, which escorts use to stay with their
+  parent, against a copy of the old `AI::KeepStation` on 50,000 generated
+  situations. In the scenarios it runs about 100,000 times in Sol traffic and
+  reaches every statement.
 - **Against the old C++ code, in isolation.** `tests/unit/src/test_guidance.cpp`
   holds a copy of the homing code that `data/guidance.txt` replaced, and runs
   it and the default script for every combination of homing attributes on

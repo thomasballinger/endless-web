@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "../Point.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -84,6 +85,11 @@ public:
 	int AddInput(const std::string &name);
 	int AddOutput(const std::string &name);
 	int AddEffect(const std::string &name);
+	// A function the host provides, such as a game calculation scripts may
+	// use. It is called with the given number of arguments, and returns false
+	// (after setting an error message) if the arguments are not valid.
+	using Function = std::function<bool(const std::vector<Value> &arguments, Value &result, std::string &error)>;
+	int AddFunction(const std::string &name, int argumentCount, Function function);
 
 	int VariableCount() const;
 	int EffectCount() const;
@@ -92,12 +98,18 @@ public:
 	int Find(const std::string &name) const;
 	bool IsOutput(int variable) const;
 	int FindEffect(const std::string &name) const;
+	int FindFunction(const std::string &name) const;
+	int FunctionArgumentCount(int function) const;
+	const Function &GetFunction(int function) const;
 
 
 private:
 	std::vector<std::string> variables;
 	std::vector<bool> outputs;
 	std::vector<std::string> effects;
+	std::vector<std::string> functionNames;
+	std::vector<int> functionArgumentCounts;
+	std::vector<Function> functions;
 };
 
 

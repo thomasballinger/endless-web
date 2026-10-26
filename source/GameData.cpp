@@ -637,6 +637,13 @@ const Set<MissileGuidance> &GameData::Guidance()
 
 
 
+const Set<ShipManeuver> &GameData::Maneuvers()
+{
+	return objects.maneuvers;
+}
+
+
+
 const Set<Minable> &GameData::Minables()
 {
 	return objects.minables;

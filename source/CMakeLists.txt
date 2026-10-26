@@ -317,6 +317,8 @@ target_sources(EndlessSkyLib PRIVATE
 	Set.h
 	Ship.cpp
 	Ship.h
+	ShipManeuver.cpp
+	ShipManeuver.h
 	Shop.h
 	ShipEvent.cpp
 	ShipEvent.h

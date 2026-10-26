@@ -21,7 +21,7 @@ Usage:
 
 Each watched block is a piece of upstream C++ that data files on this branch
 reproduce (the homing code in data/guidance.txt, the AI's turn and escort
-logic in data/ai.txt). The snapshots in tests/ai/upstream/ hold that code as it
+logic in data/ai.txt, and station keeping in data/maneuvers.txt). The snapshots in tests/ai/upstream/ hold that code as it
 was when the scripts were written. When "check" reports a change, update the
 scripts to match, re-run the listed checks, and then take a new snapshot.
 
@@ -48,6 +48,9 @@ WATCHED = [
     ('ai-move-escort', 'source/AI.cpp', r'^void AI::MoveEscort\(',
         'the "escort" rules in data/ai.txt',
         'compare-runs.sh against a build of upstream in the three AI scenarios'),
+    ('ai-keep-station', 'source/AI.cpp', r'^void AI::KeepStation\(',
+        'the "keep station" maneuver in data/maneuvers.txt',
+        'copy the new code into BuiltInKeepStation() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
 ]
 
 

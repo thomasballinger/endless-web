@@ -101,6 +101,32 @@ int Interface::AddEffect(const string &name)
 	return static_cast<int>(effects.size()) - 1;
 }
 
+int Interface::AddFunction(const string &name, int argumentCount, Function function)
+{
+	functionNames.push_back(name);
+	functionArgumentCounts.push_back(argumentCount);
+	functions.push_back(std::move(function));
+	return static_cast<int>(functions.size()) - 1;
+}
+
+int Interface::FindFunction(const string &name) const
+{
+	for(size_t i = 0; i < functionNames.size(); ++i)
+		if(functionNames[i] == name)
+			return static_cast<int>(i);
+	return -1;
+}
+
+int Interface::FunctionArgumentCount(int function) const
+{
+	return functionArgumentCounts.at(function);
+}
+
+const Interface::Function &Interface::GetFunction(int function) const
+{
+	return functions.at(function);
+}
+
 int Interface::VariableCount() const
 {
 	return static_cast<int>(variables.size());
@@ -153,7 +179,7 @@ namespace {
 		ADD, SUBTRACT, MULTIPLY, DIVIDE,
 		LESS, GREATER, LESS_EQUAL, GREATER_EQUAL, EQUAL, NOT_EQUAL,
 		NOT, AND, OR, IF,
-		ABS, SQRT, ASIN, ACOS, SIN, COS, ATAN2, MIN, MAX, COPYSIGN, CLAMP,
+		ABS, SQRT, ASIN, ACOS, SIN, COS, ATAN2, MIN, MAX, COPYSIGN, CLAMP, SIGNBIT, IS_NAN,
 		VEC, X, Y, DOT, CROSS, UNIT, LENGTH
 	};
 
@@ -191,6 +217,8 @@ namespace {
 		{"max", {Builtin::MAX, 2, 2}},
 		{"copysign", {Builtin::COPYSIGN, 2, 2}},
 		{"clamp", {Builtin::CLAMP, 3, 3}},
+		{"signbit", {Builtin::SIGNBIT, 1, 1}},
+		{"is-nan", {Builtin::IS_NAN, 1, 1}},
 		{"vec", {Builtin::VEC, 2, 2}},
 		{"x", {Builtin::X, 1, 1}},
 		{"y", {Builtin::Y, 1, 1}},
@@ -291,11 +319,13 @@ class Program::Implementation {
 public:
 	class Expression {
 	public:
-		enum class Kind { CONSTANT, VARIABLE, CALL };
+		enum class Kind { CONSTANT, VARIABLE, CALL, HOST };
 		Kind kind = Kind::CONSTANT;
 		Value constant;
 		int slot = -1;
 		Builtin builtin = Builtin::ADD;
+		// For HOST: which of the interface's functions to call.
+		int function = -1;
 		vector<Expression> arguments;
 	};
 
@@ -595,13 +625,30 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 		return false;
 	}
 	const string &function = source.items.front().atom;
+	int count = static_cast<int>(source.items.size()) - 1;
 	auto it = BUILTINS.find(function);
 	if(it == BUILTINS.end())
 	{
-		node.PrintTrace("Unknown function \"" + function + "\":");
-		return false;
+		// The host may provide functions of its own.
+		int host = interface->FindFunction(function);
+		if(host < 0)
+		{
+			node.PrintTrace("Unknown function \"" + function + "\":");
+			return false;
+		}
+		if(count != interface->FunctionArgumentCount(host))
+		{
+			node.PrintTrace("Wrong number of arguments to \"" + function + "\":");
+			return false;
+		}
+		expression.kind = Expression::Kind::HOST;
+		expression.function = host;
+		expression.arguments.resize(count);
+		bool ok = true;
+		for(int i = 0; i < count; ++i)
+			ok &= CompileExpression(source.items[i + 1], node, expression.arguments[i]);
+		return ok;
 	}
-	int count = static_cast<int>(source.items.size()) - 1;
 	if(count < it->second.minArgs || (it->second.maxArgs >= 0 && count > it->second.maxArgs))
 	{
 		node.PrintTrace("Wrong number of arguments to \"" + function + "\":");
@@ -776,6 +823,17 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			return true;
 		case Expression::Kind::CALL:
 			break;
+		case Expression::Kind::HOST:
+		{
+			vector<Value> values(expression.arguments.size());
+			for(size_t i = 0; i < values.size(); ++i)
+				if(!Evaluate(expression.arguments[i], variables, steps, values[i]))
+					return false;
+			string message;
+			if(!interface->GetFunction(expression.function)(values, result, message))
+				return Fail(message.empty() ? "a function failed" : message);
+			return true;
+		}
 	}
 
 	const vector<Expression> &arguments = expression.arguments;
@@ -966,6 +1024,13 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 				result = Value(max(a.Number(), b.Number()));
 			else
 				result = Value(copysign(a.Number(), b.Number()));
+			return true;
+		case Builtin::SIGNBIT:
+		case Builtin::IS_NAN:
+			if(a.GetType() != Type::NUMBER)
+				return typeError(expression.builtin == Builtin::SIGNBIT ? "signbit" : "is-nan");
+			result = Value(expression.builtin == Builtin::SIGNBIT ? static_cast<bool>(signbit(a.Number()))
+				: static_cast<bool>(isnan(a.Number())));
 			return true;
 		case Builtin::CLAMP:
 		{
