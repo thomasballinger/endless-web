@@ -130,7 +130,7 @@ def check(ref):
         changed += 1
         print(f'CHANGED {name}: {path} differs between {base} and {commit}')
         print(f'        Update {reproduced_by}, then {how}.')
-        commits = git('log', '--oneline', f'{base}..{commit}', '--', path).strip()
+        commits = git('log', '--oneline', f'{base}..{commit}', '--', f':(top){path}').strip()
         if commits:
             print('        Commits touching the file:')
             for line in commits.split('\n'):
