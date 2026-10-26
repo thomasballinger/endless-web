@@ -2146,6 +2146,9 @@ void Ship::Draw(DrawList &draw, optional<reference_wrapper<vector<Visual>>> visu
 {
 	// An empty visuals optional means this is being called from a UI panel and not Engine.
 	bool isUi = !visuals.has_value();
+	// Drawing may create sparks and other effects, which only change how the
+	// game looks.
+	Random::Scope randomScope(Random::EffectStream());
 
 	Ship::PlacementActivity state = Ship::PlacementActivity::WHEN_ACTIVE;
 	if(IsDestroyed())

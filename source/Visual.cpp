@@ -29,6 +29,9 @@ Visual::Visual(const Effect &effect, Point pos, Point vel, Angle facing, Point h
 	: Body(effect, pos, vel, effect.hasAbsoluteAngle ? effect.absoluteAngle : facing, parentZoom),
 	lifetime(effect.lifetime)
 {
+	// Effects only change how the game looks, so they never take random
+	// numbers from the simulation.
+	Random::Scope randomScope(Random::EffectStream());
 	if(effect.randomLifetime > 0)
 		lifetime += Random::Int(effect.randomLifetime + 1);
 

@@ -17,6 +17,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Angle.h"
 #include "Point.h"
+#include "Random.h"
 #include "Swizzle.h"
 
 #include <string>
@@ -51,6 +52,8 @@ public:
 	bool InheritsParentSwizzle() const;
 	// Get the sprite frame for the given time step.
 	float GetFrame(int step = -1) const;
+	// This object's own random numbers (see Random::Stream).
+	Random::Stream &RandomStream() const;
 	void PauseAnimation() const;
 	void UnpauseAnimation() const;
 
@@ -104,6 +107,7 @@ private:
 	mutable float frameOffset = 0.f;
 	mutable bool startAtZero = false;
 	mutable bool randomize = false;
+	mutable Random::Stream randomStream;
 	bool repeat = true;
 	bool rewind = false;
 	bool noFrameTweening = false;

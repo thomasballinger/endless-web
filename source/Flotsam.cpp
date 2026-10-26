@@ -38,6 +38,7 @@ const int Flotsam::TONS_PER_BOX = 5;
 Flotsam::Flotsam(const string &commodity, int count, const Government *sourceGovernment)
 	: lifetime(Random::Int(3600) + 7200), commodity(commodity), count(count), sourceGovernment(sourceGovernment)
 {
+	Random::SeedStream(RandomStream());
 }
 
 
@@ -45,6 +46,7 @@ Flotsam::Flotsam(const string &commodity, int count, const Government *sourceGov
 Flotsam::Flotsam(const Outfit *outfit, int count, const Government *sourceGovernment)
 	: lifetime(Random::Int(3600) + 7200), outfit(outfit), count(count), sourceGovernment(sourceGovernment)
 {
+	Random::SeedStream(RandomStream());
 }
 
 
@@ -101,6 +103,7 @@ void Flotsam::Place(const Body &source, const Point &dv)
 // Move the object one time-step forward.
 void Flotsam::Move(vector<Visual> &visuals)
 {
+	Random::Scope randomScope(RandomStream());
 	position += velocity;
 	velocity *= drag;
 	angle += spin;

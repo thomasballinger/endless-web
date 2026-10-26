@@ -275,6 +275,13 @@ void Drawable::AddFrameRate(float framesPerSecond)
 
 
 
+Random::Stream &Drawable::RandomStream() const
+{
+	return randomStream;
+}
+
+
+
 // Set the current time step.
 void Drawable::SetStep(int step) const
 {
@@ -306,8 +313,22 @@ void Drawable::SetStep(int step) const
 	if(randomize)
 	{
 		randomize = false;
-		// The random offset can be a fractional frame.
-		frameOffset += static_cast<float>(Random::Real()) * cycle;
+		// The random offset can be a fractional frame. The frame can affect
+		// collisions, but this first happens whenever the object is first
+		// drawn or collided with, so with random streams, the offset comes
+		// from the object's own seed and never takes a number from the
+		// simulation. Objects with no stream are only ever drawn.
+		double fraction = 0.;
+		if(!Random::UseStreams())
+			fraction = Random::Real();
+		else if(randomStream.IsSeeded())
+			fraction = randomStream.SeedFraction();
+		else
+		{
+			Random::Scope scope(Random::EffectStream());
+			fraction = Random::Real();
+		}
+		frameOffset += static_cast<float>(fraction) * cycle;
 	}
 	else if(startAtZero)
 	{

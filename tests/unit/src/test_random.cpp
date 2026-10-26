@@ -31,6 +31,85 @@ namespace { // test namespace
 TEST_CASE( "Random::Int", "[random][int]") {
 	REQUIRE( Random::Int(1) == 0 );
 }
+
+TEST_CASE( "Random streams", "[random][stream]" ) {
+	// Some numbers from the main sequence, with no streams involved.
+	Random::Seed(1234);
+	const uint32_t first = Random::Int();
+	const uint32_t second = Random::Int();
+
+	GIVEN( "streams are disabled" ) {
+		Random::SetUseStreams(false);
+		Random::Seed(1234);
+		Random::Stream stream;
+		THEN( "scopes do nothing" ) {
+			{
+				Random::Scope scope(stream);
+				CHECK( Random::Int() == first );
+			}
+			CHECK( Random::Int() == second );
+			CHECK( !stream.IsSeeded() );
+		}
+	}
+	GIVEN( "streams are enabled" ) {
+		Random::SetUseStreams(true);
+		Random::Seed(1234);
+		Random::Stream stream;
+		stream.Seed(99);
+		Random::Stream copy = stream;
+		THEN( "numbers come from the stream in a scope, and the main sequence is untouched" ) {
+			{
+				Random::Scope scope(stream);
+				for(int i = 0; i < 10; ++i)
+					Random::Real();
+			}
+			CHECK( Random::Int() == first );
+			CHECK( Random::Int() == second );
+			CHECK( stream() != copy() );
+		}
+		THEN( "the same stream gives the same numbers" ) {
+			double a = 0.;
+			double b = 0.;
+			{
+				Random::Scope scope(stream);
+				a = Random::Real();
+			}
+			{
+				Random::Scope scope(copy);
+				b = Random::Real();
+			}
+			CHECK( a == b );
+			CHECK( a >= 0. );
+			CHECK( a < 1. );
+		}
+		THEN( "scopes nest, and an unseeded stream is seeded from the enclosing one" ) {
+			Random::Stream inner;
+			uint32_t afterInner = 0;
+			{
+				Random::Scope outer(stream);
+				{
+					Random::Scope scope(inner);
+					Random::Int();
+				}
+				afterInner = Random::Int();
+			}
+			CHECK( inner.IsSeeded() );
+			// The inner stream's seed was the outer stream's first number.
+			copy();
+			{
+				Random::Scope scope(copy);
+				CHECK( Random::Int() == afterInner );
+			}
+			CHECK( Random::Int() == first );
+		}
+		THEN( "Int(n) stays below n" ) {
+			Random::Scope scope(stream);
+			for(int i = 0; i < 1000; ++i)
+				CHECK( Random::Int(7) < 7 );
+		}
+		Random::SetUseStreams(false);
+	}
+}
 // Test code goes here. Preferably, use scenario-driven language making use of the SCENARIO, GIVEN,
 // WHEN, and THEN macros. (There will be cases where the more traditional TEST_CASE and SECTION macros
 // are better suited to declaration of the public API.)

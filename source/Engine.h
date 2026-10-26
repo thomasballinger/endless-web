@@ -32,6 +32,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "MouseButton.h"
 #include "PlanetLabel.h"
 #include "Point.h"
+#include "Random.h"
 #include "Preferences.h"
 #include "Projectile.h"
 #include "Radar.h"
@@ -242,6 +243,8 @@ private:
 
 	// New objects created within the latest step:
 	std::list<std::shared_ptr<Ship>> newShips;
+	// Random numbers for choosing which ship sends a hail.
+	Random::Stream hailStream;
 	std::vector<Projectile> newProjectiles;
 	std::list<std::shared_ptr<Flotsam>> newFlotsam;
 	std::vector<Visual> newVisuals;

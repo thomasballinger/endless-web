@@ -32,6 +32,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -71,6 +74,8 @@ Projectile::Projectile(const Ship &parent, Point position, Angle angle, const We
 	: Body(weapon->ProjectileSprite(), position, parent.Velocity(), angle),
 	weapon(weapon), lifetime(weapon->Lifetime())
 {
+	// Projectiles get their own random numbers, seeded by whatever made them.
+	Random::SeedStream(RandomStream());
 	shared_ptr<Ship> targetShip = parent.GetTargetShip();
 	target = targetShip ? static_pointer_cast<Entity>(targetShip)
 		: static_pointer_cast<Entity>(parent.GetTargetAsteroid());
@@ -112,6 +117,8 @@ Projectile::Projectile(const Projectile &parent, const Point &offset, const Angl
 	parent.velocity, parent.angle + angle),
 	weapon(weapon), target(parent.target), lifetime(weapon->Lifetime())
 {
+	// Projectiles get their own random numbers, seeded by whatever made them.
+	Random::SeedStream(RandomStream());
 	government = parent.government;
 	targetGovernment = parent.targetGovernment;
 	targetDisabled = parent.targetDisabled;
@@ -145,8 +152,55 @@ Projectile::Projectile(const Projectile &parent, const Point &offset, const Angl
 Projectile::Projectile(const Point &position, const Angle &angle, const Weapon *weapon)
 	: weapon(weapon), isShipExplosion(true)
 {
+	// Projectiles get their own random numbers, seeded by whatever made them.
+	Random::SeedStream(RandomStream());
 	this->position = position;
 	this->angle = angle;
+}
+
+
+
+namespace {
+	// When ES_MISSILE_STATS is set, count how the projectiles of each homing
+	// weapon end, and print the counts when the game exits.
+	struct Outcomes {
+		uint64_t hit = 0;
+		uint64_t expired = 0;
+		uint64_t shotDown = 0;
+	};
+	map<const Weapon *, Outcomes> outcomes;
+
+	void PrintOutcomes()
+	{
+		map<string, Outcomes> byName;
+		for(const auto &[name, outfit] : GameData::Outfits())
+		{
+			auto it = outcomes.find(outfit.GetWeapon().get());
+			if(it != outcomes.end())
+				byName[name] = it->second;
+		}
+		for(const auto &[name, counts] : byName)
+			printf("MISSILES %s|hit=%llu expired=%llu shotdown=%llu\n", name.c_str(),
+				static_cast<unsigned long long>(counts.hit), static_cast<unsigned long long>(counts.expired),
+				static_cast<unsigned long long>(counts.shotDown));
+		fflush(stdout);
+	}
+
+	void RecordOutcome(const Weapon &weapon, int death)
+	{
+		static const bool collect = getenv("ES_MISSILE_STATS");
+		if(!collect || !weapon.Homing())
+			return;
+		if(outcomes.empty())
+			atexit(PrintOutcomes);
+		Outcomes &counts = outcomes[&weapon];
+		if(death & (Projectile::COLLISION | Projectile::EXPLOSION))
+			++counts.hit;
+		else if(death & Projectile::ANTI_MISSILE)
+			++counts.shotDown;
+		else
+			++counts.expired;
+	}
 }
 
 
@@ -154,6 +208,7 @@ Projectile::Projectile(const Point &position, const Angle &angle, const Weapon *
 // This returns false if it is time to delete this projectile.
 void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 {
+	Random::Scope randomScope(RandomStream());
 	if(--lifetime <= 0)
 	{
 		if(death == DeathType::NATURAL || death == DeathType::ANTI_MISSILE)
@@ -183,6 +238,7 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 				projectiles.emplace_back(*this, it.offset, it.facing + inaccuracy, subWeapon);
 			}
 		}
+		RecordOutcome(*weapon, death);
 		MarkForRemoval();
 		return;
 	}

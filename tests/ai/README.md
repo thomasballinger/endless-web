@@ -14,6 +14,50 @@ same simulation. That requires:
 - AI decisions that don't depend on where objects are in memory (for example,
   `governmentRosters` is sorted by government name, not by address).
 
+Headless runs (integration tests) and drawn runs (`--debug`, `record.sh`)
+are also the same. Two things used to differ: without uploading images,
+sprites had no frames, so nothing was animated and only the first frame's
+collision mask was used, and they had no area, so optical tracking never got
+a lock. `ImageSet::Upload` now keeps both.
+
+## Random streams
+
+With one sequence of random numbers, any change in what one object does shifts
+the numbers every other object gets, so the whole simulation diverges within
+a few dozen steps. With `ES_RANDOM_STREAMS=1`, every ship, projectile,
+asteroid and piece of flotsam has its own small generator (`Random::Stream`),
+and `Random::Scope` makes the random functions use it while that object acts.
+A new object is seeded from the stream of whatever made it (a projectile from
+the ship that fired it, a fighter from its carrier); arriving fleets get one
+seed each from the main sequence whether or not they actually arrive. Effects
+and drawing use a separate stream, so they never change the simulation. Without the variable, everything
+uses the main sequence exactly as before.
+
+Measured with `divergence.py` on the Al Dhanab scenario with the
+pursuit-missiles plugin (12,000 steps; "differed" counts ships that were ever
+in a different state, out of all ships seen in either run; "end" is the last
+step's same / different / in only one run):
+
+| Seed | One sequence: differed | end | Streams: differed | end |
+|---|---|---|---|---|
+| 1 | 322 of 325 | 3 / 3 / 71 | 119 of 210 | 29 / 4 / 1 |
+| 2 | 257 of 283 | 3 / 2 / 33 | 126 of 203 | 3 / 19 / 8 |
+| 3 | 79 of 220 | 5 / 5 / 53 | 90 of 160 | 5 / 15 / 14 |
+
+With one sequence, the first difference changes which fleets arrive, so by
+the end most ships exist in only one of the two runs. With streams, the same
+fleets arrive, and a difference only spreads through what ships actually do
+to each other. In a large battle that still reaches many ships (who is
+targeted, who is damaged, which side is stronger), but in a quieter system
+like Ne-20 it stays small (seed 42: 19 of 53 ships with streams, 68 of 85
+without). Seeds are not comparable between the two columns: with streams,
+every random number is different, so the battles are different.
+
+`ES_RANDOM_DRAWS=1` (with `ES_STATE_HASH`) prints how many numbers have been
+taken from the main sequence. With streams, that count should be the same in
+both runs; if it is not, some code is taking numbers from the main sequence
+in a way that depends on what an object did, and needs a `Random::Scope`.
+
 ## Debug environment variables
 
 - `ES_STATE_HASH=1`: every 60 steps, print `STATEHASH <step> ships=<n> <hash>`,
@@ -21,9 +65,18 @@ same simulation. That requires:
 - `ES_STATE_DETAIL=<first>-<last>` (with `ES_STATE_HASH`): on each step in the
   range, print every ship's state and target, and the order governments are
   iterated in. Use this to find exactly where two runs diverge.
+- `ES_MISSILE_STATS=1`: at exit, print how many projectiles of each homing
+  weapon hit something, expired, or were shot down.
+- `ES_SCRIPT_STATS=1`: at exit, print how often each script statement ran.
 - `ES_AI_RULE_STATS=1`: at exit, print how often each AI rule ran, and how often
   it ended a ship's turn (or, for movement rules, moved the ship). Useful for
   seeing which rules a scenario exercises.
+
+## divergence.py
+
+`divergence.py A.log B.log` compares two runs made with `ES_STATE_DETAIL`
+ship by ship: how many ships are identical, different, or in only one run over
+time, and which ships diverged first. Use it to see how far a change spread.
 
 ## compare-runs.sh
 
@@ -78,8 +131,8 @@ Behavior that moved from C++ into scripts is checked two ways:
 - **Against an old build, in the whole game.** `compare-runs.sh` with
   `BINARY=` runs a scenario with a build from before the change and compares
   state hashes. With `ES_SCRIPT_STATS=1` the log also shows how often each
-  script statement ran, which shows what a scenario does not cover. (In the
-  scenarios, the "throttle control" script never sees a lock, because the
-  weapons that use it track optically and sprites have no area in headless
-  runs; the "leading" script and blind spots are not used by any weapon in the
-  game data. The unit test covers those.)
+  script statement ran, which shows what a scenario does not cover. (The
+  "leading" script and blind spots are not used by any weapon in the game
+  data; the unit test covers those.) The reference build must include the
+  headless sprite fix (`ImageSet::Upload`), or runs will differ for that
+  reason alone.

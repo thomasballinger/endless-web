@@ -904,6 +904,8 @@ void AI::Step(Command &activeCommands)
 		if(!it->GetSystem())
 			continue;
 
+		// Each ship's decisions use its own random numbers.
+		Random::Scope randomScope(it->RandomStream());
 		if(it.get() == flagship)
 		{
 			// Player cannot do anything if the flagship is landing.
@@ -5504,6 +5506,7 @@ void AI::UpdateStrengths(map<const Government *, int64_t> &strength, const Syste
 			scanPermissions.emplace(gov, gov && gov->CanEnforce(playerSystem));
 
 		// Only have ships update their strength estimate once per second on average.
+		Random::Scope randomScope(it->RandomStream());
 		if(!gov || it->GetSystem() != playerSystem || it->IsDisabled() || Random::Int(60))
 			continue;
 

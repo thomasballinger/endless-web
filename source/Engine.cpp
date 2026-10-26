@@ -1089,6 +1089,7 @@ void Engine::Step(bool isActive)
 				if(shouldCatalogAsteroids && !asteroidsScanned.contains(minable->DisplayName()))
 				{
 					scanComplete = false;
+					Random::Scope randomScope(minable->RandomStream());
 					if(!Random::Int(10) && inRange)
 					{
 						asteroidsScanned.insert(minable->DisplayName());
@@ -1688,6 +1689,12 @@ void Engine::CalculateStep()
 		printf("STATEHASH %llu ships=%zu %016llx projectiles=%zu homing=%zu %016llx\n",
 			static_cast<unsigned long long>(probeStep), ships.size(), static_cast<unsigned long long>(shipHash),
 			projectiles.size(), homing, static_cast<unsigned long long>(h));
+		// The number of draws from the main random sequence is printed
+		// separately, so that it doesn't make hashes from builds before it
+		// was added look different.
+		if(getenv("ES_RANDOM_DRAWS"))
+			printf("RANDOMDRAWS %llu %llu\n", static_cast<unsigned long long>(probeStep),
+				static_cast<unsigned long long>(Random::MainDrawCount()));
 		fflush(stdout);
 	}
 	// With ES_STATE_DETAIL=<first>-<last> as well, print every ship's state on
@@ -1959,6 +1966,10 @@ void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 	// be drawn this step (and the projectiles will participate in collision
 	// detection) but they should not be moved, which is why we put off adding
 	// them to the lists until now.
+	// New ships that did not come from a carrier (e.g. arriving fleets) are
+	// seeded from the main sequence of random numbers.
+	for(const shared_ptr<Ship> &ship : newShips)
+		Random::SeedStream(ship->RandomStream());
 	ships.splice(ships.end(), newShips);
 	Append(projectiles, newProjectiles);
 	flotsam.splice(flotsam.end(), newFlotsam);
@@ -2008,6 +2019,7 @@ void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 // boarding events, fire weapons, and launch fighters.
 void Engine::MoveShip(const shared_ptr<Ship> &ship)
 {
+	Random::Scope randomScope(ship->RandomStream());
 	// Various actions a ship could have taken last frame may have impacted the accuracy of cached values.
 	// Therefore, determine with any information needs recalculated and cache it.
 	ship->UpdateCaches();
@@ -2088,8 +2100,12 @@ void Engine::MoveShip(const shared_ptr<Ship> &ship)
 	if(ship->GetSystem() != player.GetSystem())
 		return;
 
-	// Launch fighters.
+	// Launch fighters. With random streams, a fighter that has not been
+	// launched before is seeded from its carrier's stream.
+	auto firstLaunched = newShips.empty() ? newShips.end() : prev(newShips.end());
 	ship->Launch(newShips, newVisuals);
+	for(auto it = (firstLaunched == newShips.end() ? newShips.begin() : next(firstLaunched)); it != newShips.end(); ++it)
+		Random::SeedStream((*it)->RandomStream());
 
 	// Fire weapons.
 	ship->Fire(newProjectiles, newVisuals, ship.get() == flagship ? &emptySoundsTimer : nullptr);
@@ -2137,6 +2153,13 @@ void Engine::SpawnFleets()
 	for(const auto &fleet : player.GetSystem()->Fleets())
 		if(!Random::Int(fleet.Period() / fleetMultiplier) && fleet.CanTrigger())
 		{
+			// With random streams, a fleet that might arrive gets its own
+			// stream whether or not it does. Whether it does depends on the
+			// ships in the system, and this way that can't change which random
+			// numbers any later fleet gets.
+			Random::Stream fleetStream;
+			Random::SeedStream(fleetStream);
+
 			const Government *gov = fleet.Get()->GetGovernment();
 			if(!gov)
 				continue;
@@ -2148,7 +2171,12 @@ void Engine::SpawnFleets()
 			if(enemyStrength && ai.AllyStrength(gov) > 2 * enemyStrength)
 				continue;
 
+			Random::Scope randomScope(fleetStream);
+			auto last = newShips.empty() ? newShips.end() : prev(newShips.end());
 			fleet.Get()->Enter(*player.GetSystem(), newShips);
+			// The ships in the fleet are seeded from its stream.
+			for(auto it = (last == newShips.end() ? newShips.begin() : next(last)); it != newShips.end(); ++it)
+				Random::SeedStream((*it)->RandomStream());
 		}
 }
 
@@ -2232,6 +2260,9 @@ void Engine::GenerateWeather()
 // At random intervals, have one of the ships in the game send you a hail.
 void Engine::SendHails()
 {
+	// Which ships can send hails depends on what every ship is doing, so
+	// with random streams, hails have a stream of their own.
+	Random::Scope hailScope(hailStream);
 	if(Random::Int(600) || player.IsDead() || ships.empty())
 		return;
 
@@ -2252,6 +2283,7 @@ void Engine::SendHails()
 	shared_ptr<const Ship> source = canSend[i];
 
 	// Generate a random hail message.
+	Random::Scope randomScope(source->RandomStream());
 	SendMessage(source, source->GetHail(player.GetSubstitutions()));
 }
 
@@ -2525,6 +2557,7 @@ void Engine::HandleMouseInput(Command &activeCommands)
 // this is multi-threaded in the future, that will need to change.
 void Engine::FindCollisions(Projectile &projectile, map<Entity *, vector<EntityCollision>> &entityCollisions)
 {
+	Random::Scope randomScope(projectile.RandomStream());
 	// The asteroids can collide with projectiles, the same as any other
 	// object. If the asteroid turns out to be closer than the ship, it
 	// shields the ship (unless the projectile has a blast radius).
@@ -2698,6 +2731,7 @@ void Engine::DoCollisions(map<Entity *, vector<EntityCollision>> &entityCollisio
 
 	for(auto &[entity, collisions] : entityCollisions)
 	{
+		Random::Scope randomScope(entity->RandomStream());
 		shared_ptr<Ship> shipHit;
 		switch(entity->EntityType())
 		{
@@ -2750,6 +2784,7 @@ void Engine::DoWeather(Weather &weather)
 		for(Body *body : affectedShips)
 		{
 			Ship *hit = static_cast<Ship *>(body);
+			Random::Scope randomScope(hit->RandomStream());
 			int eventType = hit->TakeDamage(visuals, DamageProfile(*hit, impact).CalculateDamage(), nullptr);
 			if(eventType)
 				eventQueue.emplace_back(nullptr, hit->shared_from_this(), eventType);
@@ -2762,6 +2797,7 @@ void Engine::DoWeather(Weather &weather)
 // Check if any ship collected the given flotsam.
 void Engine::DoCollection(Flotsam &flotsam)
 {
+	Random::Scope randomScope(flotsam.RandomStream());
 	// Check if any ship can pick up this flotsam. Cloaked ships without "cloaked pickup" cannot act.
 	Ship *collector = nullptr;
 	vector<Body *> pickupShips;

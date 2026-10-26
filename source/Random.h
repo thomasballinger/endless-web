@@ -24,6 +24,62 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 // random number generation is not thread-safe.)
 class Random {
 public:
+	// An independent sequence of random numbers, small enough for every ship
+	// and projectile to have its own. While a Scope for a stream exists, the
+	// functions below take their numbers from that stream on that thread.
+	//
+	// With one sequence for everything, any change in what one object does
+	// (e.g. a missile following a different course) shifts the numbers every
+	// other object gets afterwards, so the whole simulation diverges. With a
+	// stream per object, only objects that are affected by the change behave
+	// differently. Streams are only used if ES_RANDOM_STREAMS is set to 1;
+	// otherwise Scopes do nothing and everything uses one sequence.
+	class Stream {
+	public:
+		using result_type = uint64_t;
+		static constexpr result_type min() { return 0; }
+		static constexpr result_type max() { return UINT64_MAX; }
+		result_type operator()();
+
+		bool IsSeeded() const;
+		void Seed(uint64_t seed);
+		// A number in [0, 1) that depends only on the stream's seed.
+		double SeedFraction() const;
+
+	private:
+		uint64_t state = 0;
+		uint64_t seed = 0;
+		bool isSeeded = false;
+	};
+
+	// Draw random numbers from the given stream until this is destroyed. If
+	// the stream has not been seeded yet, it is seeded from wherever random
+	// numbers came from before this scope.
+	class Scope {
+	public:
+		explicit Scope(Stream &stream);
+		~Scope();
+		Scope(const Scope &) = delete;
+		Scope &operator=(const Scope &) = delete;
+
+	private:
+		Stream *previous = nullptr;
+		bool isActive = false;
+	};
+
+	// Whether streams are used (by default, if ES_RANDOM_STREAMS is 1).
+	static bool UseStreams();
+	static void SetUseStreams(bool use);
+	// How many numbers have been taken from the main sequence (for debugging:
+	// with streams, this should not depend on what any one object does).
+	static uint64_t MainDrawCount();
+	// Seed the given stream from wherever random numbers come from right now,
+	// if streams are enabled and it is not seeded yet.
+	static void SeedStream(Stream &stream);
+	// A stream for effects that only change how the game looks, and so should
+	// not take numbers from any object's stream.
+	static Stream &EffectStream();
+
 	// Seed the generator (e.g. to make it produce exactly the same random
 	// numbers it produced previously).
 	static void Seed(uint64_t seed);

@@ -236,6 +236,7 @@ void Minable::Place(double energy, double beltRadius)
 // In that case it will return false, meaning it should be deleted.
 bool Minable::Move(vector<Visual> &visuals, list<shared_ptr<Flotsam>> &flotsam)
 {
+	Random::Scope randomScope(RandomStream());
 	DoStatusEffects();
 	DoStatusSparks(visuals);
 
