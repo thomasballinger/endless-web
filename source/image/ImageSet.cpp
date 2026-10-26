@@ -310,14 +310,19 @@ void ImageSet::LoadDimensions(Sprite *sprite) noexcept(false)
 // the paths are saved in case the sprite needs to be loaded again.
 void ImageSet::Upload(Sprite *sprite, bool enableUpload)
 {
-	// Clear all the buffers if we are not uploading the image data.
-	if(!enableUpload)
-		for(ImageBuffer &it : buffer)
-			it.Clear();
-
-	// Only masked sprites need to know their area.
+	// Only masked sprites need to know their area. This must be measured
+	// before the buffers are cleared, so that it is known even when nothing
+	// is uploaded (e.g. in headless tests); otherwise optical tracking, which
+	// depends on it, never gets a lock.
 	if(IsMasked(name) && !sprite->Area())
 		sprite->SetArea(buffer[0].CalculateArea());
+
+	// Clear all the buffers if we are not uploading the image data. Keep the
+	// number of frames, so that animations, and the collision masks of each
+	// frame, are the same as when the images are uploaded.
+	if(!enableUpload)
+		for(ImageBuffer &it : buffer)
+			it.Clear(it.Frames());
 	// Load the frames (this will clear the buffers).
 	sprite->AddFrames(buffer[0], buffer[1], noReduction);
 	sprite->AddSwizzleMaskFrames(buffer[2], buffer[3], noReduction);
