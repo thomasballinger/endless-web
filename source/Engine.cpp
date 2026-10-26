@@ -1721,8 +1721,10 @@ void Engine::CalculateStep()
 				ship->Facing().Degrees(), target ? target->GivenName().c_str() : "none");
 		}
 		for(const Projectile &projectile : projectiles)
-			printf("PROJECTILE %llu lifetime=%d pos=%.17g,%.17g vel=%.17g,%.17g facing=%.17g\n",
+			printf("PROJECTILE %llu lifetime=%d homing=%d gov=%s pos=%.17g,%.17g vel=%.17g,%.17g facing=%.17g\n",
 				static_cast<unsigned long long>(probeStep), projectile.GetWeapon().Lifetime(),
+				projectile.GetWeapon().Homing() ? 1 : 0,
+				projectile.GetGovernment() ? projectile.GetGovernment()->TrueName().c_str() : "none",
 				projectile.Position().X(), projectile.Position().Y(), projectile.Velocity().X(),
 				projectile.Velocity().Y(), projectile.Facing().Degrees());
 		fflush(stdout);
