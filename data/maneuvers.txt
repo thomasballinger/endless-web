@@ -20,14 +20,23 @@
 #   last-turn                                   the turn command given last step
 #   should-use-afterburner                      whether it has the fuel, energy
 #                                               and cooling for its afterburner
-# and these outputs (starting at 0 or false):
+#   top-speed                                   max-velocity, counting the
+#                                               afterburner if it should use it
+#   radius slow cruise-speed                    for "move to" (see below)
+#   command-turn                                the turn command so far this step
+# and these outputs (starting at command-turn or false):
 #   turn          how far to turn, in units of the ship's turn rate
 #   forward       whether to thrust forward
 #   back          whether to thrust in reverse
 #   afterburner   whether to use the afterburner
-# and two functions from the game:
+#   arrived       for "move to": whether the ship is there
+# and functions from the game:
 #   (rendezvous-time offset velocity speed)     steps to reach a moving point
 #   (heading v)                                 direction of v in degrees
+# and, only for "move to", three about the ship itself:
+#   (stopping-point target-velocity)            where it would come to rest
+#   (stopping-reverse target-velocity)          whether reverse thrust stops it sooner
+#   (turn-toward v)                             the turn command that points it along v
 
 # Hold position near a moving target, matching its velocity and then its
 # facing. Escorts use this to stay with their parent. This reproduces the
@@ -137,3 +146,45 @@ maneuver "circle around"
 		set forward true
 		if (and (> distance 750) should-use-afterburner)
 			set afterburner true
+
+# Fly to target-position and arrive with target-velocity: within radius and
+# slower than slow, relative to it. With a cruise speed, hold that speed on the
+# way. The AI uses this for many things: approaching planets to land, mining,
+# swarming, patrolling and more. This reproduces the game's built-in behavior
+# exactly.
+maneuver "move to"
+	let offset (- target-position position)
+	let relative-speed (length (- target-velocity velocity))
+	let is-close (< (length offset) radius)
+	if (and is-close (< relative-speed slow))
+		set arrived true
+		stop
+
+	# Aim at where the ship would stop, not where it is.
+	set offset (- target-position (stopping-point target-velocity))
+	let should-reverse (stopping-reverse target-velocity)
+
+	# The direction to accelerate in to get where the ship wants to be.
+	let aim offset
+	let has-cruise-speed (> cruise-speed 0)
+	if has-cruise-speed
+		# Prefer to fly toward the target at cruise speed. If already close to
+		# that velocity, face the target.
+		set aim (- (* (unit offset) cruise-speed) velocity)
+		if (< (dot aim aim) .01)
+			set aim offset
+
+	let is-facing (> (dot (unit aim) facing) .95)
+	if (or (not is-close) (and (not is-facing) (not should-reverse)))
+		set turn (turn-toward aim)
+
+	# Drag only applies while thrusting, so stop thrusting just below top
+	# speed, unless the course needs correcting.
+	let limit (* top-speed .99)
+	if (and is-facing (or (<= (dot velocity velocity) (* limit limit)) (< (dot (unit offset) (unit velocity)) .95)))
+		let heading-there (> (dot (unit velocity) (unit offset)) .95)
+		if (or (not has-cruise-speed) (not heading-there) (< (length velocity) cruise-speed))
+			set forward true
+	elif should-reverse
+		set turn (turn-toward velocity)
+		set back true

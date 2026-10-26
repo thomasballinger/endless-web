@@ -26,6 +26,50 @@ using namespace std;
 namespace {
 	using script::Value;
 
+	// The ship being flown by the script that is running on this thread.
+	thread_local const ShipManeuver::Context *currentContext = nullptr;
+
+	bool NeedsVector(const vector<Value> &arguments, const char *name, string &error)
+	{
+		if(arguments[0].GetType() == Value::Type::VECTOR && currentContext)
+			return true;
+		error = currentContext ? string("\"") + name + "\" takes a vector"
+			: string("\"") + name + "\" can only be used when flying a ship";
+		return false;
+	}
+
+	// (stopping-point target-velocity): where the ship would come to rest
+	// relative to something moving at the given velocity.
+	bool StoppingPoint(const vector<Value> &arguments, Value &result, string &error)
+	{
+		if(!NeedsVector(arguments, "stopping-point", error))
+			return false;
+		bool shouldReverse = false;
+		result = Value(currentContext->StoppingPoint(arguments[0].Vector(), shouldReverse));
+		return true;
+	}
+
+	// (stopping-reverse target-velocity): whether reverse thrust stops the ship
+	// sooner than turning around.
+	bool StoppingReverse(const vector<Value> &arguments, Value &result, string &error)
+	{
+		if(!NeedsVector(arguments, "stopping-reverse", error))
+			return false;
+		bool shouldReverse = false;
+		currentContext->StoppingPoint(arguments[0].Vector(), shouldReverse);
+		result = Value(shouldReverse);
+		return true;
+	}
+
+	// (turn-toward v): the turn command that points the ship along v.
+	bool TurnToward(const vector<Value> &arguments, Value &result, string &error)
+	{
+		if(!NeedsVector(arguments, "turn-toward", error))
+			return false;
+		result = Value(currentContext->TurnToward(arguments[0].Vector()));
+		return true;
+	}
+
 	// (rendezvous-time offset velocity speed): how many steps it takes
 	// something moving at the given speed to meet a point at the given offset
 	// that moves with the given velocity, or not a number if it never can.
@@ -73,12 +117,21 @@ namespace {
 		interface.AddInput("reverse-thrust");
 		interface.AddInput("last-turn");
 		interface.AddInput("should-use-afterburner");
+		interface.AddInput("top-speed");
+		interface.AddInput("radius");
+		interface.AddInput("slow");
+		interface.AddInput("cruise-speed");
+		interface.AddInput("command-turn");
 		interface.AddOutput("turn");
 		interface.AddOutput("forward");
 		interface.AddOutput("back");
 		interface.AddOutput("afterburner");
+		interface.AddOutput("arrived");
 		interface.AddFunction("rendezvous-time", 3, RendezvousTime);
 		interface.AddFunction("heading", 1, Heading);
+		interface.AddFunction("stopping-point", 1, StoppingPoint);
+		interface.AddFunction("stopping-reverse", 1, StoppingReverse);
+		interface.AddFunction("turn-toward", 1, TurnToward);
 		return interface;
 	}
 }
@@ -115,7 +168,7 @@ bool ShipManeuver::IsValid() const
 
 
 
-bool ShipManeuver::Run(const Input &input, Output &output) const
+bool ShipManeuver::Run(const Input &input, Output &output, const Context *context) const
 {
 	// Each thread reuses its own variables.
 	thread_local vector<Value> variables;
@@ -135,20 +188,32 @@ bool ShipManeuver::Run(const Input &input, Output &output) const
 	variables[REVERSE_THRUST] = Value(input.reverseThrust);
 	variables[LAST_TURN] = Value(input.lastTurn);
 	variables[SHOULD_USE_AFTERBURNER] = Value(input.shouldUseAfterburner);
-	variables[TURN] = Value(0.);
+	variables[TOP_SPEED] = Value(input.topSpeed);
+	variables[RADIUS] = Value(input.radius);
+	variables[SLOW] = Value(input.slow);
+	variables[CRUISE_SPEED] = Value(input.cruiseSpeed);
+	variables[COMMAND_TURN] = Value(input.commandTurn);
+	variables[TURN] = Value(input.commandTurn);
 	variables[FORWARD] = Value(false);
 	variables[BACK] = Value(false);
 	variables[AFTERBURNER] = Value(false);
+	variables[ARRIVED] = Value(false);
 
 	uint32_t effects = 0;
 	output = Output();
-	if(!program.Run(variables, effects) || variables[TURN].GetType() != Value::Type::NUMBER
+	const Context *previousContext = currentContext;
+	currentContext = context;
+	bool ran = program.Run(variables, effects);
+	currentContext = previousContext;
+	if(!ran || variables[TURN].GetType() != Value::Type::NUMBER
 			|| variables[FORWARD].GetType() != Value::Type::BOOLEAN || variables[BACK].GetType() != Value::Type::BOOLEAN
-			|| variables[AFTERBURNER].GetType() != Value::Type::BOOLEAN)
+			|| variables[AFTERBURNER].GetType() != Value::Type::BOOLEAN
+			|| variables[ARRIVED].GetType() != Value::Type::BOOLEAN)
 		return false;
 	output.turn = variables[TURN].Number();
 	output.forward = variables[FORWARD].Boolean();
 	output.back = variables[BACK].Boolean();
 	output.afterburner = variables[AFTERBURNER].Boolean();
+	output.arrived = variables[ARRIVED].Boolean();
 	return true;
 }

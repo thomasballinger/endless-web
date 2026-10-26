@@ -127,28 +127,14 @@ namespace {
 		return min(a, 360. - a);
 	}
 
-	// Fly the given ship relative to the given target with the named maneuver
-	// script (see data/maneuvers.txt).
-	void RunManeuver(const string &name, const Ship &ship, Command &command, const Body &target)
+	// What a maneuver script knows about the ship it is flying.
+	ShipManeuver::Input ManeuverInput(const Ship &ship)
 	{
-		const ShipManeuver *maneuver = GameData::Maneuvers().Find(name);
-		if(!maneuver || !maneuver->IsValid())
-		{
-			static set<string> warned;
-			if(warned.insert(name).second)
-				Logger::Log("No valid \"" + name + "\" maneuver is defined; ships will not use it.",
-					Logger::Level::ERROR);
-			return;
-		}
-
 		ShipManeuver::Input input;
 		input.position = ship.Position();
 		input.velocity = ship.Velocity();
 		input.facing = ship.Facing().Unit();
 		input.facingDegrees = ship.Facing().Degrees();
-		input.targetPosition = target.Position();
-		input.targetVelocity = target.Velocity();
-		input.targetFacing = target.Facing().Unit();
 		input.maxVelocity = ship.MaxVelocity();
 		input.acceleration = ship.Acceleration();
 		input.turnRate = ship.TurnRate();
@@ -157,10 +143,38 @@ namespace {
 		input.reverseThrust = ship.ReverseThrust();
 		input.lastTurn = ship.Commands().Turn();
 		input.shouldUseAfterburner = ship.ShouldUseAfterburner();
+		input.topSpeed = ship.MaxVelocity(input.shouldUseAfterburner);
+		return input;
+	}
 
-		ShipManeuver::Output output;
-		if(!maneuver->Run(input, output))
-			return;
+	ShipManeuver::Input ManeuverInput(const Ship &ship, const Body &target)
+	{
+		ShipManeuver::Input input = ManeuverInput(ship);
+		input.targetPosition = target.Position();
+		input.targetVelocity = target.Velocity();
+		input.targetFacing = target.Facing().Unit();
+		return input;
+	}
+
+	// Fly a ship with the named maneuver script (see data/maneuvers.txt), and
+	// add what it decided to the command. Returns false if there is no such
+	// script or it failed.
+	bool RunManeuver(const string &name, ShipManeuver::Input input, Command &command,
+		ShipManeuver::Output &output, const ShipManeuver::Context *context = nullptr)
+	{
+		const ShipManeuver *maneuver = GameData::Maneuvers().Find(name);
+		if(!maneuver || !maneuver->IsValid())
+		{
+			static set<string> warned;
+			if(warned.insert(name).second)
+				Logger::Log("No valid \"" + name + "\" maneuver is defined; ships will not use it.",
+					Logger::Level::ERROR);
+			return false;
+		}
+
+		input.commandTurn = command.Turn();
+		if(!maneuver->Run(input, output, context))
+			return false;
 		command.SetTurn(output.turn);
 		if(output.back)
 			command |= Command::BACK;
@@ -168,6 +182,7 @@ namespace {
 			command |= Command::FORWARD;
 		if(output.afterburner)
 			command |= Command::AFTERBURNER;
+		return true;
 	}
 
 	// Determine if all able, non-carried escorts are ready to jump with this
@@ -2930,61 +2945,32 @@ bool AI::MoveToPlanet(const Ship &ship, Command &command, double cruiseSpeed)
 bool AI::MoveTo(const Ship &ship, Command &command, const Point &targetPosition,
 	const Point &targetVelocity, double radius, double slow, double cruiseSpeed)
 {
-	const Point &position = ship.Position();
-	const Point &velocity = ship.Velocity();
-	const Angle &angle = ship.Facing();
-	Point dp = targetPosition - position;
-	Point dv = targetVelocity - velocity;
+	// The "move to" script can ask where this ship would stop, and how to turn it.
+	class ShipContext : public ShipManeuver::Context {
+	public:
+		explicit ShipContext(const Ship &ship) : ship(ship) {}
+		Point StoppingPoint(const Point &targetVelocity, bool &shouldReverse) const override
+		{
+			return AI::StoppingPoint(ship, targetVelocity, shouldReverse);
+		}
+		double TurnToward(const Point &vector) const override
+		{
+			return AI::TurnToward(ship, vector);
+		}
 
-	double speed = dv.Length();
+	private:
+		const Ship &ship;
+	};
 
-	bool isClose = (dp.Length() < radius);
-	if(isClose && speed < slow)
-		return true;
-
-	bool shouldReverse = false;
-	dp = targetPosition - StoppingPoint(ship, targetVelocity, shouldReverse);
-
-	// Calculate target vector required to get where we want to be.
-	Point tv = dp;
-	bool hasCruiseSpeed = (cruiseSpeed > 0.);
-	if(hasCruiseSpeed)
-	{
-		// The ship prefers a velocity at cruise-speed towards the target, so we need
-		// to compare this preferred velocity to the current velocity and apply the
-		// delta to get to the preferred velocity.
-		tv = (dp.Unit() * cruiseSpeed) - velocity;
-		// If we are moving close to our preferred velocity, then face towards the target.
-		if(tv.LengthSquared() < .01)
-			tv = dp;
-	}
-
-	bool isFacing = (tv.Unit().Dot(angle.Unit()) > .95);
-	if(!isClose || (!isFacing && !shouldReverse))
-		command.SetTurn(TurnToward(ship, tv));
-
-	// Drag is not applied when not thrusting, so stop thrusting when close to max speed
-	// to save energy. Work with a slightly lower maximum velocity to avoid border cases.
-	// In order for a ship to use their afterburner, they must also have the forward
-	// command active. Therefore, if this ship should use its afterburner, use the
-	// max velocity with afterburner thrust included.
-	double maxVelocity = ship.MaxVelocity(ship.ShouldUseAfterburner()) * .99;
-	if(isFacing && (velocity.LengthSquared() <= maxVelocity * maxVelocity
-			|| dp.Unit().Dot(velocity.Unit()) < .95))
-	{
-		// We set full forward power when we don't have a cruise-speed, when we are below
-		// cruise-speed or when we need to do course corrections.
-		bool movingTowardsTarget = (velocity.Unit().Dot(dp.Unit()) > .95);
-		if(!hasCruiseSpeed || !movingTowardsTarget || velocity.Length() < cruiseSpeed)
-			command |= Command::FORWARD;
-	}
-	else if(shouldReverse)
-	{
-		command.SetTurn(TurnToward(ship, velocity));
-		command |= Command::BACK;
-	}
-
-	return false;
+	ShipManeuver::Input input = ManeuverInput(ship);
+	input.targetPosition = targetPosition;
+	input.targetVelocity = targetVelocity;
+	input.radius = radius;
+	input.slow = slow;
+	input.cruiseSpeed = cruiseSpeed;
+	ShipContext context(ship);
+	ShipManeuver::Output output;
+	return RunManeuver("move to", input, command, output, &context) && output.arrived;
 }
 
 
@@ -3118,7 +3104,8 @@ void AI::PrepareForHyperspace(const Ship &ship, Command &command)
 
 void AI::CircleAround(const Ship &ship, Command &command, const Body &target)
 {
-	RunManeuver("circle around", ship, command, target);
+	ShipManeuver::Output output;
+	RunManeuver("circle around", ManeuverInput(ship, target), command, output);
 }
 
 
@@ -3138,7 +3125,8 @@ void AI::Swarm(const Ship &ship, Command &command, const Body &target)
 
 void AI::KeepStation(const Ship &ship, Command &command, const Body &target)
 {
-	RunManeuver("keep station", ship, command, target);
+	ShipManeuver::Output output;
+	RunManeuver("keep station", ManeuverInput(ship, target), command, output);
 }
 
 

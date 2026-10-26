@@ -28,8 +28,9 @@ class DataNode;
 // from a "maneuver" node in the game data. It decides how far to turn and
 // whether to thrust forward or back, or use the afterburner. The AI runs the
 // maneuver named "keep station" to hold a ship near a moving target (e.g. an
-// escort near its parent), and "circle around" to stay close to a target
-// without matching its velocity.
+// escort near its parent), "circle around" to stay close to a target without
+// matching its velocity, and "move to" to fly to a point and arrive there with
+// a given velocity.
 class ShipManeuver {
 public:
 	// Variables available to maneuver scripts, in the order they are added to
@@ -57,13 +58,37 @@ public:
 		// Whether the ship has an afterburner and enough fuel, energy and
 		// cooling to use it.
 		SHOULD_USE_AFTERBURNER,
-		// Outputs: the turn command (in units of the ship's turn rate), and
-		// whether to thrust forward, in reverse, or with the afterburner. They
-		// start at 0 and false.
+		// The ship's maximum velocity, counting its afterburner if it should
+		// use it.
+		TOP_SPEED,
+		// For "move to": how close counts as arrived, how slow (relative to the
+		// target velocity) counts as stopped, and the speed to cruise at (0 for
+		// full speed).
+		RADIUS,
+		SLOW,
+		CRUISE_SPEED,
+		// The turn command already given this step.
+		COMMAND_TURN,
+		// Outputs: the turn command (in units of the ship's turn rate, starting
+		// at COMMAND_TURN), whether to thrust forward, in reverse, or with the
+		// afterburner, and for "move to", whether the ship has arrived.
 		TURN,
 		FORWARD,
 		BACK,
-		AFTERBURNER
+		AFTERBURNER,
+		ARRIVED
+	};
+
+	// Calculations about the ship being flown, which scripts call as
+	// functions. The AI provides these for a real ship.
+	class Context {
+	public:
+		virtual ~Context() = default;
+		// Where the ship would come to rest relative to something moving at the
+		// given velocity, and whether reverse thrust gets it there sooner.
+		virtual Point StoppingPoint(const Point &targetVelocity, bool &shouldReverse) const = 0;
+		// The turn command that points the ship along the given vector.
+		virtual double TurnToward(const Point &vector) const = 0;
 	};
 
 	// What the ship knows when the script runs.
@@ -84,6 +109,11 @@ public:
 		double reverseThrust = 0.;
 		double lastTurn = 0.;
 		bool shouldUseAfterburner = false;
+		double topSpeed = 0.;
+		double radius = 0.;
+		double slow = 0.;
+		double cruiseSpeed = 0.;
+		double commandTurn = 0.;
 	};
 	// What the script decided.
 	class Output {
@@ -92,6 +122,7 @@ public:
 		bool forward = false;
 		bool back = false;
 		bool afterburner = false;
+		bool arrived = false;
 	};
 
 	static const script::Interface &GetInterface();
@@ -104,7 +135,8 @@ public:
 	bool IsValid() const;
 
 	// Run the script. Returns false, with no command, if the script fails.
-	bool Run(const Input &input, Output &output) const;
+	// Scripts that call the ship functions need a context.
+	bool Run(const Input &input, Output &output, const Context *context = nullptr) const;
 
 
 private:

@@ -53,6 +53,12 @@ struct Situation {
 	double reverseThrust = 0.;
 	double lastTurn = 0.;
 	bool shouldUseAfterburner = false;
+	// For "move to":
+	double topSpeed = 0.;
+	double radius = 0.;
+	double slow = 0.;
+	double cruiseSpeed = 0.;
+	double commandTurn = 0.;
 };
 
 struct Steering {
@@ -60,6 +66,7 @@ struct Steering {
 	bool forward = false;
 	bool back = false;
 	bool afterburner = false;
+	bool arrived = false;
 };
 
 double AngleDiff(double a, double b)
@@ -220,7 +227,118 @@ Steering BuiltInCircleAround(const Situation &s)
 	return command;
 }
 
-Steering Scripted(const ShipManeuver &maneuver, const Situation &s)
+// The ship calculations "move to" relies on, which stay in C++. The script and
+// the copy of AI::MoveTo below both use these, so the test checks the script's
+// own logic. (This copy of AI::StoppingPoint leaves out hyperspace.)
+class TestContext : public ShipManeuver::Context {
+public:
+	explicit TestContext(const Situation &s) : s(s) {}
+
+	Point StoppingPoint(const Point &targetVelocity, bool &shouldReverse) const override
+	{
+		Point position = s.position;
+		Point velocity = s.velocity - targetVelocity;
+		shouldReverse = false;
+		double v = velocity.Length();
+		if(!v)
+			return position;
+		double degreesToTurn = TO_DEG * acos(std::min(1., std::max(-1., -velocity.Unit().Dot(s.facing.Unit()))));
+		double stopDistance = v * (degreesToTurn / s.turnRate);
+		stopDistance += .5 * v * v / s.acceleration;
+		if(s.reverseThrust)
+		{
+			double reverseAcceleration = s.reverseThrust / s.inertialMass;
+			double reverseDistance = v * (180. - degreesToTurn) / s.turnRate;
+			reverseDistance += .5 * v * v / reverseAcceleration;
+			if(reverseDistance < stopDistance)
+			{
+				shouldReverse = true;
+				stopDistance = reverseDistance;
+			}
+		}
+		return position + stopDistance * velocity.Unit();
+	}
+
+	double TurnToward(const Point &vector) const override
+	{
+		return BuiltInTurnToward(s, vector);
+	}
+
+
+private:
+	const Situation &s;
+};
+
+// AI::MoveTo from before the "move to" maneuver script replaced it, changed
+// only to read from a Situation and use the context's ship calculations.
+Steering BuiltInMoveTo(const Situation &s, const ShipManeuver::Context &context)
+{
+	Steering command;
+	command.turn = s.commandTurn;
+	const Point &targetPosition = s.targetPosition;
+	const Point &targetVelocity = s.targetVelocity;
+	const double radius = s.radius;
+	const double slow = s.slow;
+	const double cruiseSpeed = s.cruiseSpeed;
+
+	const Point &position = s.position;
+	const Point &velocity = s.velocity;
+	const Angle &angle = s.facing;
+	Point dp = targetPosition - position;
+	Point dv = targetVelocity - velocity;
+
+	double speed = dv.Length();
+
+	bool isClose = (dp.Length() < radius);
+	if(isClose && speed < slow)
+	{
+		command.arrived = true;
+		return command;
+	}
+
+	bool shouldReverse = false;
+	dp = targetPosition - context.StoppingPoint(targetVelocity, shouldReverse);
+
+	// Calculate target vector required to get where we want to be.
+	Point tv = dp;
+	bool hasCruiseSpeed = (cruiseSpeed > 0.);
+	if(hasCruiseSpeed)
+	{
+		// The ship prefers a velocity at cruise-speed towards the target, so we need
+		// to compare this preferred velocity to the current velocity and apply the
+		// delta to get to the preferred velocity.
+		tv = (dp.Unit() * cruiseSpeed) - velocity;
+		// If we are moving close to our preferred velocity, then face towards the target.
+		if(tv.LengthSquared() < .01)
+			tv = dp;
+	}
+
+	bool isFacing = (tv.Unit().Dot(angle.Unit()) > .95);
+	if(!isClose || (!isFacing && !shouldReverse))
+		command.turn = context.TurnToward(tv);
+
+	// Drag is not applied when not thrusting, so stop thrusting when close to max speed
+	// to save energy. Work with a slightly lower maximum velocity to avoid border cases.
+	double maxVelocity = s.topSpeed * .99;
+	if(isFacing && (velocity.LengthSquared() <= maxVelocity * maxVelocity
+			|| dp.Unit().Dot(velocity.Unit()) < .95))
+	{
+		// We set full forward power when we don't have a cruise-speed, when we are below
+		// cruise-speed or when we need to do course corrections.
+		bool movingTowardsTarget = (velocity.Unit().Dot(dp.Unit()) > .95);
+		if(!hasCruiseSpeed || !movingTowardsTarget || velocity.Length() < cruiseSpeed)
+			command.forward = true;
+	}
+	else if(shouldReverse)
+	{
+		command.turn = context.TurnToward(velocity);
+		command.back = true;
+	}
+
+	return command;
+}
+
+Steering Scripted(const ShipManeuver &maneuver, const Situation &s, const ShipManeuver::Context *context = nullptr)
 {
 	ShipManeuver::Input input;
 	input.position = s.position;
@@ -238,10 +356,15 @@ Steering Scripted(const ShipManeuver &maneuver, const Situation &s)
 	input.reverseThrust = s.reverseThrust;
 	input.lastTurn = s.lastTurn;
 	input.shouldUseAfterburner = s.shouldUseAfterburner;
+	input.topSpeed = s.topSpeed;
+	input.radius = s.radius;
+	input.slow = s.slow;
+	input.cruiseSpeed = s.cruiseSpeed;
+	input.commandTurn = s.commandTurn;
 	ShipManeuver::Output output;
-	if(!maneuver.Run(input, output))
-		return {std::nan(""), false, false, false};
-	return {output.turn, output.forward, output.back, output.afterburner};
+	if(!maneuver.Run(input, output, context))
+		return {std::nan(""), false, false, false, false};
+	return {output.turn, output.forward, output.back, output.afterburner, output.arrived};
 }
 
 bool Same(double a, double b)
@@ -321,6 +444,11 @@ public:
 		int last = Int(6);
 		s.lastTurn = last == 0 ? 0. : last == 1 ? -0. : last == 2 ? (Pick(2) ? 1. : -1.) : Uniform(-1., 1.);
 		s.shouldUseAfterburner = Pick(2);
+		s.topSpeed = s.maxVelocity * (Pick(3) ? 1.5 : 1.);
+		s.radius = Pick(4) ? 0. : Uniform(10., 800.);
+		s.slow = Uniform(0., 5.);
+		s.cruiseSpeed = Pick(2) ? 0. : Uniform(.5, s.maxVelocity);
+		s.commandTurn = Pick(2) ? 0. : Uniform(-1., 1.);
 		// Sometimes put the target exactly ahead or behind.
 		if(Pick(10))
 			s.targetPosition = s.position + s.facing.Unit() * (Pick(2) ? Uniform(1., 2000.) : -Uniform(1., 2000.));
@@ -403,6 +531,60 @@ TEST_CASE( "The circle around maneuver matches the built-in AI code", "[ShipMane
 	// Make sure the generated situations reach every branch.
 	CHECK( stopped > 0 );
 	CHECK( afterburner > 0 );
+}
+
+TEST_CASE( "The move to maneuver matches the built-in AI code", "[ShipManeuver]" ) {
+	const ShipManeuver *maneuver = LoadManeuver("move to");
+	REQUIRE( maneuver );
+
+	SituationGenerator generator(11);
+	int mismatches = 0;
+	int arrived = 0;
+	int forward = 0;
+	int back = 0;
+	int kept = 0;
+	for(int i = 0; i < 50000 && mismatches < 5; ++i)
+	{
+		Situation s = generator.Next();
+		// Sometimes start already there, or nearly there.
+		if(generator.Next().shouldUseAfterburner)
+			s.targetPosition = s.position + Point(s.radius * .5, 0.);
+		TestContext context(s);
+		const Steering expected = BuiltInMoveTo(s, context);
+		const Steering actual = Scripted(*maneuver, s, &context);
+		arrived += expected.arrived;
+		forward += expected.forward;
+		back += expected.back;
+		kept += (!expected.arrived && expected.turn == s.commandTurn);
+		if(!Same(expected.turn, actual.turn) || expected.forward != actual.forward || expected.back != actual.back
+				|| expected.arrived != actual.arrived || actual.afterburner)
+		{
+			++mismatches;
+			UNSCOPED_INFO( Describe(s) << " radius " << s.radius << " slow " << s.slow << " cruise "
+				<< s.cruiseSpeed << " top speed " << s.topSpeed << " command turn " << s.commandTurn );
+			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " back "
+				<< expected.back << " arrived " << expected.arrived << "; got turn " << actual.turn << " forward "
+				<< actual.forward << " back " << actual.back << " arrived " << actual.arrived );
+		}
+	}
+	CHECK( mismatches == 0 );
+	// Make sure the generated situations reach every branch.
+	CHECK( arrived > 0 );
+	CHECK( forward > 0 );
+	CHECK( back > 0 );
+	CHECK( kept > 0 );
+}
+
+TEST_CASE( "Ship functions need a ship", "[ShipManeuver]" ) {
+	const ShipManeuver *maneuver = LoadManeuver("move to");
+	REQUIRE( maneuver );
+	Situation s;
+	s.targetPosition = Point(1000., 0.);
+	s.acceleration = 1.;
+	s.turnRate = 1.;
+	THEN( "running without a context fails instead of guessing" ) {
+		CHECK( std::isnan(Scripted(*maneuver, s).turn) );
+	}
 }
 // #endregion unit tests
 

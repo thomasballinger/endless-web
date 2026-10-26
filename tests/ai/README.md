@@ -179,7 +179,8 @@ how the line of sight moved since the last step.
 `upstream-watch.py check` tells you when upstream has changed C++ that a script
 on this branch reproduces. `tests/ai/upstream/` holds a snapshot of each such
 block (the homing code in `Projectile::Move`, `AI::Step`,
-`AI::MoveEscort`, `AI::KeepStation`, `AI::CircleAround` and `AI::TurnToward`) as it was when the scripts were written. After
+`AI::MoveEscort`, `AI::KeepStation`, `AI::CircleAround`, `AI::MoveTo` and
+`AI::TurnToward`) as it was when the scripts were written. After
 `git fetch upstream`, the check compares the same blocks at `upstream/master`.
 For each one that changed, it shows the diff and the commits involved, and
 says which scripts to update and how to verify them:
@@ -197,9 +198,14 @@ Behavior that moved from C++ into scripts is then checked two ways:
   `tests/unit/src/test_maneuver.cpp` does the same for the maneuvers in
   `data/maneuvers.txt`, on 50,000 generated situations each: "keep station"
   (which escorts use to stay with their parent) against a copy of the old
-  `AI::KeepStation`, and "circle around" against `AI::CircleAround` and
-  `AI::TurnToward`. In Sol traffic, "keep station" runs about 100,000 times and
-  "circle around" about 1,500 times.
+  `AI::KeepStation`, "circle around" against `AI::CircleAround` and
+  `AI::TurnToward`, and "move to" against `AI::MoveTo`. "move to" asks the
+  game where the ship would stop and how to turn it (`AI::StoppingPoint` and
+  `AI::TurnToward` stay in C++), so the test gives the script and the copy of
+  `MoveTo` the same versions of those. In Sol traffic, "keep station" runs
+  about 100,000 times, "move to" about 105,000 and "circle around" about
+  1,500; "move to" never uses a cruise speed there, so only the unit test
+  covers that branch.
 - **Against the old C++ code, in isolation.** `tests/unit/src/test_guidance.cpp`
   holds a copy of the homing code that `data/guidance.txt` replaced, and runs
   it and the default script for every combination of homing attributes on
