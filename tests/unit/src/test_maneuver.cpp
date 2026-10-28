@@ -60,6 +60,8 @@ struct Situation {
 	double slow = 0.;
 	double cruiseSpeed = 0.;
 	double commandTurn = 0.;
+	// For "attack":
+	Point aim;
 };
 
 struct Steering {
@@ -372,6 +374,43 @@ Steering BuiltInPickUp(const Situation &s, const ShipManeuver::Context &context)
 	return command;
 }
 
+// AI::MoveToAttack from before the "attack" maneuver script replaced it,
+// changed only to read from a Situation and use the context's ship
+// calculations. The aim comes from AI::TargetAim, which stays in C++.
+Steering BuiltInMoveToAttack(const Situation &s, const ShipManeuver::Context &context)
+{
+	Steering command;
+	Point direction = s.targetPosition - s.position;
+
+	// First of all, aim in the direction that will hit this target.
+	command.turn = context.TurnToward(s.aim);
+
+	// Calculate this ship's "turning radius"; that is, the smallest circle it
+	// can make while at its current speed.
+	double stepsInFullTurn = 360. / s.turnRate;
+	double circumference = stepsInFullTurn * s.velocity.Length();
+	double diameter = std::max(200., circumference / PI);
+
+	const auto facing = s.facing.Unit().Dot(direction.Unit());
+	// If the ship has reverse thrusters and the target is behind it, we can
+	// use them to reach the target more quickly.
+	if(facing < -.75 && s.reverseThrust)
+		command.back = true;
+	// Only apply thrust if either:
+	// This ship is within 90 degrees of facing towards its target and far enough away not to overshoot
+	// if it accelerates while needing to turn further, or:
+	// This ship is moving away from its target but facing mostly towards it.
+	else if((facing >= 0. && direction.Length() > diameter)
+			|| (s.velocity.Dot(direction) < 0. && facing >= .9))
+	{
+		command.forward = true;
+		// Use afterburner, if applicable.
+		if(direction.Length() > 600. && s.shouldUseAfterburner)
+			command.afterburner = true;
+	}
+	return command;
+}
+
 Steering Scripted(const ShipManeuver &maneuver, const Situation &s, const ShipManeuver::Context *context = nullptr)
 {
 	ShipManeuver::Input input;
@@ -395,6 +434,7 @@ Steering Scripted(const ShipManeuver &maneuver, const Situation &s, const ShipMa
 	input.slow = s.slow;
 	input.cruiseSpeed = s.cruiseSpeed;
 	input.commandTurn = s.commandTurn;
+	input.aim = s.aim;
 	ShipManeuver::Output output;
 	if(!maneuver.Run(input, output, context))
 		return {std::nan(""), false, false, false, false};
@@ -483,6 +523,8 @@ public:
 		s.slow = Uniform(0., 5.);
 		s.cruiseSpeed = Pick(2) ? 0. : Uniform(.5, s.maxVelocity);
 		s.commandTurn = Pick(2) ? 0. : Uniform(-1., 1.);
+		// Usually near the direction to the target, as when leading it.
+		s.aim = (s.targetPosition - s.position) + RandomPoint(Pick(2) ? 50. : 1000.);
 		// Sometimes put the target exactly ahead or behind.
 		if(Pick(10))
 			s.targetPosition = s.position + s.facing.Unit() * (Pick(2) ? Uniform(1., 2000.) : -Uniform(1., 2000.));
@@ -646,6 +688,44 @@ TEST_CASE( "The pick up maneuver matches the built-in AI code", "[ShipManeuver]"
 	CHECK( forward > 0 );
 	CHECK( afterburner > 0 );
 	CHECK( neverMeets > 0 );
+}
+
+TEST_CASE( "The attack maneuver matches the built-in AI code", "[ShipManeuver]" ) {
+	const ShipManeuver *maneuver = LoadManeuver("attack");
+	REQUIRE( maneuver );
+
+	SituationGenerator generator(17);
+	int mismatches = 0;
+	int forward = 0;
+	int back = 0;
+	int afterburner = 0;
+	for(int i = 0; i < 50000 && mismatches < 5; ++i)
+	{
+		Situation s = generator.Next();
+		// Sometimes stand still, or turn slowly, so the turning circle is small.
+		if(generator.Next().shouldUseAfterburner)
+			s.velocity = Point();
+		TestContext context(s);
+		const Steering expected = BuiltInMoveToAttack(s, context);
+		const Steering actual = Scripted(*maneuver, s, &context);
+		forward += expected.forward;
+		back += expected.back;
+		afterburner += expected.afterburner;
+		if(!Same(expected.turn, actual.turn) || expected.forward != actual.forward || expected.back != actual.back
+				|| expected.afterburner != actual.afterburner || actual.arrived)
+		{
+			++mismatches;
+			UNSCOPED_INFO( Describe(s) << " aim " << s.aim.X() << "," << s.aim.Y() );
+			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " back "
+				<< expected.back << " afterburner " << expected.afterburner << "; got turn " << actual.turn
+				<< " forward " << actual.forward << " back " << actual.back << " afterburner " << actual.afterburner);
+		}
+	}
+	CHECK( mismatches == 0 );
+	// Make sure the generated situations reach every branch.
+	CHECK( forward > 0 );
+	CHECK( back > 0 );
+	CHECK( afterburner > 0 );
 }
 
 // Not run by default: "endless-sky-tests [.maneuver-speed]" times the scripts.

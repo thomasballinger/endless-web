@@ -24,6 +24,8 @@
 #                                               afterburner if it should use it
 #   radius slow cruise-speed                    for "move to" (see below)
 #   command-turn                                the turn command so far this step
+#   aim                                         for "attack": the direction to point
+#                                               the guns to hit the target
 # and these outputs (starting at command-turn or false):
 #   turn          how far to turn, in units of the ship's turn rate
 #   forward       whether to thrust forward
@@ -33,7 +35,7 @@
 # and functions from the game:
 #   (rendezvous-time offset velocity speed)     steps to reach a moving point
 #   (heading v)                                 direction of v in degrees
-# and, only for "move to" and "pick up", three about the ship itself:
+# and, only for "move to", "pick up" and "attack", three about the ship itself:
 #   (stopping-point target-velocity)            where it would come to rest
 #   (stopping-reverse target-velocity)          whether reverse thrust stops it sooner
 #   (turn-toward v)                             the turn command that points it along v
@@ -218,4 +220,27 @@ maneuver "pick up"
 	# this maneuver ran, but facing this closely means forward is set anyway.)
 	if (and forward should-use-afterburner)
 		if (> alignment (max .9 (min .9999 (- 1 (/ square-distance 10000000)))))
+			set afterburner true
+
+# Close in on a target while pointing the guns at it. Ships use this to fight
+# other ships and to mine asteroids. This reproduces the game's built-in
+# behavior exactly.
+maneuver "attack"
+	set turn (turn-toward aim)
+
+	# The smallest circle the ship can turn in at its current speed.
+	let steps-in-full-turn (/ 360 turn-rate)
+	let circumference (* steps-in-full-turn (length velocity))
+	let diameter (max 200 (/ circumference pi))
+
+	let direction (- target-position position)
+	let alignment (dot facing (unit direction))
+	# With reverse thrusters, back toward a target behind the ship.
+	if (and (< alignment -.75) (!= reverse-thrust 0))
+		set back true
+	# Thrust when facing the target and far enough away not to overshoot while
+	# still turning, or when moving away from it but facing it.
+	elif (or (and (>= alignment 0) (> (length direction) diameter)) (and (< (dot velocity direction) 0) (>= alignment .9)))
+		set forward true
+		if (and (> (length direction) 600) should-use-afterburner)
 			set afterburner true

@@ -122,6 +122,7 @@ namespace {
 		interface.AddInput("slow");
 		interface.AddInput("cruise-speed");
 		interface.AddInput("command-turn");
+		interface.AddInput("aim");
 			interface.AddOutput("turn");
 		interface.AddOutput("forward");
 		interface.AddOutput("back");
@@ -193,6 +194,7 @@ bool ShipManeuver::Run(const Input &input, Output &output, const Context *contex
 	variables[SLOW] = Value(input.slow);
 	variables[CRUISE_SPEED] = Value(input.cruiseSpeed);
 	variables[COMMAND_TURN] = Value(input.commandTurn);
+	variables[AIM] = Value(input.aim);
 	variables[TURN] = Value(input.commandTurn);
 	variables[FORWARD] = Value(false);
 	variables[BACK] = Value(false);

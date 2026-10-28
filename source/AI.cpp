@@ -3224,34 +3224,13 @@ void AI::AimToAttack(const Ship &ship, Command &command, const Body &target, Fir
 
 void AI::MoveToAttack(const Ship &ship, Command &command, const Body &target, FireCommand &targeting)
 {
-	Point direction = target.Position() - ship.Position();
-
-	// First of all, aim in the direction that will hit this target.
-	AimToAttack(ship, command, target, targeting);
-
-	// Calculate this ship's "turning radius"; that is, the smallest circle it
-	// can make while at its current speed.
-	double stepsInFullTurn = 360. / ship.TurnRate();
-	double circumference = stepsInFullTurn * ship.Velocity().Length();
-	double diameter = max(200., circumference / PI);
-
-	const auto facing = ship.Facing().Unit().Dot(direction.Unit());
-	// If the ship has reverse thrusters and the target is behind it, we can
-	// use them to reach the target more quickly.
-	if(facing < -.75 && ship.ReverseThrust())
-		command |= Command::BACK;
-	// Only apply thrust if either:
-	// This ship is within 90 degrees of facing towards its target and far enough away not to overshoot
-	// if it accelerates while needing to turn further, or:
-	// This ship is moving away from its target but facing mostly towards it.
-	else if((facing >= 0. && direction.Length() > diameter)
-			|| (ship.Velocity().Dot(direction) < 0. && facing >= .9))
-	{
-		command |= Command::FORWARD;
-		// Use afterburner, if applicable.
-		if(direction.Length() > 600. && ship.ShouldUseAfterburner())
-			command |= Command::AFTERBURNER;
-	}
+	ShipManeuver::Input input = ManeuverInput(ship, target);
+	// The direction that will hit this target. Finding it also notes which
+	// guns are on target, so it is done once, before the script runs.
+	input.aim = TargetAim(ship, target, targeting);
+	ManeuverContext context(ship);
+	ShipManeuver::Output output;
+	RunManeuver("attack", input, command, output, &context);
 }
 
 

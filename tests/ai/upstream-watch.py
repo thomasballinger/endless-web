@@ -64,6 +64,9 @@ WATCHED = [
     ('ai-pick-up', 'source/AI.cpp', r'^void AI::PickUp\(',
         'the "pick up" maneuver in data/maneuvers.txt',
         'copy the new code into BuiltInPickUp() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
+    ('ai-move-to-attack', 'source/AI.cpp', r'^void AI::MoveToAttack\(',
+        'the "attack" maneuver in data/maneuvers.txt',
+        'copy the new code into BuiltInMoveToAttack() in tests/unit/src/test_maneuver.cpp and run the unit tests'),
 ]
 
 

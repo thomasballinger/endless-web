@@ -333,13 +333,65 @@ So how far ahead to aim, and how much to smooth, are real trade-offs that
 depend on the seeker and the target, which is the kind of change a script
 should be able to make. The seeker's quality is not.
 
+## Language design notes
+
+The script language is being designed as it's used. Rules so far, and why:
+
+- **Hardware sets the limits; scripts decide within them.** Whatever an
+  outfit or ship could be made "better" at (turn rate, thrust, seeker
+  quality, how often a lock holds, what a sensor can see) is an attribute in
+  the game data, not something a script controls. A script's outputs are
+  clamped to those limits, and it learns about the world only through
+  inputs and functions the host gives it. Test for any new input or
+  function: could a script turn this up? If so, it belongs to the hardware.
+- **Capabilities gate what a script may read or write.** `target-velocity`
+  needs "leading", `thrust` needs "throttle control", and `target-facing`
+  needs "optical tracking". A weapon can't use a script that needs more
+  than it has; it falls back to its default.
+- **Host functions are pure calculations.** `turn-toward`,
+  `stopping-point` and `rendezvous-time` only compute. Anything with a side
+  effect runs in C++ before the script, once, and arrives as an input: the
+  "attack" maneuver's `aim` comes from `AI::TargetAim`, which also notes
+  which guns are on target. Otherwise how often a script called a function
+  would change the game.
+- **A script's variables may hide inputs, but not outputs or constants.**
+  When the "attack" maneuver added an `aim` input, the existing "move to"
+  script, which has its own `aim`, stopped compiling, and every scenario
+  changed. Letting a `let` or `memory` hide an input means the host can add
+  inputs without breaking scripts already written, including plugins'.
+- **A script with errors is never run.** Loading reports every error with
+  its file and line, and a failed reload keeps the previous version.
+- **`memory` belongs to a compiled version of a script.** Reloading an edited
+  script starts every projectile's memory over, so values can't land in a
+  slot that now means something else.
+- **Arithmetic works left to right, exactly as the C++ did.** `(* a b c)` is
+  `(* (* a b) c)`, so scripts that copy C++ code give bit-identical results.
+
+Open questions:
+
+- **Sensors as functions.** Should a sensor be an input, or a function
+  called only when wanted, like `(seek)`? A function only pays off when
+  calling it costs something (energy, giving away position, time), and one
+  reading per refresh must be the rule, or a script could call again until
+  it got the answer it wanted.
+- **Randomness in scripts.** Patrols and other AI behaviors choose at random.
+  A `(random)` function drawing from the object's own random stream fits the
+  rules above, but the number of draws then depends on the script, so it
+  must not draw from the main sequence when streams are off, or editing one
+  script would change everything.
+- **Functions defined by scripts.** The noise examples repeat the same few
+  lines to turn toward a point; shared definitions would help.
+- **Limits on computation.** Scripts already have a step limit per run. A
+  smaller one for cheaper hardware would make "how much can this missile
+  think" a hardware property too.
+
 ## Keeping scripts in sync with the C++ code
 
 `upstream-watch.py check` tells you when upstream has changed C++ that a script
 on this branch reproduces. `tests/ai/upstream/` holds a snapshot of each such
 block (the homing code in `Projectile::Move`, `AI::Step`,
 `AI::MoveEscort`, `AI::KeepStation`, `AI::CircleAround`, `AI::MoveTo`,
-`AI::PickUp` and `AI::TurnToward`) as it was when the scripts were written. After
+`AI::PickUp`, `AI::MoveToAttack` and `AI::TurnToward`) as it was when the scripts were written. After
 `git fetch upstream`, the check compares the same blocks at `upstream/master`.
 For each one that changed, it shows the diff and the commits involved, and
 says which scripts to update and how to verify them:
@@ -365,7 +417,10 @@ Behavior that moved from C++ into scripts is then checked two ways:
   the same versions of those. In Sol traffic, "keep station" runs about
   100,000 times, "move to" about 105,000 and "circle around" about 1,500;
   "move to" never uses a cruise speed there, so only the unit test covers
-  that branch. "pick up" runs about 3,000 times across the scenarios but
+  that branch. "attack" (how ships close in on a target while aiming at it,
+  in battle and when mining) is checked against `AI::MoveToAttack`; it runs
+  about 49,000 times in Al Dhanab and 6,000 in Ne-20, and reaches every
+  branch. "pick up" runs about 3,000 times across the scenarios but
   never uses the afterburner or chases flotsam it cannot catch, which the unit
   test also covers. `AI::PickUp` also checked whether forward thrust was
   commanded before it ran; the script leaves that out, because facing

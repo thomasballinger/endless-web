@@ -30,7 +30,8 @@ class DataNode;
 // maneuver named "keep station" to hold a ship near a moving target (e.g. an
 // escort near its parent), "circle around" to stay close to a target without
 // matching its velocity, "move to" to fly to a point and arrive there with a
-// given velocity, and "pick up" to fly into flotsam to collect it.
+// given velocity, "pick up" to fly into flotsam to collect it, and "attack" to
+// close in on a target while aiming at it.
 class ShipManeuver {
 public:
 	// Variables available to maneuver scripts, in the order they are added to
@@ -69,6 +70,9 @@ public:
 		CRUISE_SPEED,
 		// The turn command already given this step.
 		COMMAND_TURN,
+		// For "attack": the direction to point the ship's guns to hit the
+		// target, allowing for the speed of their projectiles.
+		AIM,
 		// Outputs: the turn command (in units of the ship's turn rate, starting
 		// at COMMAND_TURN), whether to thrust forward, in reverse, or with the
 		// afterburner, and for "move to", whether the ship has arrived.
@@ -114,6 +118,7 @@ public:
 		double slow = 0.;
 		double cruiseSpeed = 0.;
 		double commandTurn = 0.;
+		Point aim;
 	};
 	// What the script decided.
 	class Output {
