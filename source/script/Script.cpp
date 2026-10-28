@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "../DataNode.h"
 #include "../Logger.h"
 #include "../pi.h"
+#include "../Random.h"
 
 #include <atomic>
 #include <cmath>
@@ -182,7 +183,7 @@ namespace {
 		LESS, GREATER, LESS_EQUAL, GREATER_EQUAL, EQUAL, NOT_EQUAL,
 		NOT, AND, OR, IF,
 		ABS, SQRT, ASIN, ACOS, SIN, COS, ATAN2, MIN, MAX, COPYSIGN, CLAMP, SIGNBIT, IS_NAN,
-		VEC, X, Y, DOT, CROSS, UNIT, LENGTH
+		VEC, X, Y, DOT, CROSS, UNIT, LENGTH, RANDOM, RANDOM_INT
 	};
 
 	class BuiltinInfo {
@@ -228,6 +229,10 @@ namespace {
 		{"cross", {Builtin::CROSS, 2, 2}},
 		{"unit", {Builtin::UNIT, 1, 1}},
 		{"length", {Builtin::LENGTH, 1, 1}},
+		// Random numbers come from whatever random stream the host has made
+		// current, so a script draws them exactly as the code it replaced did.
+		{"random", {Builtin::RANDOM, 0, 0}},
+		{"random-int", {Builtin::RANDOM_INT, 1, 1}},
 	};
 
 	const map<string, double> CONSTANTS = {
@@ -1128,6 +1133,18 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			result = Value(expression.builtin == Builtin::DOT
 				? a.Vector().Dot(b.Vector()) : a.Vector().Cross(b.Vector()));
 			return true;
+		case Builtin::RANDOM:
+			result = Value(Random::Real());
+			return true;
+		case Builtin::RANDOM_INT:
+		{
+			// A whole number from 0 up to (but not including) the given count.
+			const double n = a.GetType() == Type::NUMBER ? a.Number() : 0.;
+			if(!(n >= 1. && n <= 4294967295.) || n != floor(n))
+				return Fail("\"random-int\" needs a whole number from 1 to 4294967295");
+			result = Value(static_cast<double>(Random::Int(static_cast<uint32_t>(n))));
+			return true;
+		}
 		case Builtin::AND:
 		case Builtin::OR:
 		case Builtin::IF:

@@ -21,6 +21,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 // Include a helper for creating well-formed DataNodes.
 #include "datanode-factory.h"
 
+// Include the game's random numbers, which scripts can draw from.
+#include "../../../source/Random.h"
+
 #include <cmath>
 #include <string>
 #include <vector>
@@ -89,6 +92,24 @@ SCENARIO( "Running scripts", "[Script]" ) {
 			CHECK( vector.out.Number() == (2. * v * 3.).X() );
 			CHECK_FALSE( Run("program test\n\tset out (x (* v 2 v))\n", 0., v).ran );
 			CHECK_FALSE( Run("program test\n\tset out (min 1 2 v)\n", 0., v).ran );
+		}
+	}
+	GIVEN( "random numbers" ) {
+		THEN( "they come from the game's random numbers, in order" ) {
+			Random::Seed(5);
+			const double first = Random::Real();
+			const uint32_t second = Random::Int(10);
+			Random::Seed(5);
+			auto result = Run("program test\n\tlet r (random)\n\tset out (+ r (* 100 (random-int 10)))\n");
+			REQUIRE( result.ran );
+			CHECK( result.out.Number() == first + 100. * second );
+		}
+		THEN( "random-int needs a whole number of at least 1" ) {
+			CHECK( Run("program test\n\tset out (random-int 1)\n").out.Number() == 0. );
+			CHECK_FALSE( Run("program test\n\tset out (random-int 0)\n").ran );
+			CHECK_FALSE( Run("program test\n\tset out (random-int 2.5)\n").ran );
+			CHECK_FALSE( Run("program test\n\tset out (random-int v)\n").ran );
+			CHECK_FALSE( Run("program test\n\tset out (random 1)\n").valid );
 		}
 	}
 	GIVEN( "vector math" ) {

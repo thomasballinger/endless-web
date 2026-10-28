@@ -44,6 +44,8 @@
 #   + - * /  < > <= >= == !=  and or not  (if c a b)
 #   abs sqrt asin acos sin cos atan2 min max copysign (clamp x low high)
 #   (vec x y) x y dot cross unit length
+#   (random)        a random number from 0 up to 1
+#   (random-int n)  a random whole number from 0 up to n - 1
 # Arithmetic works on numbers, and +, -, * and / also on vectors where it
 # makes sense. +, *, min, max, and, and or take any number of arguments, and
 # work from left to right: (* a b c) is the same as (* (* a b) c).
