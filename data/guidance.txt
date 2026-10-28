@@ -30,7 +30,8 @@
 # Scripts are written one expression per line, in prefix notation, with
 # parentheses for nested expressions. Indented lines are the block of the line
 # above them. Statements:
-#   let <name> <expression>      define a variable (visible to the end of its block)
+#   let <name> <expression>      define a variable (visible to the end of its block);
+#                                it may reuse the name of an input, hiding it
 #   set <name> <expression>      change a variable or an output
 #   memory <name> <expression>   define a variable that keeps its value from one
 #                                step to the next, for each projectile; the

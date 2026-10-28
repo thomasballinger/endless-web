@@ -365,6 +365,7 @@ private:
 	bool CompileBlock(const DataNode &node, Block &block);
 	bool CompileExpression(const SExpression &source, const DataNode &node, Expression &expression);
 	int Lookup(const string &name) const;
+	bool IsTaken(const string &name) const;
 
 	enum class Result { CONTINUE, STOP, ERROR };
 	Result RunBlock(const Block &block, vector<Value> &variables, uint32_t &effects, Memory *memory,
@@ -471,7 +472,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 					ok = false;
 					continue;
 				}
-				if(Lookup(variable) >= 0 || CONSTANTS.contains(variable))
+				if(IsTaken(variable))
 				{
 					child.PrintTrace("\"" + variable + "\" is already defined:");
 					ok = false;
@@ -485,7 +486,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			}
 			else if(keyword == "let")
 			{
-				if(Lookup(variable) >= 0 || CONSTANTS.contains(variable))
+				if(IsTaken(variable))
 				{
 					child.PrintTrace("\"" + variable + "\" is already defined:");
 					ok = false;
@@ -673,6 +674,21 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	for(int i = 0; i < count; ++i)
 		ok &= CompileExpression(source.items[i + 1], node, expression.arguments[i]);
 	return ok;
+}
+
+
+
+// Whether a "let" or "memory" can't define a variable with this name. A
+// script's own variable may hide one of the host's inputs, so that adding an
+// input can't break a script that already uses the name, but it may not hide
+// an output, a constant, or another of the script's variables.
+bool Program::Implementation::IsTaken(const string &name) const
+{
+	for(const auto &scope : scopes)
+		if(scope.contains(name))
+			return true;
+	const int slot = interface->Find(name);
+	return CONSTANTS.contains(name) || (slot >= 0 && interface->IsOutput(slot));
 }
 
 

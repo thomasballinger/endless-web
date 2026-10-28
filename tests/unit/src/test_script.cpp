@@ -129,6 +129,14 @@ R"(program test
 			CHECK( Run(text, 1.).out.Number() == 1. );
 		}
 	}
+	GIVEN( "a variable with the same name as an input" ) {
+		auto result = Run("program test\n\tlet a (* a 10)\n\tset out (+ a 1)\n", 2.);
+		THEN( "it hides the input, so new inputs can't break old scripts" ) {
+			REQUIRE( result.valid );
+			REQUIRE( result.ran );
+			CHECK( result.out.Number() == 21. );
+		}
+	}
 	GIVEN( "effects and stop" ) {
 		auto result = Run("program test\n\tping\n\tstop\n\tset out 1\n");
 		THEN( "effects are reported and stop ends the program" ) {
@@ -155,7 +163,10 @@ SCENARIO( "Script errors", "[Script]" ) {
 			CHECK_FALSE( Run("program test\n\tset out (+ 1\n").valid );
 			CHECK_FALSE( Run("program test\n\telse\n\t\tset out 1\n").valid );
 			CHECK_FALSE( Run("program test\n\tset out (sqrt 1 2)\n").valid );
-			CHECK_FALSE( Run("program test\n\tlet a 1\n").valid );
+			// A script's variable may not hide an output or a constant.
+			CHECK_FALSE( Run("program test\n\tlet out 1\n").valid );
+			CHECK_FALSE( Run("program test\n\tlet pi 3\n").valid );
+			CHECK_FALSE( Run("program test\n\tlet x 1\n\tlet x 2\n").valid );
 			// A variable whose definition has an error is still invalid to use.
 			CHECK_FALSE( Run("program test\n\tlet x (sqrt 1 2)\n\tset out x\n").valid );
 		}
