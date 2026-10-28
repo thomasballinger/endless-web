@@ -62,6 +62,17 @@ struct Situation {
 	double commandTurn = 0.;
 	// For "attack":
 	Point aim;
+	// For "fight":
+	bool ramming = false;
+	double targetMaxVelocity = 0.;
+	bool artillery = false;
+	double shortestRange = 0.;
+	double shortestArtillery = 0.;
+	double minSafeDistance = 0.;
+	double shipRadius = 0.;
+	double targetRadius = 0.;
+	double maxReverseVelocity = 0.;
+	double reverseAcceleration = 0.;
 };
 
 struct Steering {
@@ -70,6 +81,9 @@ struct Steering {
 	bool back = false;
 	bool afterburner = false;
 	bool arrived = false;
+	// For "fight": whether it asked to fly "attack" or to aim its guns.
+	bool attack = false;
+	bool aimGuns = false;
 };
 
 double AngleDiff(double a, double b)
@@ -411,6 +425,88 @@ Steering BuiltInMoveToAttack(const Situation &s, const ShipManeuver::Context &co
 	return command;
 }
 
+// AI::Attack from before the "fight" maneuver script replaced it, changed
+// only to read from a Situation, use the context's ship calculations, and
+// report where it called MoveToAttack or AimToAttack instead of calling them.
+// (Deploying fighters stays in C++.)
+Steering BuiltInAttack(const Situation &s, const ShipManeuver::Context &context)
+{
+	Steering command;
+	command.turn = s.commandTurn;
+	const double SAFETY_MULTIPLIER = 1.1;
+	// Ramming AI doesn't take weapon range or self-damage into account, instead opting to bum-rush the target.
+	if(s.ramming)
+	{
+		command.attack = true;
+		return command;
+	}
+
+	// Check if this ship is fast enough to keep distance from target.
+	// Have a 10% minimum to avoid ships getting in a chase loop.
+	const bool isAbleToRun = s.targetMaxVelocity * SAFETY_MULTIPLIER < s.maxVelocity;
+
+	const bool useArtilleryAI = s.artillery && isAbleToRun;
+	const double shortestRange = s.shortestRange;
+	const double shortestArtillery = s.shortestArtillery;
+	double minSafeDistance = isAbleToRun ? s.minSafeDistance : 0.;
+
+	const double totalRadius = s.shipRadius + s.targetRadius;
+	const Point direction = s.targetPosition - s.position;
+	// Average distance from this ship's weapons to the enemy ship.
+	const double weaponDistanceFromTarget = direction.Length() - totalRadius / 3.;
+
+	// If this ship has mostly long-range weapons, or some weapons have a
+	// blast radius, it should keep some distance instead of closing in.
+	// If a weapon has blast radius, some leeway helps avoid getting hurt.
+	if(minSafeDistance || (useArtilleryAI && shortestRange < weaponDistanceFromTarget))
+	{
+		minSafeDistance = 1.25 * minSafeDistance + totalRadius;
+
+		double approachSpeed = (s.velocity - s.targetVelocity).Dot(direction.Unit());
+		double slowdownDistance = 0.;
+		// If this ship can use reverse thrusters, consider doing so.
+		double reverseSpeed = s.maxReverseVelocity;
+		bool useReverse = reverseSpeed && (reverseSpeed >= std::min(s.targetMaxVelocity, s.maxVelocity)
+				|| s.targetVelocity.Dot(-direction.Unit()) <= reverseSpeed);
+		slowdownDistance = approachSpeed * approachSpeed / (useReverse ?
+			s.reverseAcceleration : (s.acceleration + 160. / s.turnRate)) / 2.;
+
+		// If we're too close, run away.
+		if(direction.Length() <
+				std::max(minSafeDistance + std::max(slowdownDistance, 0.), useArtilleryAI * .75 * shortestArtillery))
+		{
+			if(useReverse)
+			{
+				command.turn = context.TurnToward(direction);
+				if(s.facing.Unit().Dot(direction) >= 0.)
+					command.back = true;
+			}
+			else
+			{
+				command.turn = context.TurnToward(-direction);
+				if(s.facing.Unit().Dot(direction) <= 0.)
+					command.forward = true;
+			}
+		}
+		else
+		{
+			// This isn't perfect, but it works well enough.
+			if((useArtilleryAI && (approachSpeed > 0. && weaponDistanceFromTarget < shortestArtillery * .9)) ||
+					weaponDistanceFromTarget < shortestRange * .75)
+				command.aimGuns = true;
+			else
+				command.attack = true;
+		}
+	}
+	// Fire if we can or move closer to use all weapons.
+	else
+		if(weaponDistanceFromTarget < shortestRange * .75)
+			command.aimGuns = true;
+		else
+			command.attack = true;
+	return command;
+}
+
 Steering Scripted(const ShipManeuver &maneuver, const Situation &s, const ShipManeuver::Context *context = nullptr)
 {
 	ShipManeuver::Input input;
@@ -435,10 +531,21 @@ Steering Scripted(const ShipManeuver &maneuver, const Situation &s, const ShipMa
 	input.cruiseSpeed = s.cruiseSpeed;
 	input.commandTurn = s.commandTurn;
 	input.aim = s.aim;
+	input.ramming = s.ramming;
+	input.targetMaxVelocity = s.targetMaxVelocity;
+	input.artillery = s.artillery;
+	input.shortestRange = s.shortestRange;
+	input.shortestArtillery = s.shortestArtillery;
+	input.minSafeDistance = s.minSafeDistance;
+	input.shipRadius = s.shipRadius;
+	input.targetRadius = s.targetRadius;
+	input.maxReverseVelocity = s.maxReverseVelocity;
+	input.reverseAcceleration = s.reverseAcceleration;
 	ShipManeuver::Output output;
 	if(!maneuver.Run(input, output, context))
-		return {std::nan(""), false, false, false, false};
-	return {output.turn, output.forward, output.back, output.afterburner, output.arrived};
+		return {std::nan(""), false, false, false, false, false, false};
+	return {output.turn, output.forward, output.back, output.afterburner, output.arrived, output.attack,
+		output.aimGuns};
 }
 
 bool Same(double a, double b)
@@ -726,6 +833,71 @@ TEST_CASE( "The attack maneuver matches the built-in AI code", "[ShipManeuver]" 
 	CHECK( forward > 0 );
 	CHECK( back > 0 );
 	CHECK( afterburner > 0 );
+}
+
+TEST_CASE( "The fight maneuver matches the built-in AI code", "[ShipManeuver]" ) {
+	const ShipManeuver *maneuver = LoadManeuver("fight");
+	REQUIRE( maneuver );
+
+	// Separate from the other situations, so as not to change them.
+	std::mt19937_64 gen(23);
+	auto uniform = [&gen](double low, double high) { return std::uniform_real_distribution<double>(low, high)(gen); };
+	auto pick = [&gen](int count) { return !std::uniform_int_distribution<int>(0, count - 1)(gen); };
+
+	SituationGenerator generator(19);
+	int mismatches = 0;
+	std::map<std::string, int> reached;
+	for(int i = 0; i < 50000 && mismatches < 5; ++i)
+	{
+		Situation s = generator.Next();
+		s.ramming = pick(20);
+		s.targetMaxVelocity = pick(2) ? s.maxVelocity * uniform(.3, .9) : s.maxVelocity * uniform(.9, 1.5);
+		s.artillery = pick(3);
+		s.shortestRange = uniform(100., 1500.);
+		s.shortestArtillery = s.shortestRange * uniform(1., 3.);
+		s.minSafeDistance = pick(2) ? 0. : uniform(50., 600.);
+		s.shipRadius = uniform(10., 200.);
+		s.targetRadius = uniform(10., 200.);
+		s.maxReverseVelocity = pick(2) ? 0. : s.maxVelocity * uniform(.2, 1.2);
+		s.reverseAcceleration = uniform(.05, 1.);
+		// Often put the target near the distance at which the ship backs off,
+		// closing fast, where the slowdown distance decides what it does.
+		if(pick(3))
+		{
+			const Point unit = Angle(uniform(0., 360.)).Unit();
+			const double edge = 1.25 * s.minSafeDistance + s.shipRadius + s.targetRadius;
+			s.targetPosition = s.position + unit * uniform(0., edge + 100.);
+			s.velocity = unit * uniform(5., 30.);
+			s.targetVelocity = Point();
+		}
+		TestContext context(s);
+		const Steering expected = BuiltInAttack(s, context);
+		const Steering actual = Scripted(*maneuver, s, &context);
+		reached["attack"] += expected.attack && !s.ramming;
+		reached["ram"] += expected.attack && s.ramming;
+		reached["aim"] += expected.aimGuns;
+		reached["back"] += expected.back;
+		reached["forward"] += expected.forward;
+		reached["turn away only"] += !expected.attack && !expected.aimGuns && !expected.back && !expected.forward;
+		if(!Same(expected.turn, actual.turn) || expected.forward != actual.forward || expected.back != actual.back
+				|| expected.afterburner != actual.afterburner || expected.attack != actual.attack
+				|| expected.aimGuns != actual.aimGuns || actual.arrived)
+		{
+			++mismatches;
+			UNSCOPED_INFO( Describe(s) );
+			UNSCOPED_INFO( "expected turn " << expected.turn << " forward " << expected.forward << " back "
+				<< expected.back << " attack " << expected.attack << " aim " << expected.aimGuns << "; got turn "
+				<< actual.turn << " forward " << actual.forward << " back " << actual.back << " attack "
+				<< actual.attack << " aim " << actual.aimGuns);
+		}
+	}
+	CHECK( mismatches == 0 );
+	// Make sure the generated situations reach every branch.
+	for(const auto &[branch, count] : reached)
+	{
+		INFO( branch );
+		CHECK( count > 0 );
+	}
 }
 
 // Not run by default: "endless-sky-tests [.maneuver-speed]" times the scripts.

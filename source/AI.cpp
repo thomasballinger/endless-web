@@ -3140,77 +3140,29 @@ void AI::Attack(const Ship &ship, Command &command, const Ship &target, FireComm
 		command |= Command::DEPLOY;
 		Deploy(ship, false);
 	}
-	// Ramming AI doesn't take weapon range or self-damage into account, instead opting to bum-rush the target.
-	if(ship.GetPersonality().IsRamming())
-	{
-		MoveToAttack(ship, command, target, targeting);
-		return;
-	}
 
-	// Check if this ship is fast enough to keep distance from target.
-	// Have a 10% minimum to avoid ships getting in a chase loop.
-	const bool isAbleToRun = target.MaxVelocity() * SAFETY_MULTIPLIER < ship.MaxVelocity();
-
+	// The "fight" maneuver decides whether to keep away from the target, or
+	// to close in on it or just aim at it, which it asks for as effects.
+	ShipManeuver::Input input = ManeuverInput(ship, target);
 	const ShipAICache &shipAICache = ship.GetAICache();
-	const bool useArtilleryAI = shipAICache.IsArtilleryAI() && isAbleToRun;
-	const double shortestRange = shipAICache.ShortestRange();
-	const double shortestArtillery = shipAICache.ShortestArtillery();
-	double minSafeDistance = isAbleToRun ? shipAICache.MinSafeDistance() : 0.;
-
-	const double totalRadius = ship.Radius() + target.Radius();
-	const Point direction = target.Position() - ship.Position();
-	// Average distance from this ship's weapons to the enemy ship.
-	const double weaponDistanceFromTarget = direction.Length() - totalRadius / 3.;
-
-	// If this ship has mostly long-range weapons, or some weapons have a
-	// blast radius, it should keep some distance instead of closing in.
-	// If a weapon has blast radius, some leeway helps avoid getting hurt.
-	if(minSafeDistance || (useArtilleryAI && shortestRange < weaponDistanceFromTarget))
-	{
-		minSafeDistance = 1.25 * minSafeDistance + totalRadius;
-
-		double approachSpeed = (ship.Velocity() - target.Velocity()).Dot(direction.Unit());
-		double slowdownDistance = 0.;
-		// If this ship can use reverse thrusters, consider doing so.
-		double reverseSpeed = ship.MaxReverseVelocity();
-		bool useReverse = reverseSpeed && (reverseSpeed >= min(target.MaxVelocity(), ship.MaxVelocity())
-				|| target.Velocity().Dot(-direction.Unit()) <= reverseSpeed);
-		slowdownDistance = approachSpeed * approachSpeed / (useReverse ?
-			ship.ReverseAcceleration() : (ship.Acceleration() + 160. / ship.TurnRate())) / 2.;
-
-		// If we're too close, run away.
-		if(direction.Length() <
-				max(minSafeDistance + max(slowdownDistance, 0.), useArtilleryAI * .75 * shortestArtillery))
-		{
-			if(useReverse)
-			{
-				command.SetTurn(TurnToward(ship, direction));
-				if(ship.Facing().Unit().Dot(direction) >= 0.)
-					command |= Command::BACK;
-			}
-			else
-			{
-				command.SetTurn(TurnToward(ship, -direction));
-				if(ship.Facing().Unit().Dot(direction) <= 0.)
-					command |= Command::FORWARD;
-			}
-		}
-		else
-		{
-			// This isn't perfect, but it works well enough.
-			if((useArtilleryAI && (approachSpeed > 0. && weaponDistanceFromTarget < shortestArtillery * .9)) ||
-					weaponDistanceFromTarget < shortestRange * .75)
-				AimToAttack(ship, command, target, targeting);
-			else
-				MoveToAttack(ship, command, target, targeting);
-		}
-	}
-	// Fire if we can or move closer to use all weapons.
-	else
-		if(weaponDistanceFromTarget < shortestRange * .75)
-			AimToAttack(ship, command, target, targeting);
-		else
-			MoveToAttack(ship, command, target, targeting);
+	input.ramming = ship.GetPersonality().IsRamming();
+	input.targetMaxVelocity = target.MaxVelocity();
+	input.artillery = shipAICache.IsArtilleryAI();
+	input.shortestRange = shipAICache.ShortestRange();
+	input.shortestArtillery = shipAICache.ShortestArtillery();
+	input.minSafeDistance = shipAICache.MinSafeDistance();
+	input.shipRadius = ship.Radius();
+	input.targetRadius = target.Radius();
+	input.maxReverseVelocity = ship.MaxReverseVelocity();
+	input.reverseAcceleration = ship.ReverseAcceleration();
+	ManeuverContext context(ship);
+	ShipManeuver::Output output;
+	if(!RunManeuver("fight", input, command, output, &context))
+		return;
+	if(output.attack)
+		MoveToAttack(ship, command, target, targeting);
+	else if(output.aimGuns)
+		AimToAttack(ship, command, target, targeting);
 }
 
 

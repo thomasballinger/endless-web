@@ -123,11 +123,23 @@ namespace {
 		interface.AddInput("cruise-speed");
 		interface.AddInput("command-turn");
 		interface.AddInput("aim");
+		interface.AddInput("ramming");
+		interface.AddInput("target-max-velocity");
+		interface.AddInput("artillery");
+		interface.AddInput("shortest-range");
+		interface.AddInput("shortest-artillery");
+		interface.AddInput("min-safe-distance");
+		interface.AddInput("ship-radius");
+		interface.AddInput("target-radius");
+		interface.AddInput("max-reverse-velocity");
+		interface.AddInput("reverse-acceleration");
 			interface.AddOutput("turn");
 		interface.AddOutput("forward");
 		interface.AddOutput("back");
 		interface.AddOutput("afterburner");
 		interface.AddOutput("arrived");
+		interface.AddEffect("attack");
+		interface.AddEffect("aim-guns");
 		interface.AddFunction("rendezvous-time", 3, RendezvousTime);
 		interface.AddFunction("heading", 1, Heading);
 		interface.AddFunction("stopping-point", 1, StoppingPoint);
@@ -195,6 +207,16 @@ bool ShipManeuver::Run(const Input &input, Output &output, const Context *contex
 	variables[CRUISE_SPEED] = Value(input.cruiseSpeed);
 	variables[COMMAND_TURN] = Value(input.commandTurn);
 	variables[AIM] = Value(input.aim);
+	variables[RAMMING] = Value(input.ramming);
+	variables[TARGET_MAX_VELOCITY] = Value(input.targetMaxVelocity);
+	variables[ARTILLERY] = Value(input.artillery);
+	variables[SHORTEST_RANGE] = Value(input.shortestRange);
+	variables[SHORTEST_ARTILLERY] = Value(input.shortestArtillery);
+	variables[MIN_SAFE_DISTANCE] = Value(input.minSafeDistance);
+	variables[SHIP_RADIUS] = Value(input.shipRadius);
+	variables[TARGET_RADIUS] = Value(input.targetRadius);
+	variables[MAX_REVERSE_VELOCITY] = Value(input.maxReverseVelocity);
+	variables[REVERSE_ACCELERATION] = Value(input.reverseAcceleration);
 	variables[TURN] = Value(input.commandTurn);
 	variables[FORWARD] = Value(false);
 	variables[BACK] = Value(false);
@@ -217,5 +239,7 @@ bool ShipManeuver::Run(const Input &input, Output &output, const Context *contex
 	output.back = variables[BACK].Boolean();
 	output.afterburner = variables[AFTERBURNER].Boolean();
 	output.arrived = variables[ARRIVED].Boolean();
+	output.attack = effects & (1u << ATTACK);
+	output.aimGuns = effects & (1u << AIM_GUNS);
 	return true;
 }

@@ -26,16 +26,23 @@
 #   command-turn                                the turn command so far this step
 #   aim                                         for "attack": the direction to point
 #                                               the guns to hit the target
+#   ramming target-max-velocity artillery       for "fight" (see below)
+#   shortest-range shortest-artillery min-safe-distance
+#   ship-radius target-radius max-reverse-velocity reverse-acceleration
 # and these outputs (starting at command-turn or false):
 #   turn          how far to turn, in units of the ship's turn rate
 #   forward       whether to thrust forward
 #   back          whether to thrust in reverse
 #   afterburner   whether to use the afterburner
 #   arrived       for "move to": whether the ship is there
+# and these actions, which only "fight" uses:
+#   attack        fly the "attack" maneuver after this one
+#   aim-guns      only turn to aim the guns at the target
 # and functions from the game:
 #   (rendezvous-time offset velocity speed)     steps to reach a moving point
 #   (heading v)                                 direction of v in degrees
-# and, only for "move to", "pick up" and "attack", three about the ship itself:
+# and, only for "move to", "pick up", "attack" and "fight", three about the
+# ship itself:
 #   (stopping-point target-velocity)            where it would come to rest
 #   (stopping-reverse target-velocity)          whether reverse thrust stops it sooner
 #   (turn-toward v)                             the turn command that points it along v
@@ -244,3 +251,59 @@ maneuver "attack"
 		set forward true
 		if (and (> (length direction) 600) should-use-afterburner)
 			set afterburner true
+
+# Decide how to fight a ship. A ship that rams always closes in. A ship whose
+# weapons could hurt it up close, or that fights with long-range artillery,
+# keeps its distance if it is fast enough to; otherwise it closes in until
+# its shortest-range weapon reaches and then just aims. Inputs:
+#   ramming               whether its personality is to ram its target
+#   target-max-velocity   the target's top speed
+#   artillery             whether it fights with mostly long-range weapons
+#   shortest-range        the range of its shortest-range weapon
+#   shortest-artillery    the range of its shortest-range artillery
+#   min-safe-distance     how far to stay from the target to be safe from its
+#                         own weapons' blasts
+#   ship-radius target-radius
+#   max-reverse-velocity reverse-acceleration
+# This reproduces the game's built-in behavior exactly.
+maneuver "fight"
+	if ramming
+		attack
+		stop
+
+	# Keeping away only works with a 10% edge in speed over the target.
+	let can-run (< (* target-max-velocity 1.1) max-velocity)
+	let use-artillery (and artillery can-run)
+	let safe-distance (if can-run min-safe-distance 0)
+
+	let total-radius (+ ship-radius target-radius)
+	let direction (- target-position position)
+	# Roughly how far the ship's weapons are from the target's hull.
+	let weapon-distance (- (length direction) (/ total-radius 3))
+
+	if (or (!= safe-distance 0) (and use-artillery (< shortest-range weapon-distance)))
+		set safe-distance (+ (* 1.25 safe-distance) total-radius)
+		let approach-speed (dot (- velocity target-velocity) (unit direction))
+		# Back away with reverse thrusters if they are fast enough.
+		let use-reverse (and (!= max-reverse-velocity 0) (or (>= max-reverse-velocity (min target-max-velocity max-velocity)) (<= (dot target-velocity (- (unit direction))) max-reverse-velocity)))
+		let slowdown-distance (/ (/ (* approach-speed approach-speed) (if use-reverse reverse-acceleration (+ acceleration (/ 160 turn-rate)))) 2)
+
+		# Too close: get away.
+		if (< (length direction) (max (+ safe-distance (max slowdown-distance 0)) (* (if use-artillery 1 0) .75 shortest-artillery)))
+			if use-reverse
+				set turn (turn-toward direction)
+				if (>= (dot facing direction) 0)
+					set back true
+			else
+				set turn (turn-toward (- direction))
+				if (<= (dot facing direction) 0)
+					set forward true
+		elif (or (and use-artillery (and (> approach-speed 0) (< weapon-distance (* shortest-artillery .9)))) (< weapon-distance (* shortest-range .75)))
+			aim-guns
+		else
+			attack
+	# Fire if in range, or else move closer.
+	elif (< weapon-distance (* shortest-range .75))
+		aim-guns
+	else
+		attack

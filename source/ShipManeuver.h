@@ -30,8 +30,9 @@ class DataNode;
 // maneuver named "keep station" to hold a ship near a moving target (e.g. an
 // escort near its parent), "circle around" to stay close to a target without
 // matching its velocity, "move to" to fly to a point and arrive there with a
-// given velocity, "pick up" to fly into flotsam to collect it, and "attack" to
-// close in on a target while aiming at it.
+// given velocity, "pick up" to fly into flotsam to collect it, "attack" to
+// close in on a target while aiming at it, and "fight" to decide how to fight
+// a ship: keep a safe distance, close in, or just aim.
 class ShipManeuver {
 public:
 	// Variables available to maneuver scripts, in the order they are added to
@@ -73,6 +74,22 @@ public:
 		// For "attack": the direction to point the ship's guns to hit the
 		// target, allowing for the speed of their projectiles.
 		AIM,
+		// For "fight": whether the ship's personality is to ram its target,
+		// the target's top speed, whether the ship fights from a distance
+		// with artillery, the range of its shortest-range weapon and of its
+		// shortest-range artillery, how far it must stay away from its target
+		// to be safe from its own weapons' blasts, the two ships' radii, and
+		// the ship's top speed and acceleration in reverse.
+		RAMMING,
+		TARGET_MAX_VELOCITY,
+		ARTILLERY,
+		SHORTEST_RANGE,
+		SHORTEST_ARTILLERY,
+		MIN_SAFE_DISTANCE,
+		SHIP_RADIUS,
+		TARGET_RADIUS,
+		MAX_REVERSE_VELOCITY,
+		REVERSE_ACCELERATION,
 		// Outputs: the turn command (in units of the ship's turn rate, starting
 		// at COMMAND_TURN), whether to thrust forward, in reverse, or with the
 		// afterburner, and for "move to", whether the ship has arrived.
@@ -81,6 +98,12 @@ public:
 		BACK,
 		AFTERBURNER,
 		ARRIVED
+	};
+	// Actions a maneuver can ask for. Only "fight" uses them: "attack" flies
+	// the "attack" maneuver, and "aim-guns" only turns to aim at the target.
+	enum Effect {
+		ATTACK,
+		AIM_GUNS
 	};
 
 	// Calculations about the ship being flown, which scripts call as
@@ -119,6 +142,16 @@ public:
 		double cruiseSpeed = 0.;
 		double commandTurn = 0.;
 		Point aim;
+		bool ramming = false;
+		double targetMaxVelocity = 0.;
+		bool artillery = false;
+		double shortestRange = 0.;
+		double shortestArtillery = 0.;
+		double minSafeDistance = 0.;
+		double shipRadius = 0.;
+		double targetRadius = 0.;
+		double maxReverseVelocity = 0.;
+		double reverseAcceleration = 0.;
 	};
 	// What the script decided.
 	class Output {
@@ -128,6 +161,8 @@ public:
 		bool back = false;
 		bool afterburner = false;
 		bool arrived = false;
+		bool attack = false;
+		bool aimGuns = false;
 	};
 
 	static const script::Interface &GetInterface();

@@ -354,6 +354,11 @@ The script language is being designed as it's used. Rules so far, and why:
   "attack" maneuver's `aim` comes from `AI::TargetAim`, which also notes
   which guns are on target. Otherwise how often a script called a function
   would change the game.
+- **Decision scripts choose actions by triggering effects; C++ carries
+  them out.** "fight" decides between flying "attack" and only aiming the
+  guns, and says which with the `attack` or `aim-guns` effect. Scripts never
+  call other scripts directly, so each one stays a function from its inputs
+  to its outputs and effects, which is what lets it be tested on its own.
 - **A script's variables may hide inputs, but not outputs or constants.**
   When the "attack" maneuver added an `aim` input, the existing "move to"
   script, which has its own `aim`, stopped compiling, and every scenario
@@ -391,7 +396,8 @@ Open questions:
 on this branch reproduces. `tests/ai/upstream/` holds a snapshot of each such
 block (the homing code in `Projectile::Move`, `AI::Step`,
 `AI::MoveEscort`, `AI::KeepStation`, `AI::CircleAround`, `AI::MoveTo`,
-`AI::PickUp`, `AI::MoveToAttack` and `AI::TurnToward`) as it was when the scripts were written. After
+`AI::PickUp`, `AI::Attack`, `AI::MoveToAttack` and `AI::TurnToward`) as it
+was when the scripts were written. After
 `git fetch upstream`, the check compares the same blocks at `upstream/master`.
 For each one that changed, it shows the diff and the commits involved, and
 says which scripts to update and how to verify them:
@@ -420,7 +426,12 @@ Behavior that moved from C++ into scripts is then checked two ways:
   that branch. "attack" (how ships close in on a target while aiming at it,
   in battle and when mining) is checked against `AI::MoveToAttack`; it runs
   about 49,000 times in Al Dhanab and 6,000 in Ne-20, and reaches every
-  branch. "pick up" runs about 3,000 times across the scenarios but
+  branch. "fight" (whether to keep a safe distance from a ship, close in on
+  it, or just aim) is checked against `AI::Attack`; it runs about 76,000
+  times in the scenarios, but never for a ramming ship or one backing away
+  on reverse thrusters, which only the unit test covers. Situations near
+  the distance where a ship backs off are generated on purpose: otherwise
+  the slowdown distance, which only matters there, went untested. "pick up" runs about 3,000 times across the scenarios but
   never uses the afterburner or chases flotsam it cannot catch, which the unit
   test also covers. `AI::PickUp` also checked whether forward thrust was
   commanded before it ran; the script leaves that out, because facing
