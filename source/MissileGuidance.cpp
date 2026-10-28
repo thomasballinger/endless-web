@@ -39,6 +39,9 @@ namespace {
 		interface.AddInput("max-turn");
 		interface.AddInput("acceleration");
 		interface.AddInput("drag");
+		interface.AddInput("age");
+		interface.AddInput("lifetime-left");
+		interface.AddInput("target-facing");
 		interface.AddOutput("turn");
 		interface.AddOutput("thrust");
 		interface.AddEffect("drop-target");
@@ -113,15 +116,17 @@ const script::Program &MissileGuidance::Program() const
 
 string MissileGuidance::MissingCapability(const Weapon &weapon) const
 {
-	return MissingCapability(weapon.Leading(), weapon.ThrottleControl());
+	return MissingCapability(weapon.Leading(), weapon.ThrottleControl(), weapon.OpticalTracking() > 0.);
 }
 
 
 
-string MissileGuidance::MissingCapability(bool leading, bool throttleControl) const
+string MissileGuidance::MissingCapability(bool leading, bool throttleControl, bool optical) const
 {
 	if(!leading && program.Reads(TARGET_VELOCITY))
 		return "it reads \"target-velocity\", which requires \"leading\"";
+	if(!optical && program.Reads(TARGET_FACING))
+		return "it reads \"target-facing\", which requires \"optical tracking\"";
 	if(!throttleControl && program.Writes(THRUST))
 		return "it sets \"thrust\", which requires \"throttle control\"";
 	return "";
@@ -146,6 +151,9 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	variables[MAX_TURN] = script::Value(input.maxTurn);
 	variables[ACCELERATION] = script::Value(input.acceleration);
 	variables[DRAG] = script::Value(input.drag);
+	variables[AGE] = script::Value(static_cast<double>(input.age));
+	variables[LIFETIME_LEFT] = script::Value(static_cast<double>(input.lifetimeLeft));
+	variables[TARGET_FACING] = script::Value(locked ? input.targetFacing : Point());
 	variables[TURN] = script::Value(input.maxTurn);
 	variables[THRUST] = script::Value(input.acceleration);
 

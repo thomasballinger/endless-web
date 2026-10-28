@@ -64,6 +64,13 @@ public:
 		MAX_TURN,
 		ACCELERATION,
 		DRAG,
+		// How many steps since the projectile was fired, and how many until it
+		// expires.
+		AGE,
+		LIFETIME_LEFT,
+		// The unit vector the target faces. Seeing it takes an optical seeker,
+		// which sees the target's shape. Zero without a lock.
+		TARGET_FACING,
 		// Outputs: degrees to turn this step, and acceleration to apply. They
 		// start at the weapon's maximum turn rate and acceleration, and are
 		// limited to those after the script runs.
@@ -89,6 +96,9 @@ public:
 		double maxTurn = 0.;
 		double acceleration = 0.;
 		double drag = 0.;
+		int age = 0;
+		int lifetimeLeft = 0;
+		Point targetFacing;
 	};
 	// What the script decided.
 	class Output {
@@ -116,7 +126,7 @@ public:
 	// Describe a capability this script uses that the weapon lacks, or return
 	// an empty string if the weapon may use this script.
 	std::string MissingCapability(const Weapon &weapon) const;
-	std::string MissingCapability(bool leading, bool throttleControl) const;
+	std::string MissingCapability(bool leading, bool throttleControl, bool optical = false) const;
 
 	// Run the script. The turn and thrust are limited to what the weapon can
 	// do. Returns false, with no turn, if the script fails.

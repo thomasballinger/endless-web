@@ -209,6 +209,7 @@ namespace {
 void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 {
 	Random::Scope randomScope(RandomStream());
+	++age;
 	if(--lifetime <= 0)
 	{
 		if(death == DeathType::NATURAL || death == DeathType::ANTI_MISSILE)
@@ -368,12 +369,15 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	{
 		input.targetPosition = currentTarget->Position();
 		input.targetVelocity = currentTarget->Velocity();
+		input.targetFacing = currentTarget->Facing().Unit();
 	}
 	input.confused = isConfused;
 	input.confusionDirection = confusionDirection;
 	input.maxTurn = turn;
 	input.acceleration = accel;
 	input.drag = weapon->Drag();
+	input.age = age;
+	input.lifetimeLeft = lifetime;
 
 	MissileGuidance::Output output;
 	if(!guidance->Run(input, output, &guidanceMemory))

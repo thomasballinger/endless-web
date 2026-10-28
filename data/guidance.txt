@@ -18,6 +18,7 @@
 # A weapon's homing attributes are the capabilities of its guidance hardware:
 #   leading            it can measure its target's velocity ("target-velocity")
 #   throttle control   it can change its thrust (set "thrust")
+#   optical tracking   it can see which way its target faces ("target-facing")
 #   blindspot          it can't see behind itself: if its target is behind it,
 #                      it loses the target (this happens before the script runs)
 # Each weapon uses the default script below for its capabilities, or the
@@ -52,6 +53,10 @@
 #   target-position target-velocity          (zero without a lock)
 #   confused confusion-direction             the seeker's state (direction is 1 or -1)
 #   max-turn acceleration drag               the weapon's attributes
+#   age lifetime-left                        steps since it was fired, and until
+#                                            it expires
+#   target-facing                            the unit vector the target faces
+#                                            (zero without a lock)
 # Outputs (start at the weapon's turn rate and acceleration, and are limited to
 # those after the script runs):
 #   turn thrust

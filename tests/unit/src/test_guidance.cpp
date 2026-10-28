@@ -325,6 +325,33 @@ TEST_CASE( "Guidance scripts need the capabilities they use", "[MissileGuidance]
 			CHECK( guidance.MissingCapability(true, false).empty() );
 		}
 	}
+	GIVEN( "a script that reads which way the target faces" ) {
+		const MissileGuidance guidance = load("guidance test\n\tif (< (dot target-facing facing) 0)\n\t\tset turn 0");
+		REQUIRE( guidance.IsValid() );
+		THEN( "only weapons with optical tracking can use it" ) {
+			CHECK( !guidance.MissingCapability(true, true).empty() );
+			CHECK( guidance.MissingCapability(false, false, true).empty() );
+		}
+	}
+	GIVEN( "a script that reads its age and remaining lifetime" ) {
+		const MissileGuidance guidance = load("guidance test\n\tif (< age lifetime-left)\n\t\tset turn 0");
+		REQUIRE( guidance.IsValid() );
+		THEN( "any homing weapon can use it" ) {
+			CHECK( guidance.MissingCapability(false, false).empty() );
+		}
+		THEN( "it sees the projectile's age and lifetime" ) {
+			MissileGuidance::Input input;
+			input.maxTurn = 5.;
+			input.age = 3;
+			input.lifetimeLeft = 4;
+			MissileGuidance::Output output;
+			REQUIRE( guidance.Run(input, output) );
+			CHECK( output.turn == 0. );
+			input.age = 5;
+			REQUIRE( guidance.Run(input, output) );
+			CHECK( output.turn == 5. );
+		}
+	}
 	GIVEN( "a script that sets its thrust" ) {
 		const MissileGuidance guidance = load("guidance test\n\tset thrust 0");
 		REQUIRE( guidance.IsValid() );

@@ -143,6 +143,8 @@ private:
 	double clip = 1.;
 	// A non-zero positive value means the projectile is alive.
 	int lifetime = 0;
+	// How many steps since the projectile was created.
+	int age = 0;
 	// The manner by which this projectile died.
 	DeathType death = DeathType::NATURAL;
 	double distanceTraveled = 0.;
