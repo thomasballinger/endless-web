@@ -368,6 +368,11 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	if(input.hasLock)
 	{
 		input.targetPosition = currentTarget->Position();
+		// An imperfect seeker misjudges the bearing to its target by a
+		// different amount on each step.
+		if(weapon->SeekerNoise())
+			input.targetPosition = position
+				+ Angle(Random::Normal(0., weapon->SeekerNoise())).Rotate(input.targetPosition - position);
 		input.targetVelocity = currentTarget->Velocity();
 		input.targetFacing = currentTarget->Facing().Unit();
 	}

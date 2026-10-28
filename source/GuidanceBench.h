@@ -43,6 +43,8 @@ public:
 		std::vector<std::string> scriptFiles;
 		// The ship model to fire at.
 		std::string target = "Argosy";
+		// If not negative, the seeker noise to give the weapon, in degrees.
+		double seekerNoise = -1.;
 		// How many projectiles to fire in each scenario.
 		int trials = 20;
 		// If not empty, write every projectile's path to this file as JSON. With

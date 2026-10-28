@@ -1,0 +1,84 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Scripts for weapons whose seekers misjudge the bearing to the target
+# ("seeker noise" in a weapon's "homing" attributes, or --bench-seeker-noise
+# on the bench). None of them use "leading": each estimates the target's
+# velocity from the seeker's fixes, if at all, so they show what noise does
+# to a prediction. All four turn by the full angle to where they aim.
+#
+#   endless-sky --resources . --config tests/integration/config \
+#       --guidance-bench "Sidewinder Missile Launcher" --bench-target Hawk \
+#       --bench-seeker-noise 3 --bench-script tests/ai/guidance-noise.txt \
+#       --bench-guidance pursuit --bench-guidance "raw lead" \
+#       --bench-guidance "smoothed lead 0.2s" --bench-guidance "smoothed lead 1s"
+
+# Aim at the latest fix.
+guidance "pursuit"
+	if (not has-lock)
+		set turn (if confused (* turn confusion-direction) 0)
+		stop
+	let aim (- target-position position)
+	let desired (* to-deg (atan2 (cross facing aim) (dot facing aim)))
+	set turn (clamp desired (- turn) turn)
+
+# Estimate the target's velocity as the difference between the last two
+# fixes, and aim where that puts the target 0.2 seconds (12 steps) from now.
+guidance "raw lead"
+	memory last-fix (vec 0 0)
+	memory has-fix false
+	if (not has-lock)
+		set has-fix false
+		set turn (if confused (* turn confusion-direction) 0)
+		stop
+	let estimate (if has-fix (- target-position last-fix) (vec 0 0))
+	set last-fix target-position
+	set has-fix true
+	let aim (- (+ target-position (* estimate 12)) position)
+	let desired (* to-deg (atan2 (cross facing aim) (dot facing aim)))
+	set turn (clamp desired (- turn) turn)
+
+# The same, but move the velocity estimate only a tenth of the way toward each
+# new difference, which smooths out the noise but reacts more slowly.
+guidance "smoothed lead 0.2s"
+	memory last-fix (vec 0 0)
+	memory has-fix false
+	memory estimate (vec 0 0)
+	if (not has-lock)
+		set has-fix false
+		set turn (if confused (* turn confusion-direction) 0)
+		stop
+	if has-fix
+		set estimate (+ estimate (* .1 (- (- target-position last-fix) estimate)))
+	set last-fix target-position
+	set has-fix true
+	let aim (- (+ target-position (* estimate 12)) position)
+	let desired (* to-deg (atan2 (cross facing aim) (dot facing aim)))
+	set turn (clamp desired (- turn) turn)
+
+# The same smoothing, aiming a whole second (60 steps) ahead.
+guidance "smoothed lead 1s"
+	memory last-fix (vec 0 0)
+	memory has-fix false
+	memory estimate (vec 0 0)
+	if (not has-lock)
+		set has-fix false
+		set turn (if confused (* turn confusion-direction) 0)
+		stop
+	if has-fix
+		set estimate (+ estimate (* .1 (- (- target-position last-fix) estimate)))
+	set last-fix target-position
+	set has-fix true
+	let aim (- (+ target-position (* estimate 60)) position)
+	let desired (* to-deg (atan2 (cross facing aim) (dot facing aim)))
+	set turn (clamp desired (- turn) turn)

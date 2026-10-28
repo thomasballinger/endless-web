@@ -251,7 +251,9 @@ bool GuidanceBench::Run(const Options &options)
 		fprintf(stderr, "\"%s\" is not a homing weapon.\n", options.outfit.c_str());
 		return false;
 	}
-	const Weapon &original = *outfit->GetWeapon();
+	Weapon original = *outfit->GetWeapon();
+	if(options.seekerNoise >= 0.)
+		original.SetSeekerNoise(options.seekerNoise);
 
 	// Scripts loaded from files must outlive the weapons that point to them.
 	map<string, MissileGuidance> fileScripts;
@@ -377,6 +379,8 @@ bool GuidanceBench::Run(const Options &options)
 	if(!several)
 	{
 		printf("Guidance bench: %s, guidance \"%s\"\n", options.outfit.c_str(), labels[0].c_str());
+		if(original.SeekerNoise())
+			printf("Seeker noise: %g degrees.\n", original.SeekerNoise());
 		printf("Target: %s, moving at %.1f, starting %.0f away. %d shots per scenario.\n\n",
 			options.target.c_str(), speed, distance, options.trials);
 		printf("%-28s %7s %12s %14s\n", "scenario", "hits", "mean steps", "closest miss");
@@ -395,6 +399,8 @@ bool GuidanceBench::Run(const Options &options)
 
 	// Several scripts: one column of hits and mean steps to impact for each.
 	printf("Guidance bench: %s, comparing %zu guidance scripts\n", options.outfit.c_str(), weapons.size());
+	if(original.SeekerNoise())
+		printf("Seeker noise: %g degrees.\n", original.SeekerNoise());
 	printf("Target: %s, moving at %.1f, starting %.0f away. %d shots per scenario.\n",
 		options.target.c_str(), speed, distance, options.trials);
 	printf("Each column shows hits, and the mean steps to impact, for one script:\n");

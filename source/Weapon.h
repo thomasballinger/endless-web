@@ -175,10 +175,16 @@ public:
 	bool HasBlindspot() const;
 	bool ThrottleControl() const;
 	bool Leading() const;
+	// How far off, in degrees (one standard deviation), the seeker's bearing to
+	// its target is on each step. The guidance script sees the target where
+	// the seeker thinks it is. Zero (the default) for a perfect seeker.
+	double SeekerNoise() const;
 	// The script that steers this weapon's projectiles, or null to use the default.
 	const MissileGuidance *Guidance() const;
 	// Use a different guidance script (e.g. to compare scripts on the bench).
 	void SetGuidance(const MissileGuidance *guidance);
+	// Use a different seeker noise (e.g. to see how scripts cope with it).
+	void SetSeekerNoise(double degrees);
 
 	// These values include all submunitions:
 	// Normal damage types:
@@ -281,6 +287,7 @@ private:
 	bool blindspot = false;
 	bool throttleControl = false;
 	bool leading = false;
+	double seekerNoise = 0.;
 	const MissileGuidance *guidance = nullptr;
 
 	// Attributes.
@@ -471,6 +478,7 @@ inline bool Weapon::Homing() const { return homing; }
 inline bool Weapon::HasBlindspot() const { return blindspot; }
 inline bool Weapon::ThrottleControl() const { return throttleControl; }
 inline bool Weapon::Leading() const { return leading; }
+inline double Weapon::SeekerNoise() const { return seekerNoise; }
 inline const MissileGuidance *Weapon::Guidance() const { return guidance; }
 
 inline double Weapon::ShieldDamage() const { return TotalDamage(SHIELD_DAMAGE); }

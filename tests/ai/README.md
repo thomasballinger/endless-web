@@ -235,9 +235,15 @@ For the Sidewinder Missile Launcher, against an Argosy, 20 shots each:
 
 The default never hits a target directly behind it: the built-in steering
 turns by `asin(cross(facing, direction))`, which is 0 for a target exactly
-behind, so the missile never turns around. Proportional navigation fixes
-that, but a target that reverses every second fools it, because it steers by
-how the line of sight moved since the last step.
+behind, so the missile never turns around. That only happens for a target
+*exactly* behind, as on the bench: for one even slightly to the side, the
+default turns at its full rate and comes around. With a seeker that misjudges
+the bearing by 0.1 degrees (`--bench-seeker-noise 0.1`), the default hits 16
+of 20 against the Hawk behind it. So the bench overstates how much the
+scripts below gain by turning around; in a battle, a target is rarely
+exactly behind a missile. Proportional navigation also turns around, but a
+target that reverses every second fools it, because it steers by how the
+line of sight moved since the last step.
 
 ### Faster targets
 
@@ -253,7 +259,8 @@ from `--bench-target`:
 | Fury (13.4) | 38 | 52 | 58 | 36 | 58 |
 
 Against these, nothing catches a target fleeing or crossing straight ahead.
-"Intercept" (from `intercept-missiles`) gains on "full turn" in the jinking
+Most of what "full turn" and "intercept" gain is the target exactly behind
+(see above). "Intercept" (from `intercept-missiles`) gains on "full turn" in the jinking
 and circling scenarios: the default's lead is one step of an estimate,
 which is close enough against the Argosy (where intercept and the default
 hit with the same shots) but not against a target turning quickly.
@@ -283,12 +290,48 @@ endless-sky --resources . --config tests/integration/config \
   dot products instead of `asin` of the cross product alone. A target behind
   is then 180 degrees away rather than 0, so the missile turns around. Nothing
   else changes: in every other scenario its shots are identical to the
-  default's.
+  default's. (This fixes a target *exactly* behind, which is rare in a
+  battle; see above.)
 - **Full throttle** never cuts thrust to turn more tightly. For this weapon it
   makes almost no difference.
 - **No lead** aims at the target rather than ahead of it. That does better
   against a target that reverses every second (it isn't fooled into leading
   the wrong way) and worse against one crossing in a straight line.
+
+### Imperfect seekers
+
+A weapon's `homing` block can now give a `"seeker noise"` in degrees: on each
+step, the seeker misjudges the bearing to its target by a random angle with
+that standard deviation (drawn from the projectile's own random stream), and
+the script sees the target where the seeker thinks it is. No weapon in the
+game has it, so nothing changes unless a plugin adds it.
+`--bench-seeker-noise DEGREES` sets it on the bench.
+
+This is hardware, which no script can improve; what a script can choose is
+how to use noisy fixes. `tests/ai/guidance-noise.txt` holds four scripts that
+estimate the target's velocity themselves from successive fixes (none use
+"leading"). Total hits of 160 for the Sidewinder:
+
+| Target, noise | Pursuit | Raw lead 0.2 s | Smoothed lead 0.2 s | Smoothed lead 1 s |
+|---|---|---|---|---|
+| Argosy, none | 156 | 156 | 156 | 111 |
+| Argosy, 3° | 156 | 93 | 153 | 94 |
+| Hawk, none | 70 | 74 | 69 | 56 |
+| Hawk, 1° | 74 | 63 | 73 | 50 |
+| Hawk, 3° | 73 | 40 | 65 | 45 |
+
+- Aiming 0.2 seconds ahead using the difference between the last two fixes
+  is the best of these against the Hawk with a perfect seeker, and falls
+  apart with 3 degrees of noise: the difference between two noisy fixes is
+  mostly noise.
+- Smoothing the estimate (moving it a tenth of the way toward each new
+  difference) recovers most of that, but reacts more slowly.
+- Aiming a whole second ahead overshoots, with or without noise.
+- Pursuit barely notices the noise: the errors average out over its turns.
+
+So how far ahead to aim, and how much to smooth, are real trade-offs that
+depend on the seeker and the target, which is the kind of change a script
+should be able to make. The seeker's quality is not.
 
 ## Keeping scripts in sync with the C++ code
 

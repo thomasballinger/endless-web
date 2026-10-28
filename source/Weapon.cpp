@@ -108,6 +108,8 @@ void Weapon::Load(const DataNode &node)
 					throttleControl = true;
 				else if(grandKey == "leading")
 					leading = true;
+				else if(grandKey == "seeker noise" && grand.Size() >= 2)
+					seekerNoise = max(0., grand.Value(1));
 				else
 					grand.PrintTrace("Skipping unknown homing attribute:");
 			}
@@ -654,4 +656,11 @@ double Weapon::Inaccuracy() const
 void Weapon::SetGuidance(const MissileGuidance *guidance)
 {
 	this->guidance = guidance;
+}
+
+
+
+void Weapon::SetSeekerNoise(double degrees)
+{
+	seekerNoise = max(0., degrees);
 }
