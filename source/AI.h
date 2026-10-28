@@ -213,6 +213,8 @@ private:
 	void DoSurveillance(Ship &ship, Command &command, std::shared_ptr<Ship> &target);
 	void DoMining(Ship &ship, Command &command);
 	bool DoHarvesting(Ship &ship, Command &command) const;
+	// Choose flotsam for a ship to chase, with the "flotsam" choice script.
+	std::shared_ptr<Flotsam> ChooseFlotsam(const Ship &ship) const;
 	bool DoCloak(const Ship &ship, Command &command) const;
 	void DoPatrol(Ship &ship, Command &command) const;
 	// Prevent ships from stacking on each other when many are moving in sync.

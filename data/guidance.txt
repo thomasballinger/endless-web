@@ -45,6 +45,11 @@
 #                                (only allowed outside of any block); call it
 #                                like any other, as (<name> <argument>...)
 #   return <expression>          give a function's value and end it
+#   for <name> in <list>         run the statements below once for each
+#                                record in a list the game provides (none do
+#                                for guidance yet; see choices.txt), reading
+#                                its fields as <name>.<field>, and its place
+#                                in the list as <name>.index
 # A function sees its parameters, its own variables, the inputs and outputs,
 # and functions defined above it; it can't change outputs, use memory or
 # effects, or stop the script.

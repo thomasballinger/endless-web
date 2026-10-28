@@ -50,6 +50,8 @@ target_sources(EndlessSkyLib PRIVATE
 	CategoryList.cpp
 	CategoryList.h
 	CategoryType.h
+	ChoiceScript.cpp
+	ChoiceScript.h
 	ClickZone.h
 	Collision.cpp
 	Collision.h

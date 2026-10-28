@@ -346,6 +346,48 @@ code on 50,000 situations, checking both the result and that it draws the
 same number of random numbers. Aiming at targets is still C++; it is the
 natural next step for turret scripts (point defense, for example).
 
+## Two ways for scripts to handle lists
+
+Choosing among several things (which flotsam to pick up, which ship to
+shoot, which missile to stop) means looking at a list. There are two
+versions of the same choice, which flotsam a ship chases, from
+`AI::DoHarvesting`; both make exactly the choices the C++ did. Whether a
+ship can pick a piece up at all stays in C++, as a game rule.
+
+**A. Rate each candidate** (`rate "flotsam"` in `data/choices.txt`, used by
+default). The game runs the script once per candidate, with the candidate's
+position and velocity as inputs; the script sets a `score` or triggers
+`skip`, and the game keeps the lowest score. The language needed nothing new.
+
+**B. Choose from the list** (`choose "flotsam"` in
+`tests/ai/plugins/choose-flotsam`). The script gets every candidate as a
+list, loops over it with `for f in flotsam`, reads `f.position`,
+`f.velocity` and `f.index`, and sets `chosen`. This needed lists of records,
+a `for` statement and field access in the language. A record can only be
+used through its fields: it can't be copied into a variable or memory, so
+it can never outlive the run it was given to.
+
+How they compare:
+
+| | Rate each | Choose from the list |
+|---|---|---|
+| Script length | 13 lines | 12 lines, nested three levels deeper |
+| Who decides "best" | the game (lowest score) | the script |
+| Can weigh candidates against each other (e.g. prefer clusters, avoid what an escort is already chasing) | no | yes |
+| New language features | none | lists, records, `for`, fields |
+| Runs in Al Dhanab | 8,608 (once per candidate) | 487 (once per choice) |
+| Time per choice, about 4.5 candidates | 7–8.5 µs | 9–10 µs |
+| The same choice in C++ | 0.2–0.3 µs | |
+
+Both give the same state hashes as the reference build in all three
+scenarios, and a script that changes one threshold changes Al Dhanab.
+`tests/unit/src/test_choiceScript.cpp` compares both with a copy of the old
+code on 20,000 generated situations; `endless-sky-tests "[.choice-speed]"`
+times them. "Rate each" is simpler and enough for "pick the best by some
+measure"; "choose" is what a script needs to reason about the set as a
+whole. They can coexist: the game uses a "choose" script if one is defined,
+and otherwise the "rate" script.
+
 ## Language design notes
 
 The script language is being designed as it's used. Rules so far, and why:

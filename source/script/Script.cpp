@@ -49,6 +49,16 @@ Value::Value(const Point &vector)
 {
 }
 
+Value::Value(const RecordList &list)
+	: type(Type::LIST), list(&list)
+{
+}
+
+Value::Value(const RecordList &list, size_t record)
+	: type(Type::RECORD), list(&list), record(record)
+{
+}
+
 Value::Type Value::GetType() const
 {
 	return type;
@@ -69,6 +79,16 @@ const Point &Value::Vector() const
 	return vector;
 }
 
+const RecordList *Value::List() const
+{
+	return list;
+}
+
+size_t Value::Record() const
+{
+	return record;
+}
+
 const char *Value::TypeName(Type type)
 {
 	switch(type)
@@ -79,8 +99,44 @@ const char *Value::TypeName(Type type)
 			return "boolean";
 		case Type::VECTOR:
 			return "vector";
+		case Type::LIST:
+			return "list";
+		case Type::RECORD:
+			return "record";
 	}
 	return "unknown";
+}
+
+
+
+RecordList::RecordList(int fieldCount)
+	: fieldCount(fieldCount)
+{
+}
+
+void RecordList::Clear()
+{
+	values.clear();
+}
+
+void RecordList::Add()
+{
+	values.resize(values.size() + fieldCount);
+}
+
+void RecordList::SetField(int field, const Value &value)
+{
+	values[values.size() - fieldCount + field] = value;
+}
+
+size_t RecordList::Size() const
+{
+	return fieldCount ? values.size() / fieldCount : 0;
+}
+
+const Value &RecordList::Field(size_t record, int field) const
+{
+	return values[record * fieldCount + field];
 }
 
 
@@ -89,13 +145,22 @@ int Interface::AddInput(const string &name)
 {
 	variables.push_back(name);
 	outputs.push_back(false);
+	listFields.emplace_back();
 	return static_cast<int>(variables.size()) - 1;
+}
+
+int Interface::AddList(const string &name, const vector<string> &fields)
+{
+	int variable = AddInput(name);
+	listFields.back() = fields;
+	return variable;
 }
 
 int Interface::AddOutput(const string &name)
 {
 	variables.push_back(name);
 	outputs.push_back(true);
+	listFields.emplace_back();
 	return static_cast<int>(variables.size()) - 1;
 }
 
@@ -162,6 +227,22 @@ int Interface::Find(const string &name) const
 bool Interface::IsOutput(int variable) const
 {
 	return variable >= 0 && variable < static_cast<int>(outputs.size()) && outputs[variable];
+}
+
+bool Interface::IsList(int variable) const
+{
+	return variable >= 0 && variable < static_cast<int>(listFields.size()) && !listFields[variable].empty();
+}
+
+int Interface::FindField(int list, const string &field) const
+{
+	if(!IsList(list))
+		return -1;
+	const vector<string> &fields = listFields[list];
+	for(size_t i = 0; i < fields.size(); ++i)
+		if(fields[i] == field)
+			return static_cast<int>(i);
+	return -1;
 }
 
 int Interface::FindEffect(const string &name) const
@@ -327,13 +408,14 @@ class Program::Implementation {
 public:
 	class Expression {
 	public:
-		enum class Kind { CONSTANT, VARIABLE, CALL, HOST, FUNCTION };
+		enum class Kind { CONSTANT, VARIABLE, CALL, HOST, FUNCTION, FIELD };
 		Kind kind = Kind::CONSTANT;
 		Value constant;
 		int slot = -1;
 		Builtin builtin = Builtin::ADD;
 		// For HOST: which of the interface's functions to call. For FUNCTION:
-		// which of the script's own functions.
+		// which of the script's own functions. For FIELD: which field of the
+		// record in the slot (-1 for the record's index in its list).
 		int function = -1;
 		vector<Expression> arguments;
 	};
@@ -341,13 +423,16 @@ public:
 	class Block;
 	class Statement {
 	public:
-		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY, RETURN };
+		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY, RETURN, FOR };
 		Kind kind = Kind::STOP;
 		int slot = -1;
 		Expression expression;
 		int effect = -1;
 		// For MEMORY: which of the program's memory values this is.
 		int memory = -1;
+		// For FOR: the slot of the list to loop over (the loop variable is in
+		// "slot", and the loop's statements in blocks[0]).
+		int list = -1;
 		// For IF: the condition and block of the "if" and each "elif", then
 		// an optional "else" block with no condition.
 		vector<Expression> conditions;
@@ -420,6 +505,9 @@ private:
 	vector<map<string, int>> scopes;
 	// The function being compiled, if any.
 	const Function *compilingFunction = nullptr;
+	// The loop variables in scope, which hold records, and the list input
+	// each one loops over.
+	map<int, int> recordSlots;
 	size_t statementCount = 0;
 	mutable bool reportedError = false;
 	mutable string error;
@@ -439,6 +527,7 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 	memorySlots.clear();
 	functions.clear();
 	compilingFunction = nullptr;
+	recordSlots.clear();
 	scopes.assign(1, {});
 	body = Block();
 	valid = CompileBlock(node, body);
@@ -504,10 +593,49 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			block.statements.push_back(std::move(statement));
 			continue;
 		}
+		if(keyword == "for")
+		{
+			// "for <name> in <list>", with the loop's statements below it.
+			if(argumentCount != 3 || !line.items[1].IsAtom() || !line.items[3].IsAtom() || line.items[2].atom != "in"
+					|| !child.HasChildren())
+			{
+				child.PrintTrace("Expected \"for <name> in <list>\" with statements below it:");
+				ok = false;
+				continue;
+			}
+			const string &variable = line.items[1].atom;
+			const string &listName = line.items[3].atom;
+			statement.list = Lookup(listName);
+			if(!interface->IsList(statement.list))
+			{
+				child.PrintTrace("\"" + listName + "\" is not a list:");
+				ok = false;
+				continue;
+			}
+			if(IsTaken(variable))
+			{
+				child.PrintTrace("\"" + variable + "\" is already defined:");
+				ok = false;
+				continue;
+			}
+			reads[statement.list] = true;
+			statement.kind = Statement::Kind::FOR;
+			statement.slot = slotCount++;
+			// The loop variable is only visible inside the loop.
+			scopes.emplace_back();
+			scopes.back()[variable] = statement.slot;
+			recordSlots[statement.slot] = statement.list;
+			statement.blocks.emplace_back();
+			ok &= CompileBlock(child, statement.blocks.back());
+			recordSlots.erase(statement.slot);
+			scopes.pop_back();
+			block.statements.push_back(std::move(statement));
+			continue;
+		}
 		if(compilingFunction && keyword != "let" && keyword != "set" && keyword != "if"
 				&& keyword != "elif" && keyword != "else")
 		{
-			child.PrintTrace("A function can only use \"let\", \"set\", \"if\" and \"return\":");
+			child.PrintTrace("A function can only use \"let\", \"set\", \"if\", \"for\" and \"return\":");
 			ok = false;
 			continue;
 		}
@@ -741,11 +869,46 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 			expression.constant = Value(constant->second);
 			return true;
 		}
+		// A loop variable's fields: "name.field".
+		size_t dot = source.atom.find('.');
+		if(dot != string::npos)
+		{
+			const string base = source.atom.substr(0, dot);
+			const string field = source.atom.substr(dot + 1);
+			expression.slot = Lookup(base);
+			auto record = recordSlots.find(expression.slot);
+			if(record == recordSlots.end())
+			{
+				node.PrintTrace("\"" + base + "\" has no fields; only a \"for\" loop's variable does:");
+				return false;
+			}
+			expression.kind = Expression::Kind::FIELD;
+			expression.function = (field == "index") ? -1 : interface->FindField(record->second, field);
+			if(field != "index" && expression.function < 0)
+			{
+				node.PrintTrace("\"" + interface->VariableName(record->second) + "\" has no field \"" + field + "\":");
+				return false;
+			}
+			return true;
+		}
 		expression.kind = Expression::Kind::VARIABLE;
 		expression.slot = Lookup(source.atom);
 		if(expression.slot < 0)
 		{
 			node.PrintTrace("Unknown variable \"" + source.atom + "\":");
+			return false;
+		}
+		// Lists and records can't be copied or compared, only looped over
+		// and read, so they can never outlive the run they were given to.
+		if(interface->IsList(expression.slot))
+		{
+			node.PrintTrace("\"" + source.atom + "\" is a list; loop over it with \"for\":");
+			return false;
+		}
+		if(recordSlots.contains(expression.slot))
+		{
+			node.PrintTrace("\"" + source.atom + "\" is a record; use its fields, like \"" + source.atom
+				+ ".index\":");
 			return false;
 		}
 		if(expression.slot < interface->VariableCount())
@@ -963,6 +1126,29 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 				if(!Evaluate(statement.expression, variables, steps, variables[statement.slot]))
 					return Result::ERROR;
 				return Result::RETURN;
+			case Statement::Kind::FOR:
+			{
+				const Value &listValue = variables[statement.list];
+				if(listValue.GetType() != Value::Type::LIST || !listValue.List())
+				{
+					Fail("the host didn't give the script the list it loops over");
+					return Result::ERROR;
+				}
+				const RecordList &list = *listValue.List();
+				for(size_t i = 0; i < list.Size(); ++i)
+				{
+					if(++steps > MAX_STEPS)
+					{
+						Fail("ran for too many steps");
+						return Result::ERROR;
+					}
+					variables[statement.slot] = Value(list, i);
+					Result result = RunBlock(statement.blocks.front(), variables, effects, memory, steps);
+					if(result != Result::CONTINUE)
+						return result;
+				}
+				break;
+			}
 			case Statement::Kind::MEMORY:
 			{
 				// The initial value is only used on the first run.
@@ -999,6 +1185,15 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			return true;
 		case Expression::Kind::CALL:
 			break;
+		case Expression::Kind::FIELD:
+		{
+			const Value &record = variables[expression.slot];
+			if(expression.function < 0)
+				result = Value(static_cast<double>(record.Record()));
+			else
+				result = record.List()->Field(record.Record(), expression.function);
+			return true;
+		}
 		case Expression::Kind::FUNCTION:
 		{
 			const Function &function = functions[expression.function];

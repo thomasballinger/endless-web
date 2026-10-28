@@ -1,0 +1,55 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Choice scripts help a ship choose one of several things. For now the only
+# choice is which flotsam a ship chases to pick up, named "flotsam". There are
+# two ways to write one:
+#
+# A "rate" script looks at one candidate at a time, and either sets a score
+# or triggers "skip". The game runs it for each piece of flotsam the ship can
+# pick up, and chooses the lowest score (the first, if several are equal).
+# Inputs:
+#   position velocity facing max-velocity turn-rate   the ship's own
+#   yours                                             whether it is the player's
+#   candidate-position candidate-velocity             the flotsam's
+# Output:
+#   score
+#
+# A "choose" script gets every candidate at once, as a list it loops over
+# with "for f in flotsam", reading f.position, f.velocity and f.index, and
+# sets "chosen" to the index of the one it chooses (it starts at -1, for
+# none). If a "choose" script named "flotsam" is defined, the game uses it
+# instead of the "rate" script. tests/ai/plugins/choose-flotsam has one that
+# makes the same choices as the script below.
+#
+# Both can call (rendezvous-time offset velocity speed).
+
+# Chase whatever flotsam the ship can reach soonest, counting the time it
+# takes to turn toward it, as long as that is under 10 seconds. Only consider
+# flotsam within 800 units, and (unless it is the player's ship, or it is very
+# close) roughly ahead of the ship. This reproduces the game's built-in
+# behavior exactly.
+rate "flotsam"
+	let offset (- candidate-position position)
+	let range (length offset)
+	let alignment (dot (unit offset) facing)
+	if (or (> range 800) (and (> range 100) (< alignment .9) (not yours)))
+		skip
+		stop
+	let time (rendezvous-time offset (- candidate-velocity velocity) max-velocity)
+	if (is-nan time)
+		skip
+		stop
+	set score (+ time (/ (* to-deg (acos (min 1 (max -1 alignment)))) turn-rate))
+	if (not (< score 600))
+		skip

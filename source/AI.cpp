@@ -16,6 +16,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "AI.h"
 
 #include "audio/Audio.h"
+#include "ChoiceScript.h"
 #include "Command.h"
 #include "ConditionsStore.h"
 #include "DistanceMap.h"
@@ -3496,6 +3497,73 @@ void AI::DoMining(Ship &ship, Command &command)
 
 
 
+// Choose flotsam for the given ship to chase, from the flotsam it can pick
+// up. Which one is up to the "flotsam" choice script: a "choose" script if
+// one is defined, which looks at the whole list, and otherwise a "rate"
+// script, run for each candidate, of which the lowest score wins.
+shared_ptr<Flotsam> AI::ChooseFlotsam(const Ship &ship) const
+{
+	const set<const Flotsam *> &avoid = ship.GetTractorFlotsam();
+	ChoiceScript::Input input;
+	input.position = ship.Position();
+	input.velocity = ship.Velocity();
+	input.facing = ship.Facing().Unit();
+	input.maxVelocity = ship.MaxVelocity();
+	input.turnRate = ship.TurnRate();
+	input.yours = ship.IsYours();
+
+	const ChoiceScript *chooser = GameData::ChooseScripts().Find("flotsam");
+	if(chooser && chooser->IsValid())
+	{
+		thread_local vector<shared_ptr<Flotsam>> candidates;
+		thread_local script::RecordList list(2);
+		candidates.clear();
+		list.Clear();
+		for(const shared_ptr<Flotsam> &it : flotsam)
+			if(ship.CanPickUp(*it) && !avoid.contains(it.get()))
+			{
+				candidates.push_back(it);
+				list.Add();
+				list.SetField(0, script::Value(it->Position()));
+				list.SetField(1, script::Value(it->Velocity()));
+			}
+		input.candidates = &list;
+		int chosen = chooser->Choose(input);
+		shared_ptr<Flotsam> result = chosen >= 0 ? candidates[chosen] : nullptr;
+		candidates.clear();
+		return result;
+	}
+
+	const ChoiceScript *rater = GameData::RateScripts().Find("flotsam");
+	if(!rater || !rater->IsValid())
+	{
+		static bool warned = false;
+		if(!warned)
+			Logger::Log("No valid \"flotsam\" rate or choose script is defined; ships will not pick up flotsam.",
+				Logger::Level::ERROR);
+		warned = true;
+		return nullptr;
+	}
+	shared_ptr<Flotsam> best;
+	double bestScore = numeric_limits<double>::infinity();
+	for(const shared_ptr<Flotsam> &it : flotsam)
+	{
+		if(!ship.CanPickUp(*it) || avoid.contains(it.get()))
+			continue;
+		input.candidatePosition = it->Position();
+		input.candidateVelocity = it->Velocity();
+		double score = 0.;
+		if(rater->Rate(input, score) && score < bestScore)
+		{
+			bestScore = score;
+			best = it;
+		}
+	}
+	return best;
+}
+
+
+
 bool AI::DoHarvesting(Ship &ship, Command &command) const
 {
 	// If the ship has no target to pick up, do nothing.
@@ -3513,36 +3581,7 @@ bool AI::DoHarvesting(Ship &ship, Command &command) const
 		if(Random::Int(10))
 			return false;
 
-		// Don't chase anything that will take more than 10 seconds to reach.
-		double bestTime = 600.;
-		for(const shared_ptr<Flotsam> &it : flotsam)
-		{
-			if(!ship.CanPickUp(*it) || avoid.contains(it.get()))
-				continue;
-			// Only pick up flotsam that is nearby and that you are facing toward. Player escorts should
-			// always attempt to pick up nearby flotsams when they are given a harvest order, and so ignore
-			// the facing angle check.
-			Point p = it->Position() - ship.Position();
-			double range = p.Length();
-			// Player ships do not have a restricted field of view so that they target flotsam behind them.
-			if(range > 800. || (range > 100. && p.Unit().Dot(ship.Facing().Unit()) < .9 && !ship.IsYours()))
-				continue;
-
-			// Estimate how long it would take to intercept this flotsam.
-			Point v = it->Velocity() - ship.Velocity();
-			double vMax = ship.MaxVelocity();
-			double time = RendezvousTime(p, v, vMax);
-			if(std::isnan(time))
-				continue;
-
-			double degreesToTurn = TO_DEG * acos(min(1., max(-1., p.Unit().Dot(ship.Facing().Unit()))));
-			time += degreesToTurn / ship.TurnRate();
-			if(time < bestTime)
-			{
-				bestTime = time;
-				target = it;
-			}
-		}
+		target = ChooseFlotsam(ship);
 		if(!target)
 			return false;
 

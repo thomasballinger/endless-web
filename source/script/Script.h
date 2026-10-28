@@ -51,19 +51,29 @@ class DataNode;
 // effects (actions with no arguments) it may trigger.
 namespace script {
 
+class RecordList;
+
 class Value {
 public:
-	enum class Type : uint8_t { NUMBER, BOOLEAN, VECTOR };
+	// A LIST is a list of records the host gave the script, and a RECORD is
+	// one of them. Scripts can only loop over lists and read records' fields.
+	enum class Type : uint8_t { NUMBER, BOOLEAN, VECTOR, LIST, RECORD };
 
 	Value();
 	explicit Value(double number);
 	explicit Value(bool boolean);
 	explicit Value(const Point &vector);
+	explicit Value(const RecordList &list);
+	Value(const RecordList &list, size_t record);
 
 	Type GetType() const;
 	double Number() const;
 	bool Boolean() const;
 	const Point &Vector() const;
+	// For a list or record: the list.
+	const RecordList *List() const;
+	// For a record: its index in the list.
+	size_t Record() const;
 
 	static const char *TypeName(Type type);
 
@@ -73,6 +83,32 @@ private:
 	double number = 0.;
 	bool boolean = false;
 	Point vector;
+	const RecordList *list = nullptr;
+	size_t record = 0;
+};
+
+
+
+// A list of records, such as the flotsam near a ship, that a host gives to a
+// script as an input. Every record has the same fields, which the host names
+// when it adds the list to its interface. A script can only read the list
+// while it runs, so the host may reuse it afterward.
+class RecordList {
+public:
+	explicit RecordList(int fieldCount);
+
+	void Clear();
+	// Add a record. Set its fields with SetField().
+	void Add();
+	void SetField(int field, const Value &value);
+
+	size_t Size() const;
+	const Value &Field(size_t record, int field) const;
+
+
+private:
+	int fieldCount = 0;
+	std::vector<Value> values;
 };
 
 
@@ -83,6 +119,9 @@ public:
 	// Variables are numbered in the order they are added; a program's first
 	// variables are always the interface's, in the same order.
 	int AddInput(const std::string &name);
+	// Add an input that is a list of records with the given fields, which
+	// scripts can loop over with "for".
+	int AddList(const std::string &name, const std::vector<std::string> &fields);
 	int AddOutput(const std::string &name);
 	int AddEffect(const std::string &name);
 	// A function the host provides, such as a game calculation scripts may
@@ -97,6 +136,9 @@ public:
 	const std::string &EffectName(int effect) const;
 	int Find(const std::string &name) const;
 	bool IsOutput(int variable) const;
+	bool IsList(int variable) const;
+	// The names of the fields of a list's records, or -1 if there is no such field.
+	int FindField(int list, const std::string &field) const;
 	int FindEffect(const std::string &name) const;
 	int FindFunction(const std::string &name) const;
 	int FunctionArgumentCount(int function) const;
@@ -106,6 +148,8 @@ public:
 private:
 	std::vector<std::string> variables;
 	std::vector<bool> outputs;
+	// For each list input, the names of its records' fields.
+	std::vector<std::vector<std::string>> listFields;
 	std::vector<std::string> effects;
 	std::vector<std::string> functionNames;
 	std::vector<int> functionArgumentCounts;

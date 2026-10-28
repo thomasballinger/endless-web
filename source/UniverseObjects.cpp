@@ -481,6 +481,13 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 			turretScripts.Get(node.Token(1))->Load(node);
 			RecordScriptSource(scriptFiles, scriptSources, path, "turret " + node.Token(1));
 		}
+		else if((key == "rate" || key == "choose") && hasValue)
+		{
+			const bool isRate = (key == "rate");
+			(isRate ? rateScripts : chooseScripts).Get(node.Token(1))->Load(node,
+				isRate ? ChoiceScript::Kind::RATE : ChoiceScript::Kind::CHOOSE);
+			RecordScriptSource(scriptFiles, scriptSources, path, key + " " + node.Token(1));
+		}
 		else if(key == "formation" && hasValue)
 		{
 			FormationPattern *formation = formations.Get(node.Token(1));
@@ -836,6 +843,19 @@ vector<string> UniverseObjects::ReloadChangedScripts()
 				else
 				{
 					*maneuvers.Get(node.Token(1)) = std::move(script);
+					reloaded.push_back(node.Token(1));
+				}
+			}
+			else if((key == "rate" || key == "choose") && isFromHere(key + " " + node.Token(1)))
+			{
+				const bool isRate = (key == "rate");
+				ChoiceScript script;
+				script.Load(node, isRate ? ChoiceScript::Kind::RATE : ChoiceScript::Kind::CHOOSE);
+				if(!script.IsValid())
+					failed.push_back(node.Token(1));
+				else
+				{
+					*(isRate ? rateScripts : chooseScripts).Get(node.Token(1)) = std::move(script);
 					reloaded.push_back(node.Token(1));
 				}
 			}

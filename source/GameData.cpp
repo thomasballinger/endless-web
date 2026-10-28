@@ -677,6 +677,20 @@ const Set<TurretScript> &GameData::TurretScripts()
 
 
 
+const Set<ChoiceScript> &GameData::RateScripts()
+{
+	return objects.rateScripts;
+}
+
+
+
+const Set<ChoiceScript> &GameData::ChooseScripts()
+{
+	return objects.chooseScripts;
+}
+
+
+
 const Set<Minable> &GameData::Minables()
 {
 	return objects.minables;

@@ -1,0 +1,30 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Example: the game's "flotsam" choice written as a "choose" script, which
+# loops over the list of candidates itself, instead of as a "rate" script,
+# which rates one candidate at a time (see data/choices.txt). It makes exactly
+# the same choices; compare the two to see how each way reads.
+choose "flotsam"
+	let best-time 600
+	for f in flotsam
+		let offset (- f.position position)
+		let range (length offset)
+		let alignment (dot (unit offset) facing)
+		if (not (or (> range 800) (and (> range 100) (< alignment .9) (not yours))))
+			let time (rendezvous-time offset (- f.velocity velocity) max-velocity)
+			if (not (is-nan time))
+				set time (+ time (/ (* to-deg (acos (min 1 (max -1 alignment)))) turn-rate))
+				if (< time best-time)
+					set best-time time
+					set chosen f.index

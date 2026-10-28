@@ -348,6 +348,74 @@ R"(program test
 		}
 	}
 }
+SCENARIO( "Looping over lists of records", "[Script]" ) {
+	// An interface with a list of things, each with a size and a position.
+	static const script::Interface interface = [] {
+		script::Interface result;
+		result.AddInput("limit");
+		result.AddList("things", {"size", "where"});
+		result.AddOutput("out");
+		return result;
+	}();
+	script::RecordList things(2);
+	for(double size : {3., 8., 5., 9.})
+	{
+		things.Add();
+		things.SetField(0, script::Value(size));
+		things.SetField(1, script::Value(Point(size, -size)));
+	}
+	auto run = [&things](const std::string &text, double limit, bool &valid) {
+		script::Program program;
+		program.Load(AsDataNode(text), interface);
+		valid = program.IsValid();
+		std::vector<script::Value> variables(program.SlotCount());
+		variables[0] = script::Value(limit);
+		variables[1] = script::Value(things);
+		variables[2] = script::Value(-1.);
+		uint32_t effects = 0;
+		if(valid && !program.Run(variables, effects))
+			return std::nan("");
+		return variables[2].Number();
+	};
+	bool valid = false;
+	GIVEN( "a loop that picks the largest thing under a limit" ) {
+		const std::string text =
+R"(program test
+	let best 0
+	for t in things
+		if (and (< t.size limit) (> t.size best))
+			set best t.size
+			set out t.index
+)";
+		THEN( "it sees every record's fields and index, in order" ) {
+			CHECK( run(text, 6., valid) == 2. );
+			REQUIRE( valid );
+			CHECK( run(text, 100., valid) == 3. );
+			CHECK( run(text, 1., valid) == -1. );
+		}
+	}
+	GIVEN( "a function that loops" ) {
+		THEN( "it can return from inside the loop" ) {
+			CHECK( run("program test\n\tfunction first-over x\n\t\tfor t in things\n\t\t\tif (> t.size x)\n"
+				"\t\t\t\treturn (y t.where)\n\t\treturn 0\n\tset out (first-over limit)\n", 6., valid) == -8.);
+			CHECK( valid );
+		}
+	}
+	GIVEN( "lists and records used other than through their fields" ) {
+		THEN( "the script is rejected" ) {
+			run("program test\n\tlet copy things\n", 0., valid);
+			CHECK_FALSE( valid );
+			run("program test\n\tfor t in things\n\t\tlet copy t\n", 0., valid);
+			CHECK_FALSE( valid );
+			run("program test\n\tfor t in things\n\t\tset out t.color\n", 0., valid);
+			CHECK_FALSE( valid );
+			run("program test\n\tfor t in limit\n\t\tset out 1\n", 0., valid);
+			CHECK_FALSE( valid );
+			run("program test\n\tfor t in things\n\t\tset out 1\n\tset out t.size\n", 0., valid);
+			CHECK_FALSE( valid );
+		}
+	}
+}
 // #endregion unit tests
 
 

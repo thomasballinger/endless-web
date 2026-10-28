@@ -31,6 +31,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 class AIRules;
 class CategoryList;
+class ChoiceScript;
 class Color;
 class ConditionsStore;
 class Confusion;
@@ -156,6 +157,9 @@ public:
 	static const Set<MissileGuidance> &Guidance();
 	static const Set<ShipManeuver> &Maneuvers();
 	static const Set<TurretScript> &TurretScripts();
+	// Scripts that rate one candidate, and that choose from a list of them.
+	static const Set<ChoiceScript> &RateScripts();
+	static const Set<ChoiceScript> &ChooseScripts();
 	static const Set<Mission> &Missions();
 	static const Set<News> &SpaceportNews();
 	static const Set<Outfit> &Outfits();

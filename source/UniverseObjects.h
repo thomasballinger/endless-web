@@ -21,6 +21,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "AIRules.h"
 #include "CategoryList.h"
+#include "ChoiceScript.h"
 #include "Color.h"
 #include "Confusion.h"
 #include "Conversation.h"
@@ -142,6 +143,8 @@ private:
 	Set<MissileGuidance> guidance;
 	Set<ShipManeuver> maneuvers;
 	Set<TurretScript> turretScripts;
+	Set<ChoiceScript> rateScripts;
+	Set<ChoiceScript> chooseScripts;
 	Set<Mission> missions;
 	Set<News> news;
 	Set<Outfit> outfits;
