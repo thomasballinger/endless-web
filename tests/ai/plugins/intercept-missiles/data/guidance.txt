@@ -18,42 +18,40 @@
 # It reads target-velocity and sets thrust, so only weapons with "leading" and
 # "throttle control" can use it; it replaces their default.
 guidance "intercept" "leading and throttle control"
+	# How many steps until something moving at the given speed can meet a
+	# point at offset d that moves with velocity v, or -1 if it never can.
+	# That is the time t when |d + v t| = speed t, which is a quadratic.
+	function intercept-time d v speed
+		let a (- (dot v v) (* speed speed))
+		let b (* 2 (dot d v))
+		let c (dot d d)
+		if (< (abs a) .000001)
+			return (if (< b 0) (/ (- c) b) -1)
+		let discriminant (- (* b b) (* 4 a c))
+		if (< discriminant 0)
+			return -1
+		let root (sqrt discriminant)
+		let early (/ (- (- b) root) (* 2 a))
+		let late (/ (+ (- b) root) (* 2 a))
+		return (if (< (min early late) 0) (max early late) (min early late))
+
+	# The full angle, in degrees, from the way the missile faces to v. Unlike
+	# asin of the cross product, this is 180 for a target directly behind.
+	function degrees-to v
+		return (* to-deg (atan2 (cross facing v) (dot facing v)))
+
 	if (not has-lock)
-		if confused
-			set turn (* turn confusion-direction)
-		else
-			set turn 0
+		set turn (if confused (* turn confusion-direction) 0)
 		stop
 
 	let d (- target-position position)
 	let speed (if (!= drag 0) (/ acceleration drag) (length velocity))
-	# The time t when |d + target-velocity * t| = speed * t, a quadratic.
-	let a (- (dot target-velocity target-velocity) (* speed speed))
-	let b (* 2 (dot d target-velocity))
-	let c (dot d d)
-	let time -1
-	if (< (abs a) .000001)
-		if (< b 0)
-			set time (/ (- c) b)
-	else
-		let discriminant (- (* b b) (* 4 a c))
-		if (>= discriminant 0)
-			let root (sqrt discriminant)
-			let early (/ (- (- b) root) (* 2 a))
-			let late (/ (+ (- b) root) (* 2 a))
-			set time (min early late)
-			if (< time 0)
-				set time (max early late)
+	let time (intercept-time d target-velocity speed)
 	# If it can't catch the target, chase it directly.
 	let aim (if (> time 0) (+ d (* target-velocity time)) d)
 
-	# Turn by the full angle to the aim point, so it turns around for a
-	# target behind it.
-	let desired-turn (* to-deg (atan2 (cross facing aim) (dot facing aim)))
-	if (> (abs desired-turn) turn)
-		set turn (copysign turn desired-turn)
-	else
-		set turn desired-turn
+	let desired-turn (degrees-to aim)
+	set turn (clamp desired-turn (- turn) turn)
 
 	# Like the default: coast while there's still a long turn to make.
 	let steps-to-reach (/ (length aim) speed)

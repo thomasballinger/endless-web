@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "../pi.h"
 #include "../Random.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -326,12 +327,13 @@ class Program::Implementation {
 public:
 	class Expression {
 	public:
-		enum class Kind { CONSTANT, VARIABLE, CALL, HOST };
+		enum class Kind { CONSTANT, VARIABLE, CALL, HOST, FUNCTION };
 		Kind kind = Kind::CONSTANT;
 		Value constant;
 		int slot = -1;
 		Builtin builtin = Builtin::ADD;
-		// For HOST: which of the interface's functions to call.
+		// For HOST: which of the interface's functions to call. For FUNCTION:
+		// which of the script's own functions.
 		int function = -1;
 		vector<Expression> arguments;
 	};
@@ -339,7 +341,7 @@ public:
 	class Block;
 	class Statement {
 	public:
-		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY };
+		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY, RETURN };
 		Kind kind = Kind::STOP;
 		int slot = -1;
 		Expression expression;
@@ -360,6 +362,18 @@ public:
 		vector<Statement> statements;
 	};
 
+	// A function defined by the script. It can't call itself, even through
+	// other functions (a function can only call the ones defined above it),
+	// so each of its parameters and variables has a slot of its own.
+	class Function {
+	public:
+		string name;
+		vector<int> parameterSlots;
+		// Where "return" puts the function's value.
+		int returnSlot = -1;
+		Block body;
+	};
+
 
 public:
 	bool Compile(const DataNode &node, const Interface &interface);
@@ -368,11 +382,12 @@ public:
 
 private:
 	bool CompileBlock(const DataNode &node, Block &block);
+	bool CompileFunction(const DataNode &node, const SExpression &line);
 	bool CompileExpression(const SExpression &source, const DataNode &node, Expression &expression);
 	int Lookup(const string &name) const;
 	bool IsTaken(const string &name) const;
 
-	enum class Result { CONTINUE, STOP, ERROR };
+	enum class Result { CONTINUE, STOP, RETURN, ERROR };
 	Result RunBlock(const Block &block, vector<Value> &variables, uint32_t &effects, Memory *memory,
 		int &steps) const;
 	bool Evaluate(const Expression &expression, vector<Value> &variables, int &steps, Value &result) const;
@@ -391,6 +406,8 @@ public:
 	vector<bool> triggers;
 	// The variable slot of each "memory" value.
 	vector<int> memorySlots;
+	// The functions the script defines.
+	vector<Function> functions;
 	// Different every time a program is compiled, so that memory kept for an
 	// older version of it (e.g. before the script was edited and reloaded)
 	// isn't used with a different layout.
@@ -401,6 +418,8 @@ private:
 	const Interface *interface = nullptr;
 	// Names visible at each nesting level while compiling.
 	vector<map<string, int>> scopes;
+	// The function being compiled, if any.
+	const Function *compilingFunction = nullptr;
 	size_t statementCount = 0;
 	mutable bool reportedError = false;
 	mutable string error;
@@ -418,6 +437,8 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 	writes.assign(slotCount, false);
 	triggers.assign(interface.EffectCount(), false);
 	memorySlots.clear();
+	functions.clear();
+	compilingFunction = nullptr;
 	scopes.assign(1, {});
 	body = Block();
 	valid = CompileBlock(node, body);
@@ -448,6 +469,48 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		Statement statement;
 		statement.description = Describe(child);
 		statement.index = statementCount++;
+		if(keyword == "function")
+		{
+			if(compilingFunction || scopes.size() != 2)
+			{
+				child.PrintTrace("\"function\" can only be used outside of any block:");
+				ok = false;
+			}
+			else
+				ok &= CompileFunction(child, line);
+			continue;
+		}
+		if(keyword == "return")
+		{
+			if(!compilingFunction)
+			{
+				child.PrintTrace("\"return\" can only be used in a function:");
+				ok = false;
+				continue;
+			}
+			if(argumentCount != 1 || child.HasChildren())
+			{
+				child.PrintTrace("Expected \"return <expression>\":");
+				ok = false;
+				continue;
+			}
+			if(!CompileExpression(line.items[1], child, statement.expression))
+			{
+				ok = false;
+				continue;
+			}
+			statement.kind = Statement::Kind::RETURN;
+			statement.slot = compilingFunction->returnSlot;
+			block.statements.push_back(std::move(statement));
+			continue;
+		}
+		if(compilingFunction && keyword != "let" && keyword != "set" && keyword != "if"
+				&& keyword != "elif" && keyword != "else")
+		{
+			child.PrintTrace("A function can only use \"let\", \"set\", \"if\" and \"return\":");
+			ok = false;
+			continue;
+		}
 		if(keyword == "let" || keyword == "set" || keyword == "memory")
 		{
 			if(argumentCount != 2 || !line.items[1].IsAtom() || child.HasChildren())
@@ -512,6 +575,12 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				if(statement.slot < interface->VariableCount() && !interface->IsOutput(statement.slot))
 				{
 					child.PrintTrace("\"" + variable + "\" is an input and can't be changed:");
+					ok = false;
+					continue;
+				}
+				if(statement.slot < interface->VariableCount() && compilingFunction)
+				{
+					child.PrintTrace("A function can't change \"" + variable + "\"; it can only return a value:");
 					ok = false;
 					continue;
 				}
@@ -600,6 +669,53 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 
 
 
+// "function <name> <parameter>...", with the function's statements below it.
+bool Program::Implementation::CompileFunction(const DataNode &node, const SExpression &line)
+{
+	if(line.items.size() < 2 || !node.HasChildren())
+	{
+		node.PrintTrace("Expected \"function <name> <parameter>...\" with statements below it:");
+		return false;
+	}
+	Function function;
+	function.name = line.items[1].atom;
+	if(!line.items[1].IsAtom() || BUILTINS.contains(function.name) || interface->FindFunction(function.name) >= 0
+			|| any_of(functions.begin(), functions.end(),
+				[&function](const Function &other) { return other.name == function.name; }))
+	{
+		node.PrintTrace("A function named \"" + function.name + "\" already exists:");
+		return false;
+	}
+
+	// The function sees only its parameters and its own variables, along with
+	// the inputs and outputs, constants, and functions defined above it.
+	vector<map<string, int>> outerScopes = std::move(scopes);
+	scopes.assign(1, {});
+	bool ok = true;
+	for(size_t i = 2; i < line.items.size(); ++i)
+	{
+		const string &parameter = line.items[i].atom;
+		if(!line.items[i].IsAtom() || IsTaken(parameter))
+		{
+			node.PrintTrace("\"" + parameter + "\" can't be the name of a parameter:");
+			ok = false;
+			continue;
+		}
+		function.parameterSlots.push_back(slotCount);
+		scopes.back()[parameter] = slotCount++;
+	}
+	function.returnSlot = slotCount++;
+	compilingFunction = &function;
+	ok &= CompileBlock(node, function.body);
+	compilingFunction = nullptr;
+	scopes = std::move(outerScopes);
+	// Only now can later code call the function, so it can't call itself.
+	functions.push_back(std::move(function));
+	return ok;
+}
+
+
+
 bool Program::Implementation::CompileExpression(const SExpression &source, const DataNode &node,
 	Expression &expression)
 {
@@ -645,6 +761,24 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	const string &function = source.items.front().atom;
 	int count = static_cast<int>(source.items.size()) - 1;
 	auto it = BUILTINS.find(function);
+	// The script may define functions of its own.
+	auto defined = find_if(functions.begin(), functions.end(),
+		[&function](const Function &candidate) { return candidate.name == function; });
+	if(defined != functions.end())
+	{
+		if(count != static_cast<int>(defined->parameterSlots.size()))
+		{
+			node.PrintTrace("Wrong number of arguments to \"" + function + "\":");
+			return false;
+		}
+		expression.kind = Expression::Kind::FUNCTION;
+		expression.function = static_cast<int>(defined - functions.begin());
+		expression.arguments.resize(count);
+		bool ok = true;
+		for(int i = 0; i < count; ++i)
+			ok &= CompileExpression(source.items[i + 1], node, expression.arguments[i]);
+		return ok;
+	}
 	if(it == BUILTINS.end())
 	{
 		// The host may provide functions of its own.
@@ -825,6 +959,10 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 				break;
 			case Statement::Kind::STOP:
 				return Result::STOP;
+			case Statement::Kind::RETURN:
+				if(!Evaluate(statement.expression, variables, steps, variables[statement.slot]))
+					return Result::ERROR;
+				return Result::RETURN;
 			case Statement::Kind::MEMORY:
 			{
 				// The initial value is only used on the first run.
@@ -861,6 +999,29 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			return true;
 		case Expression::Kind::CALL:
 			break;
+		case Expression::Kind::FUNCTION:
+		{
+			const Function &function = functions[expression.function];
+			// Evaluate every argument before setting any parameter, in case an
+			// argument calls the same function.
+			const size_t count = expression.arguments.size();
+			Value small[4];
+			vector<Value> large(count > 4 ? count : 0);
+			Value *values = count > 4 ? large.data() : small;
+			for(size_t i = 0; i < count; ++i)
+				if(!Evaluate(expression.arguments[i], variables, steps, values[i]))
+					return false;
+			for(size_t i = 0; i < count; ++i)
+				variables[function.parameterSlots[i]] = values[i];
+			uint32_t noEffects = 0;
+			Result ran = RunBlock(function.body, variables, noEffects, nullptr, steps);
+			if(ran == Result::ERROR)
+				return false;
+			if(ran != Result::RETURN)
+				return Fail("function \"" + function.name + "\" ended without returning a value");
+			result = variables[function.returnSlot];
+			return true;
+		}
 		case Expression::Kind::HOST:
 		{
 			// Most functions take only a few arguments, so avoid allocating.

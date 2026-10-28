@@ -94,6 +94,60 @@ SCENARIO( "Running scripts", "[Script]" ) {
 			CHECK_FALSE( Run("program test\n\tset out (min 1 2 v)\n", 0., v).ran );
 		}
 	}
+	GIVEN( "functions defined by the script" ) {
+		const std::string text =
+R"(program test
+	function clamp-to-a x
+		if (> x a)
+			return a
+		let negative (- a)
+		if (< x negative)
+			return negative
+		return x
+	function twice-clamped x y
+		return (* 2 (+ (clamp-to-a x) (clamp-to-a y)))
+	set out (twice-clamped (clamp-to-a 100) -1)
+)";
+		THEN( "they can use their parameters, inputs, their own variables and earlier functions" ) {
+			auto result = Run(text, 3.);
+			REQUIRE( result.valid );
+			REQUIRE( result.ran );
+			CHECK( result.out.Number() == 2. * (3. + -1.) );
+		}
+		THEN( "a call as an argument to the same function works" ) {
+			auto result = Run("program test\n\tfunction add-one x\n\t\treturn (+ x 1)\n"
+				"\tset out (add-one (add-one (add-one a)))\n", 1.);
+			REQUIRE( result.ran );
+			CHECK( result.out.Number() == 4. );
+		}
+		THEN( "a function that doesn't return a value stops the script" ) {
+			auto result = Run("program test\n\tfunction maybe x\n\t\tif (> x 0)\n\t\t\treturn x\n"
+				"\tset out (maybe a)\n", -1.);
+			REQUIRE( result.valid );
+			CHECK_FALSE( result.ran );
+		}
+	}
+	GIVEN( "functions that break the rules" ) {
+		THEN( "they are rejected" ) {
+			// Calling itself, or a function defined below.
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\treturn (f x)\n").valid );
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\treturn (g x)\n"
+				"\tfunction g x\n\t\treturn x\n").valid);
+			// Changing an output, using memory or effects, or stopping.
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\tset out x\n\t\treturn x\n").valid );
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\tmemory m 0\n\t\treturn x\n").valid );
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\tping\n\t\treturn x\n").valid );
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\tstop\n").valid );
+			// Seeing the script's variables, rather than only its parameters.
+			CHECK_FALSE( Run("program test\n\tlet y 1\n\tfunction f x\n\t\treturn (+ x y)\n").valid );
+			// Defined inside a block, named like a built-in function, or called wrongly.
+			CHECK_FALSE( Run("program test\n\tif true\n\t\tfunction f x\n\t\t\treturn x\n").valid );
+			CHECK_FALSE( Run("program test\n\tfunction sqrt x\n\t\treturn x\n").valid );
+			CHECK_FALSE( Run("program test\n\tfunction f x\n\t\treturn x\n\tset out (f 1 2)\n").valid );
+			// "return" outside of a function.
+			CHECK_FALSE( Run("program test\n\treturn 1\n").valid );
+		}
+	}
 	GIVEN( "random numbers" ) {
 		THEN( "they come from the game's random numbers, in order" ) {
 			Random::Seed(5);

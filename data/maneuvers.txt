@@ -58,6 +58,11 @@ maneuver "keep station"
 	let time-deadband 120
 	let thrust-deadband .5
 
+	# How many degrees the ship must turn to face along v.
+	function degrees-to-face v
+		let difference (abs (- facing-degrees (heading v)))
+		return (min difference (- 360 difference))
+
 	# Where to be, relative to where the ship is now.
 	let velocity-delta (- target-velocity velocity)
 	let position-delta (- (+ target-position (* lead-time velocity-delta)) position)
@@ -73,16 +78,14 @@ maneuver "keep station"
 	if (or (is-nan position-time) (> position-time max-time))
 		set position-time max-time
 	let rendezvous (+ position-delta (* target-velocity position-time))
-	let position-turn (abs (- facing-degrees (heading rendezvous)))
-	set position-time (+ position-time (/ (min position-turn (- 360 position-turn)) turn-rate))
+	set position-time (+ position-time (/ (degrees-to-face rendezvous) turn-rate))
 	set position-time (+ position-time (/ (length (- (* (unit rendezvous) max-velocity) velocity)) acceleration))
 	# If very close, stop trying to adjust.
 	set position-time (* position-time (* position-weight position-weight))
 
 	# Roughly how long it will take to match the target's velocity.
 	let velocity-time (/ (length velocity-delta) acceleration)
-	let velocity-turn (abs (- facing-degrees (heading velocity-delta)))
-	set velocity-time (+ velocity-time (/ (min velocity-turn (- 360 velocity-turn)) turn-rate))
+	set velocity-time (+ velocity-time (/ (degrees-to-face velocity-delta) turn-rate))
 	set velocity-time (* velocity-time (* velocity-weight velocity-weight))
 
 	# Focus on matching position or velocity, whichever will take longer.

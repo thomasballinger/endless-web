@@ -393,6 +393,16 @@ The script language is being designed as it's used. Rules so far, and why:
   (left to right), where C++ leaves it unspecified: swapping the two draws in
   `(- (random) (random))` changes the Sol scenario, so the order the
   compiler happened to pick for the old C++ is the one the script uses.
+- **Scripts can define functions, for readability.** `function name
+  parameter...` with `return`. A function can only call those defined above
+  it, so it can't recurse, and each has fixed variable slots (no call
+  stack). It sees its parameters, its own variables, and the inputs and
+  outputs, but not the script's variables, and it can't change outputs, use
+  memory or effects, or stop: like the host's functions, it only computes a
+  value. "keep station" uses one for "how far must the ship turn to face
+  along this", which it needed twice, and the intercept example plugin uses
+  them to name the intercept time and the full angle to a point. Both give
+  exactly the same results as before.
 - **Arithmetic works left to right, exactly as the C++ did.** `(* a b c)` is
   `(* (* a b) c)`, so scripts that copy C++ code give bit-identical results.
 
@@ -403,8 +413,9 @@ Open questions:
   calling it costs something (energy, giving away position, time), and one
   reading per refresh must be the rule, or a script could call again until
   it got the answer it wanted.
-- **Functions defined by scripts.** The noise examples repeat the same few
-  lines to turn toward a point; shared definitions would help.
+- **Shared function definitions.** A script's functions belong to it, so the
+  four default guidance scripts still each repeat the same lines. Outfits or
+  libraries could supply definitions later.
 - **Limits on computation.** Scripts already have a step limit per run. A
   smaller one for cheaper hardware would make "how much can this missile
   think" a hardware property too.
