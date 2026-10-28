@@ -1,0 +1,36 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Turret scripts move one turret, or one moving decoration, for one step.
+# They are written in the same language as guidance scripts (see
+# guidance.txt), with these inputs:
+#   previous-aim   the aim command it was given last step, from -1 to 1, in
+#                  units of its turn rate (0 means it was at rest)
+#   idle-offset    how many degrees it must turn to point at its idle angle
+#   arc-middle     the middle of its arc, in degrees (180 for a turret that
+#                  can turn all the way around, and for decorations)
+# and one output, which starts at previous-aim:
+#   aim            the aim command for this step, from -1 to 1
+# Like any script, these may use (random) and (random-int n), which draw from
+# the ship's own random stream when random streams are on.
+
+# Sweep a turret with nothing to aim at back and forth, drifting toward its
+# idle angle. A turret at rest only sometimes starts moving. The AI uses this
+# for opportunistic turrets and for moving decorations. This reproduces the
+# game's built-in behavior exactly.
+turret "idle sweep"
+	if (and (== previous-aim 0) (!= (random-int 60) 0))
+		stop
+	let bias (/ idle-offset (min arc-middle 180))
+	let acceleration (+ (- (random) (random)) bias)
+	set aim (+ previous-aim (* .1 acceleration))

@@ -38,18 +38,19 @@ target_sources(EndlessSkyTests PRIVATE
 	unit/src/test_exclusiveItem.cpp
 	unit/src/test_firecommand.cpp
 	unit/src/test_formationPattern.cpp
+	unit/src/test_guidance.cpp
 	unit/src/test_main.cpp
+	unit/src/test_maneuver.cpp
 	unit/src/test_orderedMap.cpp
 	unit/src/test_point.cpp
 	unit/src/test_random.cpp
-	unit/src/test_guidance.cpp
-	unit/src/test_maneuver.cpp
 	unit/src/test_script.cpp
 	unit/src/test_scrollVar.cpp
 	unit/src/test_set.cpp
 	unit/src/test_ship.cpp
 	unit/src/test_stringInterner.cpp
 	unit/src/test_template.txt
+	unit/src/test_turretScript.cpp
 	unit/src/test_weightedList.cpp
 	unit/src/text/test_alignment.cpp
 	unit/src/text/test_displaytext.cpp

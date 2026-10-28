@@ -1,0 +1,17 @@
+// upstream 28bb9ed62
+		for(const Ship::Decor &decor : ship.Decorations())
+		{
+			if(decor.behavior == Ship::DecorBehavior::MOVING
+				|| (decor.behavior == Ship::DecorBehavior::TARGETING && targetBodies.empty()))
+			{
+				int index = &decor - &ship.Decorations().front();
+				double previous = ship.FiringCommands().AimDecor(index);
+				if(!previous && Random::Int(60))
+					continue;
+
+				Angle centerAngle = Angle(decor.position);
+				double bias = (centerAngle - decor.angle).Degrees() / 180.;
+				double acceleration = Random::Real() - Random::Real() + bias;
+				command.SetAimDecor(index, previous + .1 * acceleration);
+			}
+		}

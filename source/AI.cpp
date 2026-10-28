@@ -50,6 +50,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "ShipManeuver.h"
 #include "StellarObject.h"
 #include "System.h"
+#include "TurretScript.h"
 #include "UI.h"
 #include "Weapon.h"
 #include "Wormhole.h"
@@ -119,6 +120,25 @@ namespace {
 		if(target.GetSystem() != ship.GetSystem())
 			return false;
 		return target.IsTargetable();
+	}
+
+	// The aim command for a turret or moving decoration with nothing to aim
+	// at, from the "idle sweep" turret script.
+	double IdleSweep(const TurretScript::Input &input)
+	{
+		const TurretScript *script = GameData::TurretScripts().Find("idle sweep");
+		double aim = input.previousAim;
+		if(script && script->IsValid())
+			script->Run(input, aim);
+		else
+		{
+			static bool warned = false;
+			if(!warned)
+				Logger::Log("No valid \"idle sweep\" turret script is defined; idle turrets will not move.",
+					Logger::Level::ERROR);
+			warned = true;
+		}
+		return aim;
 	}
 
 	// What a maneuver script knows about the ship it is flying.
@@ -3995,14 +4015,10 @@ void AI::AimTurrets(const Ship &ship, FireCommand &command, bool opportunistic,
 				|| (decor.behavior == Ship::DecorBehavior::TARGETING && targetBodies.empty()))
 			{
 				int index = &decor - &ship.Decorations().front();
-				double previous = ship.FiringCommands().AimDecor(index);
-				if(!previous && Random::Int(60))
-					continue;
-
-				Angle centerAngle = Angle(decor.position);
-				double bias = (centerAngle - decor.angle).Degrees() / 180.;
-				double acceleration = Random::Real() - Random::Real() + bias;
-				command.SetAimDecor(index, previous + .1 * acceleration);
+				TurretScript::Input input;
+				input.previousAim = ship.FiringCommands().AimDecor(index);
+				input.idleOffset = (Angle(decor.position) - decor.angle).Degrees();
+				command.SetAimDecor(index, IdleSweep(input));
 			}
 		}
 		// If there are no targets to aim at, opportunistic turrets should sweep
@@ -4027,20 +4043,12 @@ void AI::AimTurrets(const Ship &ship, FireCommand &command, bool opportunistic,
 				{
 					// Get the index of this weapon.
 					int index = &hardpoint - &ship.Weapons().front();
-					// First, check if this turret is currently in motion. If not,
-					// it only has a small chance of beginning to move.
-					double previous = ship.FiringCommands().Aim(index);
-					if(!previous && Random::Int(60))
-						continue;
-
 					// Sweep between the min and max arc.
-					Angle centerAngle = Angle(hardpoint.GetIdleAngle());
-					const Angle minArc = hardpoint.GetMinArc();
-					const Angle maxArc = hardpoint.GetMaxArc();
-					const double arcMiddleDegrees = (minArc.AbsDegrees() + maxArc.AbsDegrees()) / 2.;
-					double bias = (centerAngle - hardpoint.GetAngle()).Degrees() / min(arcMiddleDegrees, 180.);
-					double acceleration = Random::Real() - Random::Real() + bias;
-					command.SetAim(index, previous + .1 * acceleration);
+					TurretScript::Input input;
+					input.previousAim = ship.FiringCommands().Aim(index);
+					input.idleOffset = (Angle(hardpoint.GetIdleAngle()) - hardpoint.GetAngle()).Degrees();
+					input.arcMiddle = (hardpoint.GetMinArc().AbsDegrees() + hardpoint.GetMaxArc().AbsDegrees()) / 2.;
+					command.SetAim(index, IdleSweep(input));
 				}
 			return;
 		}

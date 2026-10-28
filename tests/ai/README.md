@@ -333,6 +333,19 @@ So how far ahead to aim, and how much to smooth, are real trade-offs that
 depend on the seeker and the target, which is the kind of change a script
 should be able to make. The seeker's quality is not.
 
+## Turret scripts
+
+`data/turrets.txt` holds scripts that move one turret, or one moving
+decoration, for one step. The AI runs "idle sweep" for every turret with
+nothing to aim at (and for decorations that move on their own), which sweeps
+it back and forth around its idle angle at random. It reproduces
+`AI::AimTurrets`' idle code exactly: the scenarios match the reference
+build, with about 147,000 runs, and
+`tests/unit/src/test_turretScript.cpp` compares it with a copy of the old
+code on 50,000 situations, checking both the result and that it draws the
+same number of random numbers. Aiming at targets is still C++; it is the
+natural next step for turret scripts (point defense, for example).
+
 ## Language design notes
 
 The script language is being designed as it's used. Rules so far, and why:
@@ -369,6 +382,17 @@ The script language is being designed as it's used. Rules so far, and why:
 - **`memory` belongs to a compiled version of a script.** Reloading an edited
   script starts every projectile's memory over, so values can't land in a
   slot that now means something else.
+- **Scripts draw random numbers from whatever stream the game has made
+  current.** `(random)` and `(random-int n)` take the next number exactly as
+  `Random::Real()` and `Random::Int(n)` would at that point, so a script can
+  reproduce C++ that draws them; "idle sweep" does. With random streams on
+  (`ES_RANDOM_STREAMS=1`), that is the ship's or projectile's own stream, and
+  a script that draws more or fewer numbers only changes that object. With
+  them off, it shifts every later random number in the game, so experiments
+  with edited scripts should turn streams on. Evaluation order is defined
+  (left to right), where C++ leaves it unspecified: swapping the two draws in
+  `(- (random) (random))` changes the Sol scenario, so the order the
+  compiler happened to pick for the old C++ is the one the script uses.
 - **Arithmetic works left to right, exactly as the C++ did.** `(* a b c)` is
   `(* (* a b) c)`, so scripts that copy C++ code give bit-identical results.
 
@@ -379,11 +403,6 @@ Open questions:
   calling it costs something (energy, giving away position, time), and one
   reading per refresh must be the rule, or a script could call again until
   it got the answer it wanted.
-- **Randomness in scripts.** Patrols and other AI behaviors choose at random.
-  A `(random)` function drawing from the object's own random stream fits the
-  rules above, but the number of draws then depends on the script, so it
-  must not draw from the main sequence when streams are off, or editing one
-  script would change everything.
 - **Functions defined by scripts.** The noise examples repeat the same few
   lines to turn toward a point; shared definitions would help.
 - **Limits on computation.** Scripts already have a step limit per run. A

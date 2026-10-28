@@ -53,6 +53,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "test/TestData.h"
 #include "TextReplacements.h"
 #include "Trade.h"
+#include "TurretScript.h"
 #include "Wormhole.h"
 
 #include <atomic>
@@ -98,7 +99,7 @@ public:
 	// Check for objects that are referred to but never defined.
 	void CheckReferences();
 
-	// Reload the guidance scripts, maneuvers and AI rules from any data file
+	// Reload the guidance scripts, maneuvers, turret scripts and AI rules from any data file
 	// that defines them and has changed on disk since it was read. Only the
 	// definitions that file supplied are replaced, so editing the game's data
 	// doesn't undo a plugin that overrides it. A script with errors is not
@@ -140,6 +141,7 @@ private:
 	Set<Minable> minables;
 	Set<MissileGuidance> guidance;
 	Set<ShipManeuver> maneuvers;
+	Set<TurretScript> turretScripts;
 	Set<Mission> missions;
 	Set<News> news;
 	Set<Outfit> outfits;

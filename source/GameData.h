@@ -74,6 +74,7 @@ class TaskQueue;
 class Test;
 class TestData;
 class TextReplacements;
+class TurretScript;
 class UniverseObjects;
 class Wormhole;
 
@@ -154,6 +155,7 @@ public:
 	static const Set<Minable> &Minables();
 	static const Set<MissileGuidance> &Guidance();
 	static const Set<ShipManeuver> &Maneuvers();
+	static const Set<TurretScript> &TurretScripts();
 	static const Set<Mission> &Missions();
 	static const Set<News> &SpaceportNews();
 	static const Set<Outfit> &Outfits();

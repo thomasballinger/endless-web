@@ -670,6 +670,13 @@ const Set<ShipManeuver> &GameData::Maneuvers()
 
 
 
+const Set<TurretScript> &GameData::TurretScripts()
+{
+	return objects.turretScripts;
+}
+
+
+
 const Set<Minable> &GameData::Minables()
 {
 	return objects.minables;

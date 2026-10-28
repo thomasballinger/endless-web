@@ -369,6 +369,8 @@ target_sources(EndlessSkyLib PRIVATE
 	Trade.h
 	TradingPanel.cpp
 	TradingPanel.h
+	TurretScript.cpp
+	TurretScript.h
 	UI.cpp
 	UI.h
 	UniverseObjects.cpp

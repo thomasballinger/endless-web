@@ -476,6 +476,11 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 			maneuvers.Get(node.Token(1))->Load(node);
 			RecordScriptSource(scriptFiles, scriptSources, path, "maneuver " + node.Token(1));
 		}
+		else if(key == "turret" && hasValue)
+		{
+			turretScripts.Get(node.Token(1))->Load(node);
+			RecordScriptSource(scriptFiles, scriptSources, path, "turret " + node.Token(1));
+		}
 		else if(key == "formation" && hasValue)
 		{
 			FormationPattern *formation = formations.Get(node.Token(1));
@@ -831,6 +836,18 @@ vector<string> UniverseObjects::ReloadChangedScripts()
 				else
 				{
 					*maneuvers.Get(node.Token(1)) = std::move(script);
+					reloaded.push_back(node.Token(1));
+				}
+			}
+			else if(key == "turret" && isFromHere("turret " + node.Token(1)))
+			{
+				TurretScript script;
+				script.Load(node);
+				if(!script.IsValid())
+					failed.push_back(node.Token(1));
+				else
+				{
+					*turretScripts.Get(node.Token(1)) = std::move(script);
 					reloaded.push_back(node.Token(1));
 				}
 			}
