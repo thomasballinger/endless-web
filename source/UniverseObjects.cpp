@@ -35,6 +35,20 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 using namespace std;
 
+namespace {
+	// Remember that the given script was defined in the given file.
+	void RecordScriptSource(map<filesystem::path, filesystem::file_time_type> &files,
+		map<string, filesystem::path> &sources, const filesystem::path &path, const string &key)
+	{
+		sources[key] = path;
+		if(!files.contains(path))
+		{
+			error_code error;
+			files[path] = filesystem::last_write_time(path, error);
+		}
+	}
+}
+
 
 
 shared_future<void> UniverseObjects::Load(TaskQueue &queue, const vector<filesystem::path> &sources,
@@ -443,16 +457,25 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 			fleet->Load(node);
 		}
 		else if(key == "ai" && hasValue)
+		{
 			aiRules.Get(node.Token(1))->Load(node);
+			RecordScriptSource(scriptFiles, scriptSources, path, "ai " + node.Token(1));
+		}
 		else if(key == "guidance" && hasValue)
 		{
 			// One script may be given several names, e.g. to replace several
 			// of the default scripts at once.
 			for(int i = 1; i < node.Size(); ++i)
+			{
 				guidance.Get(node.Token(i))->Load(node, node.Token(i));
+				RecordScriptSource(scriptFiles, scriptSources, path, "guidance " + node.Token(i));
+			}
 		}
 		else if(key == "maneuver" && hasValue)
+		{
 			maneuvers.Get(node.Token(1))->Load(node);
+			RecordScriptSource(scriptFiles, scriptSources, path, "maneuver " + node.Token(1));
+		}
 		else if(key == "formation" && hasValue)
 		{
 			FormationPattern *formation = formations.Get(node.Token(1));
@@ -749,4 +772,89 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 		// Overwrite mode is only good for one node at a time.
 		overwrite = false;
 	}
+}
+
+
+
+vector<string> UniverseObjects::ReloadChangedScripts()
+{
+	vector<string> changes;
+	for(auto &[path, readTime] : scriptFiles)
+	{
+		error_code error;
+		filesystem::file_time_type writeTime = filesystem::last_write_time(path, error);
+		if(error || writeTime == readTime)
+			continue;
+		readTime = writeTime;
+
+		const string fileName = path.filename().string();
+		vector<string> reloaded;
+		vector<string> failed;
+		// Whether this file is still where the named script comes from. A
+		// script the file didn't define before now comes from it too.
+		auto isFromHere = [this, &path](const string &key) {
+			auto it = scriptSources.find(key);
+			if(it == scriptSources.end())
+			{
+				scriptSources[key] = path;
+				return true;
+			}
+			return it->second == path;
+		};
+		for(const DataNode &node : DataFile(path))
+		{
+			const string &key = node.Token(0);
+			if(node.Size() < 2)
+				continue;
+			if(key == "guidance")
+				for(int i = 1; i < node.Size(); ++i)
+				{
+					const string &name = node.Token(i);
+					if(!isFromHere("guidance " + name))
+						continue;
+					MissileGuidance script;
+					script.Load(node, name);
+					if(!script.IsValid())
+						failed.push_back(name);
+					else
+					{
+						*guidance.Get(name) = std::move(script);
+						reloaded.push_back(name);
+					}
+				}
+			else if(key == "maneuver" && isFromHere("maneuver " + node.Token(1)))
+			{
+				ShipManeuver script;
+				script.Load(node);
+				if(!script.IsValid())
+					failed.push_back(node.Token(1));
+				else
+				{
+					*maneuvers.Get(node.Token(1)) = std::move(script);
+					reloaded.push_back(node.Token(1));
+				}
+			}
+			else if(key == "ai" && isFromHere("ai " + node.Token(1)))
+			{
+				// A rule set is put together from every file that defines
+				// part of it, so update it in place.
+				aiRules.Get(node.Token(1))->Load(node);
+				reloaded.push_back(node.Token(1));
+			}
+		}
+		auto list = [](const vector<string> &names) {
+			string text;
+			for(const string &name : names)
+				text += (text.empty() ? "\"" : ", \"") + name + "\"";
+			return text;
+		};
+		if(!reloaded.empty())
+			changes.push_back("Reloaded " + list(reloaded) + " from " + fileName + ".");
+		if(!failed.empty())
+			changes.push_back("Errors in " + list(failed) + " in " + fileName
+				+ "; still using the previous version. See the error log for details.");
+	}
+	for(const string &change : changes)
+		Logger::Log(change, Logger::Level::INFO);
+	return changes;
 }

@@ -92,6 +92,14 @@ public:
 	static void FinishLoading();
 	// Check for objects that are referred to but never defined.
 	static void CheckReferences();
+
+	// Whether to reload scripts whose data files change while the game runs
+	// (the --watch-scripts option, or ES_WATCH_SCRIPTS=1).
+	static void SetWatchScripts(bool watch);
+	static bool WatchScripts();
+	// Reload any scripts whose data files have changed. Returns a description
+	// of each change. Only call this when no other thread is running scripts.
+	static std::vector<std::string> ReloadChangedScripts();
 	static void LoadSettings();
 	static void LoadShaders();
 	static double GetProgress();

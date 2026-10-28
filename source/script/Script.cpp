@@ -19,7 +19,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "../Logger.h"
 #include "../pi.h"
 
+#include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -383,6 +385,10 @@ public:
 	vector<bool> triggers;
 	// The variable slot of each "memory" value.
 	vector<int> memorySlots;
+	// Different every time a program is compiled, so that memory kept for an
+	// older version of it (e.g. before the script was edited and reloaded)
+	// isn't used with a different layout.
+	uint64_t version = 0;
 
 
 private:
@@ -398,6 +404,8 @@ private:
 
 bool Program::Implementation::Compile(const DataNode &node, const Interface &interface)
 {
+	static atomic<uint64_t> versions = 0;
+	version = ++versions;
 	this->interface = &interface;
 	slotCount = interface.VariableCount();
 	reads.assign(slotCount, false);
@@ -721,6 +729,11 @@ bool Program::Implementation::Run(vector<Value> &variables, uint32_t &effects, M
 	// Restore the values remembered from the last run.
 	if(memory)
 	{
+		if(memory->version != version)
+		{
+			memory->Clear();
+			memory->version = version;
+		}
 		memory->values.resize(memorySlots.size());
 		memory->isSet.resize(memorySlots.size(), false);
 		for(size_t i = 0; i < memorySlots.size(); ++i)

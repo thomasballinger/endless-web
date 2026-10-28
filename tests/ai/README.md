@@ -153,6 +153,51 @@ player idle for about 12,000 steps:
   and "throttle control". In the Al Dhanab scenario (seed 1) it runs about
   17,600 times.
 
+## Editing scripts while the game runs
+
+Start the game with `--watch-scripts` (or set `ES_WATCH_SCRIPTS=1`), and it
+checks about twice a second whether any data file that defines guidance
+scripts, maneuvers or AI rules has changed. When one has, it reloads the
+definitions from that file between two steps of the game, and says so in the
+message log:
+
+- Only definitions that file supplied are replaced. If a plugin overrides a
+  script, editing the game's own copy changes nothing; edit the plugin's.
+- A script with errors is not replaced. The message says so, and the error
+  log (`errors.txt`, or the terminal) gives the details.
+- Projectiles already in flight switch to the new script, and the `memory`
+  of a script starts over when it is reloaded.
+- AI rule sets are updated in place, because several files can each supply
+  some of a rule set's lists.
+
+`live-edit.sh` checks this without anyone at the keyboard. It runs a scenario
+twice with watching on and applies an edit to one run's copy of a plugin
+partway through:
+
+```sh
+tests/ai/live-edit.sh build/endless-sky "AI Scenario - Sol traffic" \
+    my-plugin data/maneuvers.txt 's/let position-deadband 200/let position-deadband 50/'
+```
+
+```
+Reloaded "keep station", "circle around", "move to", "pick up" from maneuvers.txt.
+Reloaded after step 4440.
+The runs first differ at step 4500.
+```
+
+Tried this way:
+
+- **A maneuver** (above): escorts start flying differently at once.
+- **Guidance**, in Al Dhanab with seed 1: changing `asin` to `atan2` in the
+  four default scripts reloaded at about step 3,750, but the runs matched
+  until step 9,720, because the two only differ for a target behind the
+  missile. So reloading an unchanged script changes nothing by itself.
+- **AI rules**, in Al Dhanab: deleting the "aim and fire" rule mid-run. No
+  projectile was in flight at any of the 136 later samples, against 86 of
+  them without the edit.
+- **A broken edit** (`(asin)` with no argument): the scripts weren't
+  replaced, and the runs matched all the way through.
+
 ## The guidance bench
 
 `endless-sky --resources . --config tests/integration/config --guidance-bench

@@ -56,6 +56,9 @@
 # those after the script runs):
 #   turn thrust
 
+# To try changes to a script while playing, start the game with
+# --watch-scripts: it reloads scripts when their files change.
+#
 # The default scripts reproduce the game's built-in behavior exactly.
 
 # Turn towards the target.

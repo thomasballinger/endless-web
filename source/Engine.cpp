@@ -460,6 +460,16 @@ void Engine::Step(bool isActive)
 	events.swap(eventQueue);
 	eventQueue.clear();
 
+	// About twice a second, pick up any edits to script files. The previous
+	// step's calculations are done, so no other thread is running scripts.
+	static int scriptCheckCountdown = 0;
+	if(GameData::WatchScripts() && --scriptCheckCountdown <= 0)
+	{
+		scriptCheckCountdown = 30;
+		for(const string &change : GameData::ReloadChangedScripts())
+			Messages::Add({change, GameData::MessageCategories().Get("normal")});
+	}
+
 	// Process any outstanding sprites that need to be uploaded to the GPU.
 	queue.ProcessSyncTasks();
 	asyncQueue.ProcessSyncTasks();

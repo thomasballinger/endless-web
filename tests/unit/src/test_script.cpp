@@ -240,6 +240,21 @@ R"(program test
 			CHECK( run(program, 0., &memory) == 1. );
 		}
 	}
+	GIVEN( "a program that is edited and loaded again" ) {
+		const script::Program before = load("program test\n\tmemory count a\n\tset count (+ count 1)\n\tset out count\n");
+		// The edited version keeps another value, and counts differently.
+		const script::Program after = load("program test\n\tmemory count a\n\tmemory where v\n"
+			"\tset count (+ count 2)\n\tset out count\n");
+		REQUIRE( before.IsValid() );
+		REQUIRE( after.IsValid() );
+		THEN( "memory kept for the old version starts over" ) {
+			script::Memory memory;
+			run(before, 0., &memory);
+			run(before, 0., &memory);
+			CHECK( run(after, 10., &memory) == 12. );
+			CHECK( run(after, 10., &memory) == 14. );
+		}
+	}
 	GIVEN( "a memory declared inside a block" ) {
 		const script::Program program = load("program test\n\tif true\n\t\tmemory x 0\n");
 		THEN( "the program is invalid" ) {

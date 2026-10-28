@@ -124,6 +124,8 @@ private:
 	friend class Program;
 	std::vector<Value> values;
 	std::vector<bool> isSet;
+	// Which compiled version of the program these values are for.
+	uint64_t version = 0;
 };
 
 

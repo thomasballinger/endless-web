@@ -98,6 +98,14 @@ public:
 	// Check for objects that are referred to but never defined.
 	void CheckReferences();
 
+	// Reload the guidance scripts, maneuvers and AI rules from any data file
+	// that defines them and has changed on disk since it was read. Only the
+	// definitions that file supplied are replaced, so editing the game's data
+	// doesn't undo a plugin that overrides it. A script with errors is not
+	// replaced. Returns a description of each change, for the player. Call it
+	// only when no other thread is using the scripts.
+	std::vector<std::string> ReloadChangedScripts();
+
 	// Draws the current menu background. Unlike accessing the menu background
 	// through GameData, this function is thread-safe.
 	void DrawMenuBackground(Panel *panel) const;
@@ -162,6 +170,12 @@ private:
 	std::map<std::string, std::string> tooltips;
 	std::map<std::string, std::string> helpMessages;
 	std::map<std::string, std::set<std::string>> disabled;
+
+	// The data files that define scripts, with the time each was last read,
+	// and which file each script's current definition came from (keyed by
+	// its kind and name, e.g. "guidance basic").
+	std::map<std::filesystem::path, std::filesystem::file_time_type> scriptFiles;
+	std::map<std::string, std::filesystem::path> scriptSources;
 
 	// A local cache of the menu background interface for thread-safe access.
 	mutable std::mutex menuBackgroundMutex;

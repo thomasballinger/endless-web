@@ -159,6 +159,8 @@ int main(int argc, char *argv[])
 			Random::SetFixedSeed(std::stoull(*it));
 		else if(arg == "--tq-threads" && *++it)
 			nWorkerThreads = std::stoull(*it);
+		else if(arg == "--watch-scripts")
+			GameData::SetWatchScripts(true);
 		else if(arg == "--guidance-bench" && *++it)
 			benchOptions.outfit = *it;
 		else if(arg == "--bench-guidance" && *++it)
@@ -698,6 +700,8 @@ void PrintHelp()
 	cerr << "    --parse-assets: load all game data, images, and sounds,"
 		" and the latest save game, and inspect data for errors." << endl;
 	cerr << "    --tests: print table of available tests, then exit." << endl;
+	cerr << "    --watch-scripts: while playing, reload guidance scripts, maneuvers and AI rules"
+		" when their data files change." << endl;
 	cerr << "    --guidance-bench <outfit>: fire the given homing weapon at a target flying"
 		" along fixed paths, and report how often it hits. Options:" << endl;
 	cerr << "        --bench-guidance <name>: use this guidance script instead of the weapon's own."

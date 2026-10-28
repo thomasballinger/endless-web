@@ -70,6 +70,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <queue>
 #include <ranges>
@@ -80,6 +81,10 @@ using namespace std;
 
 namespace {
 	UniverseObjects objects;
+	bool watchScripts = [] {
+		const char *setting = getenv("ES_WATCH_SCRIPTS");
+		return setting && string(setting) == "1";
+	}();
 	Set<Fleet> defaultFleets;
 	Set<Government> defaultGovernments;
 	Set<Planet> defaultPlanets;
@@ -201,6 +206,27 @@ void GameData::FinishLoading()
 void GameData::CheckReferences()
 {
 	objects.CheckReferences();
+}
+
+
+
+void GameData::SetWatchScripts(bool watch)
+{
+	watchScripts = watch;
+}
+
+
+
+bool GameData::WatchScripts()
+{
+	return watchScripts;
+}
+
+
+
+vector<string> GameData::ReloadChangedScripts()
+{
+	return objects.ReloadChangedScripts();
 }
 
 
