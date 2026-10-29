@@ -895,3 +895,11 @@ vector<string> UniverseObjects::ReloadChangedScripts()
 		Logger::Log(change, Logger::Level::INFO);
 	return changes;
 }
+
+
+
+filesystem::path UniverseObjects::ScriptSource(const string &kind, const string &name) const
+{
+	auto it = scriptSources.find(kind + " " + name);
+	return it == scriptSources.end() ? filesystem::path() : it->second;
+}

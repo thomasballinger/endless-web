@@ -231,6 +231,13 @@ vector<string> GameData::ReloadChangedScripts()
 
 
 
+filesystem::path GameData::ScriptSource(const string &kind, const string &name)
+{
+	return objects.ScriptSource(kind, name);
+}
+
+
+
 void GameData::LoadSettings()
 {
 	// Load the key settings.

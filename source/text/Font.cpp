@@ -217,9 +217,85 @@ void Font::DrawAliased(const string &str, double x, double y, const Color &color
 
 
 
+void Font::DrawCode(const string &str, const Point &point, const vector<Color> &colors) const
+{
+	if(str.empty() || colors.empty())
+		return;
+	glUseProgram(shader->Object());
+	glBindTexture(GL_TEXTURE_2D, texture);
+	if(OpenGL::HasVaoSupport())
+		glBindVertexArray(vao);
+	else
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		EnableAttribArrays();
+	}
+
+	// Update the scale, only if the screen size has changed.
+	if(Screen::Width() != screenWidth || Screen::Height() != screenHeight)
+	{
+		screenWidth = Screen::Width();
+		screenHeight = Screen::Height();
+		scale[0] = 2.f / screenWidth;
+		scale[1] = -2.f / screenHeight;
+	}
+	glUniform2fv(scaleI, 1, scale);
+	glUniform2f(glyphSizeI, glyphWidth, glyphHeight);
+	glUniform1f(aspectI, 1.f);
+
+	GLfloat textPos[2] = {
+		static_cast<float>(round(point.X()) - 1.),
+		static_cast<float>(round(point.Y()))};
+	int previous = 0;
+	bool isAfterSpace = true;
+	const Color *lastColor = nullptr;
+	for(size_t i = 0; i < str.size(); ++i)
+	{
+		const char c = str[i];
+		int glyph = Glyph(c, isAfterSpace);
+		if(c != '"' && c != '\'')
+			isAfterSpace = !glyph;
+		if(!glyph)
+		{
+			textPos[0] += space;
+			continue;
+		}
+		const Color &color = colors[min(i, colors.size() - 1)];
+		if(&color != lastColor)
+		{
+			glUniform4fv(colorI, 1, color.Get());
+			lastColor = &color;
+		}
+		glUniform1i(glyphI, glyph);
+		textPos[0] += advance[previous * GLYPHS + glyph] + KERN;
+		glUniform2fv(positionI, 1, textPos);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		previous = glyph;
+	}
+
+	if(OpenGL::HasVaoSupport())
+		glBindVertexArray(0);
+	else
+	{
+		glDisableVertexAttribArray(vertI);
+		glDisableVertexAttribArray(cornerI);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	}
+	glUseProgram(0);
+}
+
+
+
 int Font::Width(const string &str, char after) const
 {
 	return WidthRawString(str.c_str(), after);
+}
+
+
+
+int Font::CodeWidth(const string &str, char after) const
+{
+	return WidthRawString(str.c_str(), after, true);
 }
 
 
@@ -401,7 +477,7 @@ void Font::SetUpShader(float glyphW, float glyphH)
 
 
 
-int Font::WidthRawString(const char *str, char after) const noexcept
+int Font::WidthRawString(const char *str, char after, bool literalUnderscores) const noexcept
 {
 	int width = 0;
 	int previous = 0;
@@ -409,7 +485,7 @@ int Font::WidthRawString(const char *str, char after) const noexcept
 
 	for( ; *str; ++str)
 	{
-		if(*str == '_')
+		if(*str == '_' && !literalUnderscores)
 			continue;
 
 		int glyph = Glyph(*str, isAfterSpace);

@@ -102,6 +102,9 @@ public:
 	// Reload any scripts whose data files have changed. Returns a description
 	// of each change. Only call this when no other thread is running scripts.
 	static std::vector<std::string> ReloadChangedScripts();
+	// The data file the given script came from (e.g. kind "guidance" and name
+	// "basic"), or an empty path.
+	static std::filesystem::path ScriptSource(const std::string &kind, const std::string &name);
 	static void LoadSettings();
 	static void LoadShaders();
 	static double GetProgress();

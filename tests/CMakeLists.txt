@@ -27,6 +27,7 @@ target_sources(EndlessSkyTests PRIVATE
 	unit/src/test_bitset.cpp
 	unit/src/test_categoryList.cpp
 	unit/src/test_choiceScript.cpp
+	unit/src/test_codeDocument.cpp
 	unit/src/test_conditionAssignments.cpp
 	unit/src/test_conditionSet.cpp
 	unit/src/test_conditionsStore.cpp

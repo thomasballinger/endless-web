@@ -333,6 +333,43 @@ So how far ahead to aim, and how much to smooth, are real trade-offs that
 depend on the seeker and the target, which is the kind of change a script
 should be able to make. The seeker's quality is not.
 
+## The simulator
+
+```sh
+build/endless-sky --simulator "Sidewinder Missile Launcher" [--simulator-target Argosy]
+```
+
+opens a panel that fires the weapon at a target ship flying one of the bench's
+drills, over a grid with nothing else in it, so it doesn't look like the game.
+The weapon's guidance script is in an editor on the left:
+
+- Every change is compiled as you type. If it compiles, the battle is replayed
+  from the start with it, back to the step it was showing, so you see at once
+  what the edit would have done. If not, the line is marked with the mistake
+  and the last version that compiled keeps running.
+- Click a missile to select it. The editor then shows how its script ran this
+  step: each line that ran gets a green mark and the value it computed, and
+  the lines that didn't run are dimmed.
+- Ctrl+S saves the script into a "simulator scripts" plugin, where it replaces
+  the script of the same name in the game.
+- Space pauses, `.` steps, `-` and `+` change the speed, and 1 to 8 pick a
+  drill (when the editor doesn't have the keyboard; `e` gives it the keyboard
+  and Escape takes it back).
+
+The editor (`CodeEditor`, over the text model `CodeDocument`) has the usual
+keys: selection with shift, words with ctrl, undo and redo, the clipboard, Tab
+and Shift+Tab to indent, and a new line keeps the indentation (one more after a
+line that opens a block).
+
+`simulator-ui.sh` checks the editor without anyone at the keyboard. It runs the
+simulator on a virtual display (Xvfb), types with xdotool, and looks at
+screenshots: a mistake is marked and undo clears it, an edit that reverses the
+missile's turn replays the battle differently, and saving writes the script.
+
+```sh
+tests/ai/simulator-ui.sh build/endless-sky
+```
+
 ## Turret scripts
 
 `data/turrets.txt` holds scripts that move one turret, or one moving

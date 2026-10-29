@@ -53,6 +53,10 @@ target_sources(EndlessSkyLib PRIVATE
 	ChoiceScript.cpp
 	ChoiceScript.h
 	ClickZone.h
+	CodeDocument.cpp
+	CodeDocument.h
+	CodeEditor.cpp
+	CodeEditor.h
 	Collision.cpp
 	Collision.h
 	CollisionSet.cpp

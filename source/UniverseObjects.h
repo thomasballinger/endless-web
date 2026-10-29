@@ -107,6 +107,9 @@ public:
 	// replaced. Returns a description of each change, for the player. Call it
 	// only when no other thread is using the scripts.
 	std::vector<std::string> ReloadChangedScripts();
+	// The data file the given script's current definition came from (e.g.
+	// kind "guidance" and name "basic"), or an empty path.
+	std::filesystem::path ScriptSource(const std::string &kind, const std::string &name) const;
 
 	// Draws the current menu background. Unlike accessing the menu background
 	// through GameData, this function is thread-safe.

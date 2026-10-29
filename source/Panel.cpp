@@ -561,7 +561,7 @@ bool Panel::DoTextInput(const string &text)
 		if(c->HasFocus())
 			return c->TextInput(text);
 	}
-	return Panel::TextInput(text);
+	return TextInput(text);
 }
 
 
