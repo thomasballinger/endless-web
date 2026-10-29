@@ -364,7 +364,8 @@ line that opens a block).
 `simulator-ui.sh` checks the editor without anyone at the keyboard. It runs the
 simulator on a virtual display (Xvfb), types with xdotool, and looks at
 screenshots: a mistake is marked and undo clears it, an edit that reverses the
-missile's turn replays the battle differently, and saving writes the script.
+missile's turn replays the battle differently, saving writes the script, and
+one undo takes the edit back and the battle with it.
 
 ```sh
 tests/ai/simulator-ui.sh build/endless-sky

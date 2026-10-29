@@ -37,8 +37,8 @@ namespace {
 	// How wide a tab is drawn.
 	const double TAB_WIDTH = 20.;
 
-	const Color BACKGROUND(.01f, .035f, .02f, .92f);
-	const Color GUTTER_COLOR(0.f, .02f, .01f, .92f);
+	const Color BACKGROUND(.01f, .035f, .02f, 1.f);
+	const Color GUTTER_COLOR(0.f, .02f, .01f, 1.f);
 	const Color CURRENT_LINE(.04f, .09f, .06f, .9f);
 	const Color SELECTION(.10f, .25f, .40f, .9f);
 	const Color CARET(.90f, 1.f, .92f, 1.f);

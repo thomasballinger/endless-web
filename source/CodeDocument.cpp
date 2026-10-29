@@ -153,7 +153,11 @@ void CodeDocument::Insert(const string &text)
 {
 	if(text.empty())
 		return;
-	BeginEdit(text.find('\n') == string::npos && !HasSelection() ? EditKind::TYPING : EditKind::OTHER);
+	// Typing over a selection starts a new undo step, which the typing that
+	// follows continues.
+	if(HasSelection())
+		lastEdit = EditKind::OTHER;
+	BeginEdit(text.find('\n') == string::npos ? EditKind::TYPING : EditKind::OTHER);
 	DeleteSelection();
 	string after = lines[caret.line].substr(caret.column);
 	lines[caret.line].erase(caret.column);

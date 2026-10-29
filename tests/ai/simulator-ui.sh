@@ -18,6 +18,7 @@
 #   1. Typing a mistake marks its line, and undo clears the mark.
 #   2. Reversing the missile's turn replays the battle differently.
 #   3. Saving writes the script into a plugin.
+#   4. One undo takes back the whole edit, and the battle with it.
 #
 # Usage: simulator-ui.sh BINARY
 #
@@ -124,6 +125,11 @@ else
 	echo "FAILED: saving writes the edited script"
 	FAILED=1
 fi
+
+xdotool key ctrl+z
+sleep 1
+shot reverted
+check_not "one undo puts the battle back" differ "$OUT/before.png" "$OUT/reverted.png"
 
 echo "Screenshots in $OUT"
 exit $FAILED

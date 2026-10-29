@@ -55,6 +55,19 @@ SCENARIO( "Editing code", "[CodeDocument]" ) {
 				CHECK( document.Lines()[0] == "let a 100" );
 			}
 		}
+		WHEN( "typing over a selection" ) {
+			document.Insert("x");
+			document.SetCaret({1, 0}, false);
+			document.MoveCaret(Move::LINE_END, true);
+			document.Insert("s");
+			document.Insert("et b 3");
+			THEN( "one undo brings back what was selected" ) {
+				CHECK( document.Lines()[1] == "set b 3" );
+				REQUIRE( document.Undo() );
+				CHECK( document.Lines()[1] == "let b 2" );
+				CHECK( document.Lines()[0] == "xlet a 1" );
+			}
+		}
 		WHEN( "pasting text with line breaks over a selection" ) {
 			document.SetCaret({0, 4}, false);
 			document.SetCaret({1, 5}, true);
