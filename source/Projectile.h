@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Body.h"
 
 #include "Angle.h"
+#include "MissileGuidance.h"
 #include "Point.h"
 #include "script/Script.h"
 
@@ -67,6 +68,12 @@ public:
 	Projectile(const Projectile &parent, const Point &offset, const Angle &angle, const Weapon *weapon);
 	// Ship explosion.
 	Projectile(const Point &position, const Angle &angle, const Weapon *weapon);
+
+	// Record how this projectile's guidance script runs on each step in the
+	// given trace (or stop recording, with null), e.g. to show it to a player.
+	void SetGuidanceTrace(script::Trace *trace);
+	// What the guidance script was given on the last step it was traced.
+	const MissileGuidance::Input &LastGuidanceInput() const;
 
 	// Functions provided by the Body base class:
 	// Frame GetFrame(int step = -1) const;
@@ -153,6 +160,10 @@ private:
 	bool isConfused = false;
 	// What this projectile's guidance script remembers between steps.
 	script::Memory guidanceMemory;
+	// Where to record how the guidance script ran, if anywhere, and what it
+	// was given.
+	script::Trace *guidanceTrace = nullptr;
+	MissileGuidance::Input lastGuidanceInput;
 	// A positive value means this projectile will turn to the right;
 	// a negative value means this projectile will turn left.
 	int confusionDirection = 0;

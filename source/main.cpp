@@ -37,12 +37,15 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "MenuPanel.h"
 #include "Panel.h"
 #include "PilotProfile.h"
+#include "Outfit.h"
 #include "PlayerInfo.h"
 #include "PluginManager.h"
 #include "Preferences.h"
 #include "PrintData.h"
 #include "Random.h"
 #include "Screen.h"
+#include "Ship.h"
+#include "SimulatorPanel.h"
 #include "image/SpriteSet.h"
 #include "shader/SpriteShader.h"
 #include "Statistics.h"
@@ -92,7 +95,7 @@ using namespace std;
 void PrintHelp();
 void PrintVersion();
 void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversation,
-	const string &testToRun, bool debugMode);
+	const string &testToRun, bool debugMode, const string &simulatorOutfit, const string &simulatorTarget);
 Conversation LoadConversation(const PlayerInfo &player);
 void PrintTestsTable();
 
@@ -118,6 +121,8 @@ int main(int argc, char *argv[])
 	uint64_t nWorkerThreads = 0;
 	string testToRunName;
 	GuidanceBench::Options benchOptions;
+	string simulatorOutfit;
+	string simulatorTarget = "Argosy";
 
 	// Whether the game has encountered errors while loading.
 	bool hasErrors = false;
@@ -159,6 +164,10 @@ int main(int argc, char *argv[])
 			Random::SetFixedSeed(std::stoull(*it));
 		else if(arg == "--tq-threads" && *++it)
 			nWorkerThreads = std::stoull(*it);
+		else if(arg == "--simulator" && *++it)
+			simulatorOutfit = *it;
+		else if(arg == "--simulator-target" && *++it)
+			simulatorTarget = *it;
 		else if(arg == "--watch-scripts")
 			GameData::SetWatchScripts(true);
 		else if(arg == "--guidance-bench" && *++it)
@@ -304,7 +313,7 @@ int main(int argc, char *argv[])
 
 		CustomEvents::Init();
 		// This is the main loop where all the action begins.
-		GameLoop(player, queue, conversation, testToRunName, debugMode);
+		GameLoop(player, queue, conversation, testToRunName, debugMode, simulatorOutfit, simulatorTarget);
 	}
 	catch(Test::known_failure_tag)
 	{
@@ -333,7 +342,7 @@ int main(int argc, char *argv[])
 
 
 void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversation,
-		const string &testToRunName, bool debugMode)
+		const string &testToRunName, bool debugMode, const string &simulatorOutfit, const string &simulatorTarget)
 {
 	// gamePanels is used for the main panel where you fly your spaceship.
 	// All other game content related dialogs are placed on top of the gamePanels.
@@ -470,6 +479,7 @@ void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversa
 		bool isPerformanceDisplayReady = false;
 		int step = 0;
 		int drawStep = 0;
+		bool simulatorOpened = false;
 
 		while(!menuPanels.IsDone())
 		{
@@ -510,6 +520,19 @@ void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversa
 				isFastForward = false;
 
 			// Tell all the panels to step forward, then draw them.
+			// With --simulator, open the simulator once the game data is loaded.
+			if(dataFinishedLoading && !simulatorOutfit.empty() && !simulatorOpened)
+			{
+				simulatorOpened = true;
+				const Outfit *outfit = GameData::Outfits().Find(simulatorOutfit);
+				const Ship *target = GameData::Ships().Find(simulatorTarget);
+				if(outfit && outfit->GetWeapon() && outfit->GetWeapon()->Homing() && target)
+					menuPanels.Push(new SimulatorPanel(*outfit, *target));
+				else
+					Logger::Log("Can't open the simulator: \"" + simulatorOutfit + "\" must be a homing weapon and \""
+						+ simulatorTarget + "\" a ship model.", Logger::Level::ERROR);
+			}
+
 			((!isDebugPaused && menuPanels.IsEmpty()) ? gamePanels : menuPanels).StepAll();
 
 			// Caps lock slows the frame rate in debug mode.
@@ -702,6 +725,8 @@ void PrintHelp()
 	cerr << "    --parse-assets: load all game data, images, and sounds,"
 		" and the latest save game, and inspect data for errors." << endl;
 	cerr << "    --tests: print table of available tests, then exit." << endl;
+	cerr << "    --simulator <outfit>: open a practice range for the given homing weapon's guidance"
+		" script, with --simulator-target <ship model> to fire at (default: Argosy)." << endl;
 	cerr << "    --watch-scripts: while playing, reload guidance scripts, maneuvers and AI rules"
 		" when their data files change." << endl;
 	cerr << "    --guidance-bench <outfit>: fire the given homing weapon at a target flying"

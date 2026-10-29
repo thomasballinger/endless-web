@@ -385,7 +385,9 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	input.lifetimeLeft = lifetime;
 
 	MissileGuidance::Output output;
-	if(!guidance->Run(input, output, &guidanceMemory))
+	if(guidanceTrace)
+		lastGuidanceInput = input;
+	if(!guidance->Run(input, output, &guidanceMemory, guidanceTrace))
 	{
 		turn = 0.;
 		return;
@@ -394,6 +396,20 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 		target.reset();
 	turn = output.turn;
 	accel = output.thrust;
+}
+
+
+
+void Projectile::SetGuidanceTrace(script::Trace *trace)
+{
+	guidanceTrace = trace;
+}
+
+
+
+const MissileGuidance::Input &Projectile::LastGuidanceInput() const
+{
+	return lastGuidanceInput;
 }
 
 

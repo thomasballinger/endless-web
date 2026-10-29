@@ -163,6 +163,10 @@ target_sources(EndlessSkyLib PRIVATE
 	Government.h
 	GuidanceBench.cpp
 	GuidanceBench.h
+	GuidanceDrill.cpp
+	GuidanceDrill.h
+	GuidanceSimulation.cpp
+	GuidanceSimulation.h
 	HailPanel.cpp
 	HailPanel.h
 	Hardpoint.cpp
@@ -338,6 +342,8 @@ target_sources(EndlessSkyLib PRIVATE
 	ShipyardPanel.h
 	ShopPanel.cpp
 	ShopPanel.h
+	SimulatorPanel.cpp
+	SimulatorPanel.h
 	SpaceportPanel.cpp
 	SpaceportPanel.h
 	StartConditions.cpp

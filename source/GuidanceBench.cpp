@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataNode.h"
 #include "GameData.h"
 #include "Government.h"
+#include "GuidanceDrill.h"
 #include "image/Mask.h"
 #include "MissileGuidance.h"
 #include "Outfit.h"
@@ -47,65 +48,12 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 using namespace std;
 
 namespace {
-	// Where the target is on a given step.
-	class Motion {
-	public:
-		Point position;
-		Point velocity;
-		Angle facing;
-	};
+	using Motion = GuidanceDrill::Motion;
+	using Scenario = GuidanceDrill;
 
-	class Scenario {
-	public:
-		string name;
-		// The target's motion on the given step (step 0 is when the projectile is fired).
-		function<Motion(int step)> motion;
-	};
-
-	// Motion in a straight line at a constant velocity.
-	Motion Straight(Point start, Point velocity, int step)
-	{
-		return {start + velocity * step, velocity, Angle(velocity ? velocity : Point(0., -1.))};
-	}
-
-	// The scenarios, for a projectile fired from the origin facing "up"
-	// (negative y), at a target that starts the given distance away and moves
-	// at the given speed.
 	vector<Scenario> MakeScenarios(double distance, double speed)
 	{
-		const Point ahead(0., -distance);
-		vector<Scenario> scenarios;
-		scenarios.push_back({"ahead, holding still", [=](int step) {
-			return Straight(ahead, Point(), step); }});
-		scenarios.push_back({"ahead, fleeing", [=](int step) {
-			return Straight(ahead, Point(0., -speed), step); }});
-		scenarios.push_back({"ahead, approaching", [=](int step) {
-			return Straight(ahead, Point(0., speed), step); }});
-		scenarios.push_back({"ahead, crossing", [=](int step) {
-			return Straight(ahead, Point(speed, 0.), step); }});
-		scenarios.push_back({"ahead, jinking", [=](int step) {
-			// Cross back and forth, turning around every second.
-			Point position = ahead;
-			Point velocity;
-			for(int i = 0; i <= step; ++i)
-			{
-				velocity = Point((i / 60) % 2 ? -speed : speed, 0.);
-				if(i < step)
-					position += velocity;
-			}
-			return Motion{position, velocity, Angle(velocity)}; }});
-		scenarios.push_back({"ahead, circling", [=](int step) {
-			// Circle around the starting point, counterclockwise.
-			const double radius = 300.;
-			double theta = speed * step / radius;
-			Point offset(radius * sin(theta), -radius * cos(theta));
-			Point velocity(speed * cos(theta), speed * sin(theta));
-			return Motion{ahead + offset - Point(0., -radius), velocity, Angle(velocity)}; }});
-		scenarios.push_back({"to the side, holding still", [=](int step) {
-			return Straight(Point(distance, 0.), Point(), step); }});
-		scenarios.push_back({"behind, holding still", [=](int step) {
-			return Straight(Point(0., distance), Point(), step); }});
-		return scenarios;
+		return GuidanceDrill::MakeDrills(distance, speed);
 	}
 
 	// One shot at the target.
