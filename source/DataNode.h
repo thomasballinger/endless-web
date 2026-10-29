@@ -77,6 +77,8 @@ public:
 
 	// Print a message followed by a "trace" of this node and its parents.
 	int PrintTrace(const std::string &message = "") const;
+	// The line of the data file this node came from (starting at 1).
+	size_t LineNumber() const noexcept;
 
 
 private:

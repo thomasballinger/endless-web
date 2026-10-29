@@ -76,6 +76,8 @@ public:
 	size_t Record() const;
 
 	static const char *TypeName(Type type);
+	// A short description of the value, for showing to a player.
+	std::string ToString() const;
 
 
 private:
@@ -174,7 +176,59 @@ private:
 
 
 
+// What happened during one run of a program, for showing a player how their
+// script ran: each statement executed, in order, with its line in the data
+// file and its result.
+class Trace {
+public:
+	class Step {
+	public:
+		enum class Kind {
+			// A "let", "set" or "memory" gave a variable a value.
+			ASSIGN,
+			// An "if" or "elif" condition was checked; value is true or false.
+			CONDITION,
+			// An effect was triggered.
+			EFFECT,
+			// The program stopped.
+			STOP,
+			// A function returned a value.
+			RETURN,
+			// A "for" loop moved on to the record in value (its index).
+			LOOP
+		};
+
+		Kind kind = Kind::ASSIGN;
+		size_t line = 0;
+		// The variable or effect involved, if any.
+		std::string name;
+		Value value;
+		// How many function calls deep the statement was.
+		int depth = 0;
+	};
+
+	void Clear();
+
+	std::vector<Step> steps;
+	// The runtime error that stopped the program, if any.
+	std::string error;
+	// The line where it happened.
+	size_t errorLine = 0;
+};
+
+
+
 class Program {
+public:
+	// A mistake that keeps a program from compiling, and the line of the data
+	// file where it is.
+	class Error {
+	public:
+		size_t line = 0;
+		std::string message;
+	};
+
+
 public:
 	Program();
 	~Program();
@@ -182,9 +236,12 @@ public:
 	Program &operator=(Program &&) noexcept;
 
 	// Compile the children of the given node as the program's statements.
-	// Errors are reported with node.PrintTrace() and make the program invalid.
-	void Load(const DataNode &node, const Interface &interface);
+	// Errors are reported with node.PrintTrace() (unless logErrors is false,
+	// e.g. while a player is typing) and make the program invalid.
+	void Load(const DataNode &node, const Interface &interface, bool logErrors = true);
 	bool IsValid() const;
+	// The errors found when the program was loaded.
+	const std::vector<Error> &Errors() const;
 	const std::string &Name() const;
 
 	// Number of variable slots Run() needs, including the interface's.
@@ -201,8 +258,10 @@ public:
 	// variables hold inputs and outputs; effects receives one bit per effect
 	// that was triggered. The values of "memory" statements are kept in the
 	// given memory between runs; with none, they start over every run.
-	// Returns false, and stops, on a runtime error.
-	bool Run(std::vector<Value> &variables, uint32_t &effects, Memory *memory = nullptr) const;
+	// Returns false, and stops, on a runtime error. With a trace, records each
+	// statement that ran (which is slower, so only for showing a player).
+	bool Run(std::vector<Value> &variables, uint32_t &effects, Memory *memory = nullptr,
+		Trace *trace = nullptr) const;
 
 
 private:

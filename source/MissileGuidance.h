@@ -117,7 +117,9 @@ public:
 
 
 public:
-	void Load(const DataNode &node, const std::string &name);
+	// Load a script. With logErrors false (e.g. while a player is typing it),
+	// errors are only kept in Program().Errors().
+	void Load(const DataNode &node, const std::string &name, bool logErrors = true);
 
 	const std::string &Name() const;
 	bool IsValid() const;
@@ -131,7 +133,8 @@ public:
 	// Run the script. The turn and thrust are limited to what the weapon can
 	// do. Returns false, with no turn, if the script fails.
 	// The memory holds the script's "memory" values for one projectile.
-	bool Run(const Input &input, Output &output, script::Memory *memory = nullptr) const;
+	bool Run(const Input &input, Output &output, script::Memory *memory = nullptr,
+		script::Trace *trace = nullptr) const;
 
 
 private:

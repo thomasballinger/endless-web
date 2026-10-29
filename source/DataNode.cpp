@@ -326,6 +326,13 @@ list<DataNode>::const_iterator DataNode::end() const noexcept
 
 
 
+size_t DataNode::LineNumber() const noexcept
+{
+	return lineNumber;
+}
+
+
+
 // Print a message followed by a "trace" of this node and its parents.
 int DataNode::PrintTrace(const string &message) const
 {

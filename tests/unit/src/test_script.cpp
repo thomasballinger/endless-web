@@ -348,6 +348,89 @@ R"(program test
 		}
 	}
 }
+SCENARIO( "Tracing a run and reporting errors", "[Script]" ) {
+	static const script::Interface interface = MakeInterface();
+	GIVEN( "a program with a function, a branch, and an effect" ) {
+		script::Program program;
+		program.Load(AsDataNode(
+R"(program test
+	function double x
+		return (* x 2)
+	let y (double a)
+	if (> y 5)
+		set out y
+		ping
+	else
+		set out 0
+)"), interface);
+		REQUIRE( program.IsValid() );
+		std::vector<script::Value> variables(program.SlotCount());
+		variables[0] = script::Value(4.);
+		variables[1] = script::Value(Point());
+		variables[2] = script::Value(0.);
+		uint32_t effects = 0;
+		script::Trace trace;
+		REQUIRE( program.Run(variables, effects, nullptr, &trace) );
+		THEN( "the trace has each statement that ran, with its line and value" ) {
+			using Kind = script::Trace::Step::Kind;
+			REQUIRE( trace.steps.size() == 5 );
+			// Lines count from the "program" line, which is line 1.
+			CHECK( trace.steps[0].kind == Kind::RETURN );
+			CHECK( trace.steps[0].line == 3 );
+			CHECK( trace.steps[0].depth == 1 );
+			CHECK( trace.steps[0].value.Number() == 8. );
+			CHECK( trace.steps[1].kind == Kind::ASSIGN );
+			CHECK( trace.steps[1].line == 4 );
+			CHECK( trace.steps[1].name == "y" );
+			CHECK( trace.steps[1].depth == 0 );
+			CHECK( trace.steps[2].kind == Kind::CONDITION );
+			CHECK( trace.steps[2].line == 5 );
+			CHECK( trace.steps[2].value.Boolean() );
+			CHECK( trace.steps[3].name == "out" );
+			CHECK( trace.steps[3].value.ToString() == "8" );
+			CHECK( trace.steps[4].kind == Kind::EFFECT );
+			CHECK( trace.steps[4].name == "ping" );
+			CHECK( trace.error.empty() );
+		}
+		THEN( "running without a trace still works" ) {
+			CHECK( program.Run(variables, effects) );
+		}
+	}
+	GIVEN( "a program that fails while running" ) {
+		script::Program program;
+		program.Load(AsDataNode("program test\n\tlet x 1\n\tset out (+ a v)\n"), interface);
+		REQUIRE( program.IsValid() );
+		std::vector<script::Value> variables(program.SlotCount());
+		variables[0] = script::Value(1.);
+		variables[1] = script::Value(Point(1., 2.));
+		variables[2] = script::Value(0.);
+		uint32_t effects = 0;
+		script::Trace trace;
+		THEN( "the trace says where and why" ) {
+			CHECK_FALSE( program.Run(variables, effects, nullptr, &trace) );
+			CHECK( trace.errorLine == 3 );
+			CHECK( trace.error.find("+") != std::string::npos );
+		}
+	}
+	GIVEN( "a program with mistakes on two lines" ) {
+		script::Program program;
+		program.Load(AsDataNode("program test\n\tlet x (frobnicate 1)\n\tset out x\n\tset nothing 2\n"),
+			interface, false);
+		THEN( "each mistake is reported with its line" ) {
+			CHECK_FALSE( program.IsValid() );
+			REQUIRE( program.Errors().size() == 2 );
+			CHECK( program.Errors()[0].line == 2 );
+			CHECK( program.Errors()[0].message == "Unknown function \"frobnicate\"" );
+			CHECK( program.Errors()[1].line == 4 );
+		}
+	}
+	THEN( "values describe themselves" ) {
+		CHECK( script::Value(1.5).ToString() == "1.5" );
+		CHECK( script::Value(true).ToString() == "true" );
+		CHECK( script::Value(Point(3., -0.25)).ToString() == "(3, -0.25)" );
+	}
+}
+
 SCENARIO( "Looping over lists of records", "[Script]" ) {
 	// An interface with a list of things, each with a size and a position.
 	static const script::Interface interface = [] {

@@ -84,11 +84,11 @@ string MissileGuidance::DefaultName(bool leading, bool throttleControl)
 
 
 
-void MissileGuidance::Load(const DataNode &node, const string &name)
+void MissileGuidance::Load(const DataNode &node, const string &name, bool logErrors)
 {
 	this->name = name;
 	program = script::Program();
-	program.Load(node, GetInterface());
+	program.Load(node, GetInterface(), logErrors);
 }
 
 
@@ -134,7 +134,7 @@ string MissileGuidance::MissingCapability(bool leading, bool throttleControl, bo
 
 
 
-bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *memory) const
+bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *memory, script::Trace *trace) const
 {
 	// Each thread reuses its own variables.
 	thread_local vector<script::Value> variables;
@@ -161,7 +161,7 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	const script::Value &turn = variables[TURN];
 	const script::Value &thrust = variables[THRUST];
 	output = Output();
-	if(!program.Run(variables, effects, memory) || turn.GetType() != script::Value::Type::NUMBER
+	if(!program.Run(variables, effects, memory, trace) || turn.GetType() != script::Value::Type::NUMBER
 			|| thrust.GetType() != script::Value::Type::NUMBER)
 		return false;
 

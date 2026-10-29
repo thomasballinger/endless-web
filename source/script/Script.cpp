@@ -107,6 +107,27 @@ const char *Value::TypeName(Type type)
 	return "unknown";
 }
 
+string Value::ToString() const
+{
+	char buffer[64];
+	switch(type)
+	{
+		case Type::NUMBER:
+			snprintf(buffer, sizeof(buffer), "%.4g", number);
+			return buffer;
+		case Type::BOOLEAN:
+			return boolean ? "true" : "false";
+		case Type::VECTOR:
+			snprintf(buffer, sizeof(buffer), "(%.4g, %.4g)", vector.X(), vector.Y());
+			return buffer;
+		case Type::LIST:
+			return "a list of " + to_string(list ? list->Size() : 0);
+		case Type::RECORD:
+			return "#" + to_string(record);
+	}
+	return "?";
+}
+
 
 
 RecordList::RecordList(int fieldCount)
@@ -404,6 +425,21 @@ namespace {
 
 
 
+namespace {
+	// While a program runs on this thread with a trace: the trace, how many
+	// function calls deep it is, and the line of the statement running.
+	thread_local Trace *currentTrace = nullptr;
+	thread_local int traceDepth = 0;
+	thread_local size_t currentLine = 0;
+
+	void Record(Trace::Step::Kind kind, size_t line, const string &name, const Value &value)
+	{
+		currentTrace->steps.push_back({kind, line, name, value, traceDepth});
+	}
+}
+
+
+
 class Program::Implementation {
 public:
 	class Expression {
@@ -440,6 +476,11 @@ public:
 		// For statistics.
 		string description;
 		size_t index = 0;
+		// For traces: the line it is on, the name of the variable it sets or
+		// effect it triggers, and for IF, the line of each "if" or "elif".
+		size_t line = 0;
+		string name;
+		vector<size_t> branchLines;
 	};
 
 	class Block {
@@ -478,6 +519,8 @@ private:
 	bool Evaluate(const Expression &expression, vector<Value> &variables, int &steps, Value &result) const;
 	bool Fail(const string &message) const;
 	void CountStatement(const Statement &statement) const;
+	// Report a mistake that keeps the program from compiling.
+	void Report(const DataNode &node, const string &message);
 
 
 public:
@@ -493,6 +536,9 @@ public:
 	vector<int> memorySlots;
 	// The functions the script defines.
 	vector<Function> functions;
+	// The mistakes found while compiling, and whether to log them.
+	vector<Program::Error> errors;
+	bool logErrors = true;
 	// Different every time a program is compiled, so that memory kept for an
 	// older version of it (e.g. before the script was edited and reloaded)
 	// isn't used with a different layout.
@@ -525,6 +571,7 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 	writes.assign(slotCount, false);
 	triggers.assign(interface.EffectCount(), false);
 	memorySlots.clear();
+	errors.clear();
 	functions.clear();
 	compilingFunction = nullptr;
 	recordSlots.clear();
@@ -548,7 +595,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		string message = ReadLine(child, line);
 		if(!message.empty())
 		{
-			child.PrintTrace(message);
+			Report(child, message);
 			ok = false;
 			continue;
 		}
@@ -558,11 +605,12 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		Statement statement;
 		statement.description = Describe(child);
 		statement.index = statementCount++;
+		statement.line = child.LineNumber();
 		if(keyword == "function")
 		{
 			if(compilingFunction || scopes.size() != 2)
 			{
-				child.PrintTrace("\"function\" can only be used outside of any block:");
+				Report(child, "\"function\" can only be used outside of any block:");
 				ok = false;
 			}
 			else
@@ -573,13 +621,13 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		{
 			if(!compilingFunction)
 			{
-				child.PrintTrace("\"return\" can only be used in a function:");
+				Report(child, "\"return\" can only be used in a function:");
 				ok = false;
 				continue;
 			}
 			if(argumentCount != 1 || child.HasChildren())
 			{
-				child.PrintTrace("Expected \"return <expression>\":");
+				Report(child, "Expected \"return <expression>\":");
 				ok = false;
 				continue;
 			}
@@ -599,7 +647,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			if(argumentCount != 3 || !line.items[1].IsAtom() || !line.items[3].IsAtom() || line.items[2].atom != "in"
 					|| !child.HasChildren())
 			{
-				child.PrintTrace("Expected \"for <name> in <list>\" with statements below it:");
+				Report(child, "Expected \"for <name> in <list>\" with statements below it:");
 				ok = false;
 				continue;
 			}
@@ -608,13 +656,13 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			statement.list = Lookup(listName);
 			if(!interface->IsList(statement.list))
 			{
-				child.PrintTrace("\"" + listName + "\" is not a list:");
+				Report(child, "\"" + listName + "\" is not a list:");
 				ok = false;
 				continue;
 			}
 			if(IsTaken(variable))
 			{
-				child.PrintTrace("\"" + variable + "\" is already defined:");
+				Report(child, "\"" + variable + "\" is already defined:");
 				ok = false;
 				continue;
 			}
@@ -635,7 +683,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		if(compilingFunction && keyword != "let" && keyword != "set" && keyword != "if"
 				&& keyword != "elif" && keyword != "else")
 		{
-			child.PrintTrace("A function can only use \"let\", \"set\", \"if\", \"for\" and \"return\":");
+			Report(child, "A function can only use \"let\", \"set\", \"if\", \"for\" and \"return\":");
 			ok = false;
 			continue;
 		}
@@ -643,11 +691,12 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		{
 			if(argumentCount != 2 || !line.items[1].IsAtom() || child.HasChildren())
 			{
-				child.PrintTrace("Expected \"" + keyword + " <name> <expression>\":");
+				Report(child, "Expected \"" + keyword + " <name> <expression>\":");
 				ok = false;
 				continue;
 			}
 			const string &variable = line.items[1].atom;
+			statement.name = variable;
 			if(!CompileExpression(line.items[2], child, statement.expression))
 			{
 				// Still define the variable, so that this one mistake isn't
@@ -664,13 +713,13 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				// declared in the top-level block.
 				if(scopes.size() != 2)
 				{
-					child.PrintTrace("\"memory\" can only be used outside of any block:");
+					Report(child, "\"memory\" can only be used outside of any block:");
 					ok = false;
 					continue;
 				}
 				if(IsTaken(variable))
 				{
-					child.PrintTrace("\"" + variable + "\" is already defined:");
+					Report(child, "\"" + variable + "\" is already defined:");
 					ok = false;
 					continue;
 				}
@@ -684,7 +733,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			{
 				if(IsTaken(variable))
 				{
-					child.PrintTrace("\"" + variable + "\" is already defined:");
+					Report(child, "\"" + variable + "\" is already defined:");
 					ok = false;
 					continue;
 				}
@@ -696,19 +745,19 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				statement.slot = Lookup(variable);
 				if(statement.slot < 0)
 				{
-					child.PrintTrace("Unknown variable \"" + variable + "\":");
+					Report(child, "Unknown variable \"" + variable + "\":");
 					ok = false;
 					continue;
 				}
 				if(statement.slot < interface->VariableCount() && !interface->IsOutput(statement.slot))
 				{
-					child.PrintTrace("\"" + variable + "\" is an input and can't be changed:");
+					Report(child, "\"" + variable + "\" is an input and can't be changed:");
 					ok = false;
 					continue;
 				}
 				if(statement.slot < interface->VariableCount() && compilingFunction)
 				{
-					child.PrintTrace("A function can't change \"" + variable + "\"; it can only return a value:");
+					Report(child, "A function can't change \"" + variable + "\"; it can only return a value:");
 					ok = false;
 					continue;
 				}
@@ -729,12 +778,13 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				bool isElse = (branchKeyword == "else");
 				if(isElse ? branchLine.items.size() != 1 : branchLine.items.size() != 2)
 				{
-					branch->PrintTrace(isElse ? "Expected \"else\" alone on its line:"
+					Report(*branch, isElse ? "Expected \"else\" alone on its line:"
 						: "Expected \"" + branchKeyword + " <condition>\":");
 					ok = false;
 				}
 				else if(!isElse)
 				{
+					statement.branchLines.push_back(branch->LineNumber());
 					statement.conditions.emplace_back();
 					ok &= CompileExpression(branchLine.items[1], *branch, statement.conditions.back());
 				}
@@ -757,7 +807,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		}
 		else if(keyword == "elif" || keyword == "else")
 		{
-			child.PrintTrace("\"" + keyword + "\" must follow an \"if\" or \"elif\":");
+			Report(child, "\"" + keyword + "\" must follow an \"if\" or \"elif\":");
 			ok = false;
 			continue;
 		}
@@ -765,7 +815,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		{
 			if(argumentCount || child.HasChildren())
 			{
-				child.PrintTrace("Expected \"stop\" alone on its line:");
+				Report(child, "Expected \"stop\" alone on its line:");
 				ok = false;
 				continue;
 			}
@@ -776,17 +826,18 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			statement.effect = interface->FindEffect(keyword);
 			if(statement.effect < 0)
 			{
-				child.PrintTrace("Unknown statement \"" + keyword + "\":");
+				Report(child, "Unknown statement \"" + keyword + "\":");
 				ok = false;
 				continue;
 			}
 			if(argumentCount || child.HasChildren())
 			{
-				child.PrintTrace("\"" + keyword + "\" takes no arguments:");
+				Report(child, "\"" + keyword + "\" takes no arguments:");
 				ok = false;
 				continue;
 			}
 			statement.kind = Statement::Kind::EFFECT;
+			statement.name = keyword;
 			triggers[statement.effect] = true;
 		}
 		block.statements.push_back(std::move(statement));
@@ -802,7 +853,7 @@ bool Program::Implementation::CompileFunction(const DataNode &node, const SExpre
 {
 	if(line.items.size() < 2 || !node.HasChildren())
 	{
-		node.PrintTrace("Expected \"function <name> <parameter>...\" with statements below it:");
+		Report(node, "Expected \"function <name> <parameter>...\" with statements below it:");
 		return false;
 	}
 	Function function;
@@ -811,7 +862,7 @@ bool Program::Implementation::CompileFunction(const DataNode &node, const SExpre
 			|| any_of(functions.begin(), functions.end(),
 				[&function](const Function &other) { return other.name == function.name; }))
 	{
-		node.PrintTrace("A function named \"" + function.name + "\" already exists:");
+		Report(node, "A function named \"" + function.name + "\" already exists:");
 		return false;
 	}
 
@@ -825,7 +876,7 @@ bool Program::Implementation::CompileFunction(const DataNode &node, const SExpre
 		const string &parameter = line.items[i].atom;
 		if(!line.items[i].IsAtom() || IsTaken(parameter))
 		{
-			node.PrintTrace("\"" + parameter + "\" can't be the name of a parameter:");
+			Report(node, "\"" + parameter + "\" can't be the name of a parameter:");
 			ok = false;
 			continue;
 		}
@@ -879,14 +930,14 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 			auto record = recordSlots.find(expression.slot);
 			if(record == recordSlots.end())
 			{
-				node.PrintTrace("\"" + base + "\" has no fields; only a \"for\" loop's variable does:");
+				Report(node, "\"" + base + "\" has no fields; only a \"for\" loop's variable does:");
 				return false;
 			}
 			expression.kind = Expression::Kind::FIELD;
 			expression.function = (field == "index") ? -1 : interface->FindField(record->second, field);
 			if(field != "index" && expression.function < 0)
 			{
-				node.PrintTrace("\"" + interface->VariableName(record->second) + "\" has no field \"" + field + "\":");
+				Report(node, "\"" + interface->VariableName(record->second) + "\" has no field \"" + field + "\":");
 				return false;
 			}
 			return true;
@@ -895,19 +946,19 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 		expression.slot = Lookup(source.atom);
 		if(expression.slot < 0)
 		{
-			node.PrintTrace("Unknown variable \"" + source.atom + "\":");
+			Report(node, "Unknown variable \"" + source.atom + "\":");
 			return false;
 		}
 		// Lists and records can't be copied or compared, only looped over
 		// and read, so they can never outlive the run they were given to.
 		if(interface->IsList(expression.slot))
 		{
-			node.PrintTrace("\"" + source.atom + "\" is a list; loop over it with \"for\":");
+			Report(node, "\"" + source.atom + "\" is a list; loop over it with \"for\":");
 			return false;
 		}
 		if(recordSlots.contains(expression.slot))
 		{
-			node.PrintTrace("\"" + source.atom + "\" is a record; use its fields, like \"" + source.atom
+			Report(node, "\"" + source.atom + "\" is a record; use its fields, like \"" + source.atom
 				+ ".index\":");
 			return false;
 		}
@@ -918,7 +969,7 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 
 	if(source.items.empty() || !source.items.front().IsAtom())
 	{
-		node.PrintTrace("An expression in parentheses must begin with a function name:");
+		Report(node, "An expression in parentheses must begin with a function name:");
 		return false;
 	}
 	const string &function = source.items.front().atom;
@@ -931,7 +982,7 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	{
 		if(count != static_cast<int>(defined->parameterSlots.size()))
 		{
-			node.PrintTrace("Wrong number of arguments to \"" + function + "\":");
+			Report(node, "Wrong number of arguments to \"" + function + "\":");
 			return false;
 		}
 		expression.kind = Expression::Kind::FUNCTION;
@@ -948,12 +999,12 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 		int host = interface->FindFunction(function);
 		if(host < 0)
 		{
-			node.PrintTrace("Unknown function \"" + function + "\":");
+			Report(node, "Unknown function \"" + function + "\":");
 			return false;
 		}
 		if(count != interface->FunctionArgumentCount(host))
 		{
-			node.PrintTrace("Wrong number of arguments to \"" + function + "\":");
+			Report(node, "Wrong number of arguments to \"" + function + "\":");
 			return false;
 		}
 		expression.kind = Expression::Kind::HOST;
@@ -966,7 +1017,7 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	}
 	if(count < it->second.minArgs || (it->second.maxArgs >= 0 && count > it->second.maxArgs))
 	{
-		node.PrintTrace("Wrong number of arguments to \"" + function + "\":");
+		Report(node, "Wrong number of arguments to \"" + function + "\":");
 		return false;
 	}
 	expression.kind = Expression::Kind::CALL;
@@ -1076,6 +1127,7 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 	for(const Statement &statement : block.statements)
 	{
 		CountStatement(statement);
+		currentLine = statement.line;
 		switch(statement.kind)
 		{
 			case Statement::Kind::ASSIGN:
@@ -1084,6 +1136,8 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 				if(!Evaluate(statement.expression, variables, steps, value))
 					return Result::ERROR;
 				variables[statement.slot] = value;
+				if(currentTrace)
+					Record(Trace::Step::Kind::ASSIGN, statement.line, statement.name, value);
 				break;
 			}
 			case Statement::Kind::IF:
@@ -1100,6 +1154,8 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 							+ string(Value::TypeName(condition.GetType())));
 						return Result::ERROR;
 					}
+					if(currentTrace)
+						Record(Trace::Step::Kind::CONDITION, statement.branchLines[i], "", condition);
 					if(condition.Boolean())
 					{
 						chosen = i;
@@ -1119,12 +1175,18 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 			}
 			case Statement::Kind::EFFECT:
 				effects |= (1u << statement.effect);
+				if(currentTrace)
+					Record(Trace::Step::Kind::EFFECT, statement.line, statement.name, Value());
 				break;
 			case Statement::Kind::STOP:
+				if(currentTrace)
+					Record(Trace::Step::Kind::STOP, statement.line, "", Value());
 				return Result::STOP;
 			case Statement::Kind::RETURN:
 				if(!Evaluate(statement.expression, variables, steps, variables[statement.slot]))
 					return Result::ERROR;
+				if(currentTrace)
+					Record(Trace::Step::Kind::RETURN, statement.line, "", variables[statement.slot]);
 				return Result::RETURN;
 			case Statement::Kind::FOR:
 			{
@@ -1143,6 +1205,8 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 						return Result::ERROR;
 					}
 					variables[statement.slot] = Value(list, i);
+					if(currentTrace)
+						Record(Trace::Step::Kind::LOOP, statement.line, "", Value(static_cast<double>(i)));
 					Result result = RunBlock(statement.blocks.front(), variables, effects, memory, steps);
 					if(result != Result::CONTINUE)
 						return result;
@@ -1152,14 +1216,17 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 			case Statement::Kind::MEMORY:
 			{
 				// The initial value is only used on the first run.
-				if(memory && memory->isSet[statement.memory])
-					break;
-				Value value;
-				if(!Evaluate(statement.expression, variables, steps, value))
-					return Result::ERROR;
-				variables[statement.slot] = value;
-				if(memory)
-					memory->isSet[statement.memory] = true;
+				if(!memory || !memory->isSet[statement.memory])
+				{
+					Value value;
+					if(!Evaluate(statement.expression, variables, steps, value))
+						return Result::ERROR;
+					variables[statement.slot] = value;
+					if(memory)
+						memory->isSet[statement.memory] = true;
+				}
+				if(currentTrace)
+					Record(Trace::Step::Kind::ASSIGN, statement.line, statement.name, variables[statement.slot]);
 				break;
 			}
 		}
@@ -1209,7 +1276,9 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			for(size_t i = 0; i < count; ++i)
 				variables[function.parameterSlots[i]] = values[i];
 			uint32_t noEffects = 0;
+			++traceDepth;
 			Result ran = RunBlock(function.body, variables, noEffects, nullptr, steps);
+			--traceDepth;
 			if(ran == Result::ERROR)
 				return false;
 			if(ran != Result::RETURN)
@@ -1511,8 +1580,26 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 
 
 
+void Program::Implementation::Report(const DataNode &node, const string &message)
+{
+	if(logErrors)
+		node.PrintTrace(message);
+	// Drop the colon that introduces the trace.
+	string text = message;
+	if(!text.empty() && text.back() == ':')
+		text.pop_back();
+	errors.push_back({node.LineNumber(), text});
+}
+
+
+
 bool Program::Implementation::Fail(const string &message) const
 {
+	if(currentTrace && currentTrace->error.empty())
+	{
+		currentTrace->error = message;
+		currentTrace->errorLine = currentLine;
+	}
 	if(!reportedError)
 		Logger::Log("Script \"" + name + "\" stopped: " + message + ".", Logger::Level::WARNING);
 	reportedError = true;
@@ -1532,11 +1619,19 @@ Program &Program::operator=(Program &&) noexcept = default;
 
 
 
-void Program::Load(const DataNode &node, const Interface &interface)
+void Program::Load(const DataNode &node, const Interface &interface, bool logErrors)
 {
 	if(node.Size() >= 2)
 		implementation->name = node.Token(1);
+	implementation->logErrors = logErrors;
 	implementation->Compile(node, interface);
+}
+
+
+
+const vector<Program::Error> &Program::Errors() const
+{
+	return implementation->errors;
 }
 
 
@@ -1586,9 +1681,25 @@ bool Program::Triggers(int effect) const
 
 
 
-bool Program::Run(vector<Value> &variables, uint32_t &effects, Memory *memory) const
+bool Program::Run(vector<Value> &variables, uint32_t &effects, Memory *memory, Trace *trace) const
 {
-	return implementation->Run(variables, effects, memory);
+	if(trace)
+		trace->Clear();
+	Trace *previous = currentTrace;
+	currentTrace = trace;
+	traceDepth = 0;
+	bool ran = implementation->Run(variables, effects, memory);
+	currentTrace = previous;
+	return ran;
+}
+
+
+
+void Trace::Clear()
+{
+	steps.clear();
+	error.clear();
+	errorLine = 0;
 }
 
 
