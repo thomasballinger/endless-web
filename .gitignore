@@ -89,3 +89,6 @@ output/
 libjpeg-turbo-2.1.0/
 Ubuntu-Regular.ttf
 favicon.ico
+
+# Written by test runs; CMake deletes it when it configures.
+tests/integration/config/errors.txt
