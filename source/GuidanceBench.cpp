@@ -21,6 +21,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "GameData.h"
 #include "Government.h"
 #include "GuidanceDrill.h"
+#include "GuidanceSimulation.h"
 #include "image/Mask.h"
 #include "MissileGuidance.h"
 #include "Outfit.h"
@@ -136,6 +137,80 @@ namespace {
 		double hitSteps = 0.;
 		double closestMiss = numeric_limits<double>::infinity();
 	};
+
+	// What can be seen of one projectile in the simulator.
+	class Seen {
+	public:
+		explicit Seen(const GuidanceSimulation::Missile &missile)
+			: id(missile.id), position(missile.projectile.Position()), velocity(missile.projectile.Velocity()),
+			facing(missile.projectile.Facing().Degrees()), endStep(missile.endStep), hit(missile.hit) {}
+
+		bool operator==(const Seen &other) const = default;
+
+		int id;
+		Point position;
+		Point velocity;
+		double facing;
+		int endStep;
+		bool hit;
+	};
+
+	vector<Seen> See(const GuidanceSimulation &simulation)
+	{
+		vector<Seen> seen;
+		for(const GuidanceSimulation::Missile &missile : simulation.Missiles())
+			seen.emplace_back(missile);
+		return seen;
+	}
+
+	// For each drill, run the simulator with the weapon's own script, and then
+	// with each other script: the first step on which anything differs must be
+	// the step FirstDifference() found, or later if the change took a while to
+	// show (e.g. dropping the target), and never earlier.
+	bool CheckEdits(const Outfit &outfit, const Ship &model, const vector<Weapon> &weapons,
+		const vector<string> &labels)
+	{
+		const int STEPS = 1200;
+		GuidanceSimulation original(outfit, model);
+		GuidanceSimulation edited(outfit, model);
+		original.SetGuidance(weapons[0].Guidance());
+		printf("Edit check: %s, %d steps of each drill, against \"%s\"\n\n", outfit.TrueName().c_str(), STEPS,
+			labels[0].c_str());
+		printf("%-28s %-30s %10s %10s\n", "drill", "script", "mattered", "differed");
+		bool ok = true;
+		for(size_t d = 0; d < original.Drills().size(); ++d)
+		{
+			original.SetDrill(d);
+			vector<vector<Seen>> seen(1, See(original));
+			while(original.CurrentStep() < STEPS)
+			{
+				original.Step();
+				seen.push_back(See(original));
+			}
+			for(size_t w = 1; w < weapons.size(); ++w)
+			{
+				const MissileGuidance *guidance = weapons[w].Guidance();
+				const int mattered = original.FirstDifference(*guidance).step;
+				edited.SetGuidance(guidance);
+				edited.SetDrill(d);
+				int differed = -1;
+				while(differed < 0 && edited.CurrentStep() < STEPS)
+				{
+					edited.Step();
+					if(See(edited) != seen[edited.CurrentStep()])
+						differed = edited.CurrentStep();
+				}
+				const bool right = mattered < 0 ? differed < 0 : (differed < 0 || differed >= mattered);
+				ok &= right;
+				auto text = [](int step) { return step < 0 ? string("never") : to_string(step); };
+				printf("%-28s %-30s %10s %10s%s\n", original.Drills()[d].name.c_str(), labels[w].c_str(),
+					text(mattered).c_str(), text(differed).c_str(), right ? "" : "  WRONG");
+			}
+		}
+		printf("\n%s\n", ok ? "Every edit mattered first where the simulator said."
+			: "The simulator was WRONG about where some edits first mattered.");
+		return ok;
+	}
 
 	// Load every "guidance" node in the given files, each under its first
 	// name only, so that they don't replace the game's own scripts. Their names
@@ -261,6 +336,9 @@ bool GuidanceBench::Run(const Options &options)
 	Ship launcher(*model);
 	launcher.SetGovernment(GameData::Governments().Get("Republic"));
 	launcher.SetTargetShip(target);
+
+	if(options.editCheck)
+		return CheckEdits(*outfit, *model, weapons, labels);
 
 	const double speed = target->MaxVelocity();
 	const double distance = min(1500., .5 * original.Range());

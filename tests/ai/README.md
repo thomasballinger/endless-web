@@ -87,6 +87,9 @@ in a way that depends on what an object did, and needs a `Random::Scope`.
 - `ES_MISSILE_STATS=1`: at exit, print how many projectiles of each homing
   weapon hit something, expired, or were shot down.
 - `ES_SCRIPT_STATS=1`: at exit, print how often each script statement ran.
+- `ES_SIMULATOR_LOG=1`: in the simulator, print what each edit that compiles
+  did: `SIMULATOR edit at step <now>: first difference at step <step>, missile
+  <n>`, or `no difference`.
 - `ES_AI_RULE_STATS=1`: at exit, print how often each AI rule ran, and how often
   it ended a ship's turn (or, for movement rules, moved the ship). Useful for
   seeing which rules a scenario exercises.
@@ -343,10 +346,17 @@ opens a panel that fires the weapon at a target ship flying one of the bench's
 drills, over a grid with nothing else in it, so it doesn't look like the game.
 The weapon's guidance script is in an editor on the left:
 
-- Every change is compiled as you type. If it compiles, the battle is replayed
-  from the start with it, back to the step it was showing, so you see at once
-  what the edit would have done. If not, the line is marked with the mistake
-  and the last version that compiled keeps running.
+- Every change is compiled as you type. If it doesn't compile, the line is
+  marked with the mistake and the last version that compiled keeps running.
+- If it compiles, the battle goes back to the first step where the new script
+  would have steered any missile differently, rewinding through the old run to
+  get there, and goes on from there with the new script (as in
+  [Dal Segno](https://github.com/thomasballinger/dalsegno), which rewinds a
+  game to the last time the code you changed ran). The old run's trails stay
+  faintly in view to compare with, a ring marks where that missile was, and
+  the missile is selected, so the editor shows the run that came out
+  differently. An edit that wouldn't have changed anything yet changes
+  nothing.
 - Click a missile to select it. The editor then shows how its script ran this
   step: each line that ran gets a green mark and the value it computed, and
   the lines that didn't run are dimmed.
@@ -356,6 +366,53 @@ The weapon's guidance script is in an editor on the left:
   drill (when the editor doesn't have the keyboard; `e` gives it the keyboard
   and Escape takes it back).
 
+### Where an edit first makes a difference
+
+While it runs, the simulator keeps a record of every run of every missile's
+script: what it was given, what it decided, and the random numbers it drew
+(through a `script::RandomTape`). To find where an edit first makes a
+difference, it runs the new script on those records, missile by missile,
+carrying each one's `memory` forward, and stops at the first step where it
+decides anything differently or draws different random numbers. Nothing is
+simulated, and since everything before that step had the same inputs, the
+answer is exact. (Drawing a different random number counts as a difference at
+once, because it changes what everything after it draws, though that may show
+much later or never.)
+
+The battle itself is still replayed from the start, which takes about 3 ms for
+1200 steps, so a script that remembers something different is never resumed
+from the old script's memory.
+
+`--bench-edit-check` checks the records against brute force: for every drill,
+it runs the weapon's own script and then each script in the given files, and
+compares the first step where anything in the battle differs with the step the
+records give.
+
+```sh
+endless-sky --resources . --config tests/integration/config \
+    --guidance-bench "Sidewinder Missile Launcher" \
+    --bench-script tests/ai/guidance-mattered.txt --bench-edit-check
+```
+
+```
+drill                        script                           mattered   differed
+ahead, approaching           turns away                           1038       1038
+ahead, approaching           confused the other way                913        913
+ahead, approaching           circles without a lock                451        451
+ahead, approaching           rolls dice                              1        913
+ahead, jinking               coasts sooner                         120        120
+to the side, holding still   half fine turns                        26         26
+...
+Every edit mattered first where the simulator said.
+```
+
+In all 64 cases the two agree, except for drawing an extra random number,
+where the records find the difference earlier than it shows, as they should.
+How far back an edit goes says something about it: making small corrections
+gentler matters within a few steps, coasting sooner only once a missile is
+nearly lined up, and turning the other way when confused only once a seeker is
+confused, which in most drills never happens.
+
 The editor (`CodeEditor`, over the text model `CodeDocument`) has the usual
 keys: selection with shift, words with ctrl, undo and redo, the clipboard, Tab
 and Shift+Tab to indent, and a new line keeps the indentation (one more after a
@@ -363,9 +420,10 @@ line that opens a block).
 
 `simulator-ui.sh` checks the editor without anyone at the keyboard. It runs the
 simulator on a virtual display (Xvfb), types with xdotool, and looks at
-screenshots: a mistake is marked and undo clears it, an edit that reverses the
-missile's turn replays the battle differently, saving writes the script, and
-one undo takes the edit back and the battle with it.
+screenshots and at what the game reports with `ES_SIMULATOR_LOG`: a mistake is
+marked and undo clears it, coasting sooner first makes a difference partway
+into the jinking drill, saving writes the script, and one undo takes the edit
+back, making a difference at that same step.
 
 ```sh
 tests/ai/simulator-ui.sh build/endless-sky

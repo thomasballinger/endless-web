@@ -51,6 +51,11 @@ public:
 		// several guidance scripts, each gets its own file, named by adding the
 		// script's name to this one.
 		std::string replayPath;
+		// Instead of firing shots, check the simulator's estimate of where an
+		// edit first matters: for each script and drill, the step that
+		// GuidanceSimulation::FirstDifference() finds must be the first on
+		// which replaying with the script changes anything.
+		bool editCheck = false;
 	};
 
 

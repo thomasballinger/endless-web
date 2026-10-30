@@ -184,6 +184,8 @@ int main(int argc, char *argv[])
 			benchOptions.trials = max(1, stoi(*it));
 		else if(arg == "--bench-replay" && *++it)
 			benchOptions.replayPath = *it;
+		else if(arg == "--bench-edit-check")
+			benchOptions.editCheck = true;
 	}
 	const bool runBench = !benchOptions.outfit.empty();
 
@@ -741,6 +743,8 @@ void PrintHelp()
 	cerr << "        --bench-shots <n>: how many shots to fire in each scenario (default: 20)." << endl;
 	cerr << "        --bench-replay <file>: write the path of every shot to this file as JSON"
 		" (one file per script when comparing)." << endl;
+	cerr << "        --bench-edit-check: instead, check that the simulator finds the first step on which"
+		" each script would have steered differently than the weapon's own." << endl;
 	cerr << "    --test <name>: run given test from resources directory." << endl;
 	cerr << "    --nomute: don't mute the game while running tests." << endl;
 	cerr << "    --rng-seed <seed>: every time the pseudo-random number generator is seeded,"

@@ -108,6 +108,19 @@ public:
 		bool dropTarget = false;
 	};
 
+	// One run of a script, kept so that another version of the script can be
+	// checked against it: did it decide the same thing, given the same input?
+	class Record {
+	public:
+		// The step it ran on, as numbered by whoever keeps the records.
+		int step = 0;
+		Input input;
+		bool succeeded = false;
+		Output output;
+		// The random numbers it drew.
+		script::RandomTape draws;
+	};
+
 	static const script::Interface &GetInterface();
 
 	// The script that reproduces the built-in behavior of the given weapon.

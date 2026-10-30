@@ -158,6 +158,49 @@ R"(program test
 			REQUIRE( result.ran );
 			CHECK( result.out.Number() == first + 100. * second );
 		}
+		THEN( "a tape notes them, and plays them back to another run" ) {
+			const std::string program = "program test\n\tlet r (random)\n\tset out (+ r (* 100 (random-int 10)))\n";
+			script::RandomTape tape;
+			Random::Seed(5);
+			Result recorded;
+			{
+				script::RandomTape::Use use(&tape);
+				recorded = Run(program);
+			}
+			// Playing back draws nothing from the game's random numbers.
+			Random::Seed(6);
+			tape.Play();
+			Result played;
+			{
+				script::RandomTape::Use use(&tape);
+				played = Run(program);
+			}
+			CHECK( played.out.Number() == recorded.out.Number() );
+			CHECK( tape.Matches() );
+			CHECK( tape.IsFinished() );
+			Random::Seed(5);
+			CHECK( Run(program).out.Number() == recorded.out.Number() );
+		}
+		THEN( "a tape notices a run that draws differently" ) {
+			script::RandomTape tape;
+			{
+				script::RandomTape::Use use(&tape);
+				Run("program test\n\tset out (random-int 10)\n");
+			}
+			tape.Play();
+			{
+				script::RandomTape::Use use(&tape);
+				Run("program test\n\tset out (random-int 20)\n");
+			}
+			CHECK_FALSE( tape.Matches() );
+			tape.Play();
+			{
+				script::RandomTape::Use use(&tape);
+				Run("program test\n\tset out 1\n");
+			}
+			CHECK( tape.Matches() );
+			CHECK_FALSE( tape.IsFinished() );
+		}
 		THEN( "random-int needs a whole number of at least 1" ) {
 			CHECK( Run("program test\n\tset out (random-int 1)\n").out.Number() == 0. );
 			CHECK_FALSE( Run("program test\n\tset out (random-int 0)\n").ran );

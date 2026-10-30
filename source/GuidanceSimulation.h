@@ -16,6 +16,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
 #include "GuidanceDrill.h"
+#include "MissileGuidance.h"
 #include "Point.h"
 #include "Projectile.h"
 #include "script/Script.h"
@@ -23,11 +24,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Weapon.h"
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-class MissileGuidance;
 class Outfit;
 
 
@@ -53,6 +54,17 @@ public:
 		bool hit = false;
 		// The step it hit or expired on, or -1 while it is in flight.
 		int endStep = -1;
+	};
+
+
+	// Where another script would first have steered differently.
+	class Difference {
+	public:
+		// The step, or -1 if it would have done the same so far.
+		int step = -1;
+		// Which projectile, and where it was when its script ran.
+		int missile = -1;
+		Point position;
 	};
 
 
@@ -87,6 +99,13 @@ public:
 	int Launches() const;
 	int Hits() const;
 
+	// The first step on which the given script would have steered any
+	// projectile differently than the one in use did. Nothing that happened
+	// before that step would change if the given script were used instead.
+	// (The script is run on what each projectile's script was given; nothing
+	// is simulated.)
+	Difference FirstDifference(const MissileGuidance &guidance) const;
+
 	// Choose which projectile to trace (-1 for none).
 	void Select(int id);
 	int Selected() const;
@@ -115,6 +134,9 @@ private:
 	int step = 0;
 	int nextId = 0;
 	int hits = 0;
+
+	// How each projectile's guidance script ran, by projectile.
+	std::map<int, std::vector<MissileGuidance::Record>> records;
 
 	int selected = -1;
 	script::Trace selectedTrace;

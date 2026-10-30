@@ -24,6 +24,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Visual.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 using namespace std;
@@ -37,6 +38,21 @@ namespace {
 	const int LINGER = 120;
 	// The random seed everything starts from.
 	const uint64_t SEED = 1;
+
+	bool Same(double a, double b)
+	{
+		return a == b || (isnan(a) && isnan(b));
+	}
+
+	// Whether a script run on a record's input decided what the record says.
+	bool Same(const MissileGuidance::Record &record, bool succeeded, const MissileGuidance::Output &output)
+	{
+		if(succeeded != record.succeeded)
+			return false;
+		// A script that fails doesn't steer, whatever it set before failing.
+		return !succeeded || (Same(output.turn, record.output.turn) && Same(output.thrust, record.output.thrust)
+			&& output.dropTarget == record.output.dropTarget);
+	}
 }
 
 
@@ -104,6 +120,7 @@ void GuidanceSimulation::Reset()
 	step = 0;
 	nextId = 0;
 	hits = 0;
+	records.clear();
 	selectedTrace.Clear();
 
 	target = make_shared<Ship>(*targetModel);
@@ -134,7 +151,11 @@ void GuidanceSimulation::Step()
 		if(missile.endStep >= 0)
 			continue;
 		Projectile &projectile = missile.projectile;
+		vector<MissileGuidance::Record> &runs = records[missile.id];
+		const size_t runCount = runs.size();
 		projectile.Move(visuals, spawned);
+		for(size_t i = runCount; i < runs.size(); ++i)
+			runs[i].step = step;
 		visuals.clear();
 		spawned.clear();
 		if(projectile.ShouldBeRemoved())
@@ -194,6 +215,41 @@ const Ship &GuidanceSimulation::Target() const
 const vector<GuidanceSimulation::Missile> &GuidanceSimulation::Missiles() const
 {
 	return missiles;
+}
+
+
+
+GuidanceSimulation::Difference GuidanceSimulation::FirstDifference(const MissileGuidance &guidance) const
+{
+	Difference first;
+	for(const auto &it : records)
+	{
+		// Each projectile's script starts with nothing in memory, and carries
+		// its own memory forward from step to step, as it would have.
+		script::Memory memory;
+		for(const MissileGuidance::Record &record : it.second)
+		{
+			if(first.step >= 0 && record.step >= first.step)
+				break;
+			script::RandomTape draws = record.draws;
+			draws.Play();
+			MissileGuidance::Output output;
+			bool succeeded;
+			{
+				script::RandomTape::Use use(&draws);
+				succeeded = guidance.Run(record.input, output, &memory);
+			}
+			// Drawing other random numbers changes what everything after it gets.
+			if(!Same(record, succeeded, output) || !draws.Matches() || !draws.IsFinished())
+			{
+				first.step = record.step;
+				first.missile = it.first;
+				first.position = record.input.position;
+				break;
+			}
+		}
+	}
+	return first;
 }
 
 
@@ -269,6 +325,7 @@ int GuidanceSimulation::MissileAt(const Point &position, double distance) const
 void GuidanceSimulation::Fire()
 {
 	missiles.emplace_back(nextId, step, Projectile(launcher, Point(), Angle(), &weapon));
+	missiles.back().projectile.SetGuidanceRecords(&records[nextId]);
 	if(nextId == selected)
 		missiles.back().projectile.SetGuidanceTrace(&selectedTrace);
 	++nextId;

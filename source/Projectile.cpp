@@ -387,7 +387,24 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	MissileGuidance::Output output;
 	if(guidanceTrace)
 		lastGuidanceInput = input;
-	if(!guidance->Run(input, output, &guidanceMemory, guidanceTrace))
+	MissileGuidance::Record *record = nullptr;
+	if(guidanceRecords)
+	{
+		record = &guidanceRecords->emplace_back();
+		record->input = input;
+		record->draws.Record();
+	}
+	bool succeeded;
+	{
+		script::RandomTape::Use use(record ? &record->draws : nullptr);
+		succeeded = guidance->Run(input, output, &guidanceMemory, guidanceTrace);
+	}
+	if(record)
+	{
+		record->succeeded = succeeded;
+		record->output = output;
+	}
+	if(!succeeded)
 	{
 		turn = 0.;
 		return;
@@ -410,6 +427,13 @@ void Projectile::SetGuidanceTrace(script::Trace *trace)
 const MissileGuidance::Input &Projectile::LastGuidanceInput() const
 {
 	return lastGuidanceInput;
+}
+
+
+
+void Projectile::SetGuidanceRecords(vector<MissileGuidance::Record> *records)
+{
+	guidanceRecords = records;
 }
 
 

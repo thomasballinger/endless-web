@@ -74,6 +74,9 @@ public:
 	void SetGuidanceTrace(script::Trace *trace);
 	// What the guidance script was given on the last step it was traced.
 	const MissileGuidance::Input &LastGuidanceInput() const;
+	// Add a record of each run of the guidance script to the given list (or
+	// stop, with null), so that another script can be checked against them.
+	void SetGuidanceRecords(std::vector<MissileGuidance::Record> *records);
 
 	// Functions provided by the Body base class:
 	// Frame GetFrame(int step = -1) const;
@@ -164,6 +167,7 @@ private:
 	// was given.
 	script::Trace *guidanceTrace = nullptr;
 	MissileGuidance::Input lastGuidanceInput;
+	std::vector<MissileGuidance::Record> *guidanceRecords = nullptr;
 	// A positive value means this projectile will turn to the right;
 	// a negative value means this projectile will turn left.
 	int confusionDirection = 0;

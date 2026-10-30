@@ -16,9 +16,12 @@
 # game on a virtual display, type into the editor, and look at screenshots.
 #
 #   1. Typing a mistake marks its line, and undo clears the mark.
-#   2. Reversing the missile's turn replays the battle differently.
+#   2. Coasting sooner makes a difference only once a missile is nearly lined
+#      up with the jinking target, which is partway into the drill, so the
+#      battle rewinds to there and goes on differently.
 #   3. Saving writes the script into a plugin.
-#   4. One undo takes back the whole edit, and the battle with it.
+#   4. One undo takes back the whole edit, which makes a difference at that
+#      same step: the runs were the same until then.
 #
 # Usage: simulator-ui.sh BINARY
 #
@@ -49,7 +52,7 @@ GAME=
 trap 'kill $GAME $XVFB 2> /dev/null' EXIT
 sleep 1
 
-"$BINARY" --config "$OUT/config" --resources "$ROOT" --simulator "Sidewinder Missile Launcher" \
+ES_SIMULATOR_LOG=1 "$BINARY" --config "$OUT/config" --resources "$ROOT" --simulator "Sidewinder Missile Launcher" \
 	> "$OUT/game.log" 2>&1 &
 GAME=$!
 for i in $(seq 100); do
@@ -88,8 +91,9 @@ for i in $(seq 120); do
 done
 check "the simulator starts" ready "$OUT/start.png" || exit 1
 
-# The crossing drill, at 8x speed for a few seconds, then paused.
-xdotool key 4 equal equal equal
+# The jinking drill, at 2x speed for a few seconds (not long enough for the
+# drill to start over), then paused.
+xdotool key 5 equal
 sleep 5
 xdotool key space
 # Let the camera settle.
@@ -107,29 +111,51 @@ sleep 0.5
 shot undone
 check_not "undo clears the mark" error "$OUT/undone.png" 21
 check_not "the mistake doesn't change the battle" differ "$OUT/before.png" "$OUT/undone.png"
+# What the edits that compiled did, as the game reports them.
+edits() { grep -c '^SIMULATOR edit' "$OUT/game.log"; }
+EDITS=$(edits)
 
-# Line 19 is "set turn (copysign turn desired-turn)"; turn the other way.
-xdotool mousemove 600 "$(line 19)" click 1
+# Line 24 is "if (> (* steps-to-face 1.5) steps-to-reach)"; coast sooner.
+xdotool mousemove 600 "$(line 24)" click 1
 xdotool key End shift+Home
-xdotool type --delay 20 "set turn (- (copysign turn desired-turn))"
-sleep 1
+xdotool type --delay 20 "if (> (* steps-to-face 3) steps-to-reach)"
+# Let the rewind finish.
+sleep 2
 shot after
 check "the edit replays the battle differently" differ "$OUT/before.png" "$OUT/after.png"
+# Typing the line changes it several times; the last edit is the one that counts.
+EDIT=$(grep '^SIMULATOR edit' "$OUT/game.log" | tail -1)
+echo "  $EDIT"
+NOW=$(echo "$EDIT" | sed -n 's/^SIMULATOR edit at step \([0-9]*\):.*/\1/p')
+FIRST=$(echo "$EDIT" | sed -n 's/.*first difference at step \([0-9]*\).*/\1/p')
+if [ -n "$FIRST" ] && [ "$(edits)" -gt "$EDITS" ] && [ "$FIRST" -gt 1 ] && [ "$FIRST" -lt "$NOW" ]; then
+	echo "ok: the edit first makes a difference partway into the drill"
+else
+	echo "FAILED: the edit first makes a difference partway into the drill"
+	FAILED=1
+fi
 
 xdotool key ctrl+s
 sleep 0.5
 SAVED="$OUT/config/plugins/simulator scripts/data/guidance leading and throttle control.txt"
-if grep -q "set turn (- (copysign turn desired-turn))" "$SAVED" 2> /dev/null; then
+if grep -q "if (> (\* steps-to-face 3) steps-to-reach)" "$SAVED" 2> /dev/null; then
 	echo "ok: saving writes the edited script"
 else
 	echo "FAILED: saving writes the edited script"
 	FAILED=1
 fi
 
+EDITS=$(edits)
 xdotool key ctrl+z
-sleep 1
-shot reverted
-check_not "one undo puts the battle back" differ "$OUT/before.png" "$OUT/reverted.png"
+sleep 2
+UNDO=$(grep '^SIMULATOR edit' "$OUT/game.log" | tail -1)
+echo "  $UNDO"
+if [ "$(edits)" -eq $((EDITS + 1)) ] && echo "$UNDO" | grep -q "first difference at step $FIRST,"; then
+	echo "ok: one undo takes the edit back, with a difference at the same step"
+else
+	echo "FAILED: one undo takes the edit back, with a difference at the same step"
+	FAILED=1
+fi
 
 echo "Screenshots in $OUT"
 exit $FAILED

@@ -1,0 +1,272 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Edits of the game's "leading and throttle control" script (in
+# data/guidance.txt), for checking that the simulator finds the first step on
+# which an edit matters: some matter at once, some only in some situations,
+# and some never.
+#
+#   endless-sky --resources . --config tests/integration/config \
+#       --guidance-bench "Sidewinder Missile Launcher" \
+#       --bench-script tests/ai/guidance-mattered.txt --bench-edit-check
+
+# No change: never matters.
+guidance "same as before"
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 0
+
+# Turns away at full speed: matters once a projectile needs a hard turn.
+guidance "turns away"
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (- (copysign turn desired-turn))
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 0
+
+# Makes small corrections half as large: matters at once.
+guidance "half fine turns"
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn (* .5 desired-turn)
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 0
+
+# Stops thrusting sooner: matters once a projectile is close to lined up.
+guidance "coasts sooner"
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 3) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 0
+
+# Turns the other way when confused: matters only once a seeker is confused.
+guidance "confused the other way"
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn (- confusion-direction))
+	else
+		set turn 0
+
+# Turns without a lock: matters only once a seeker loses its lock.
+guidance "circles without a lock"
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 1
+
+# Draws a random number it never uses: matters at once, because whatever draws
+# random numbers after it gets different ones.
+guidance "rolls dice"
+	let roll (random)
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 0
+
+# Keeps a value it never uses: never matters.
+guidance "remembers nothing useful"
+	memory unused 0
+	if has-lock
+		let d (- target-position position)
+		let direction (unit d)
+		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
+		let steps-to-reach (/ (length d) true-velocity)
+		if (< (dot direction target-velocity) 0)
+			let normal (vec (y direction) (- (x direction)))
+			let normal-speed (dot normal target-velocity)
+			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
+			set d (+ (* closing-speed direction) (* normal-speed normal))
+		else
+			set d (+ d (* steps-to-reach target-velocity))
+			set steps-to-reach (/ (length d) true-velocity)
+		set direction (unit d)
+
+		let desired-turn (* to-deg (asin (cross facing direction)))
+		if (> (abs desired-turn) turn)
+			set turn (copysign turn desired-turn)
+		else
+			set turn desired-turn
+
+		let steps-to-face (/ desired-turn turn)
+		if (> (* steps-to-face 1.5) steps-to-reach)
+			set thrust 0
+	elif confused
+		set turn (* turn confusion-direction)
+	else
+		set turn 0

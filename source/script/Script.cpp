@@ -429,6 +429,7 @@ namespace {
 	// While a program runs on this thread with a trace: the trace, how many
 	// function calls deep it is, and the line of the statement running.
 	thread_local Trace *currentTrace = nullptr;
+	thread_local RandomTape *currentTape = nullptr;
 	thread_local int traceDepth = 0;
 	thread_local size_t currentLine = 0;
 
@@ -1559,7 +1560,7 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 				? a.Vector().Dot(b.Vector()) : a.Vector().Cross(b.Vector()));
 			return true;
 		case Builtin::RANDOM:
-			result = Value(Random::Real());
+			result = Value(currentTape ? currentTape->Draw() : Random::Real());
 			return true;
 		case Builtin::RANDOM_INT:
 		{
@@ -1567,7 +1568,8 @@ bool Program::Implementation::Evaluate(const Expression &expression, vector<Valu
 			const double n = a.GetType() == Type::NUMBER ? a.Number() : 0.;
 			if(!(n >= 1. && n <= 4294967295.) || n != floor(n))
 				return Fail("\"random-int\" needs a whole number from 1 to 4294967295");
-			result = Value(static_cast<double>(Random::Int(static_cast<uint32_t>(n))));
+			const uint32_t modulus = static_cast<uint32_t>(n);
+			result = Value(currentTape ? currentTape->Draw(modulus) : static_cast<double>(Random::Int(modulus)));
 			return true;
 		}
 		case Builtin::AND:
@@ -1700,6 +1702,71 @@ void Trace::Clear()
 	steps.clear();
 	error.clear();
 	errorLine = 0;
+}
+
+
+
+RandomTape::Use::Use(RandomTape *tape)
+	: previous(currentTape)
+{
+	currentTape = tape;
+}
+
+
+
+RandomTape::Use::~Use()
+{
+	currentTape = previous;
+}
+
+
+
+void RandomTape::Record()
+{
+	entries.clear();
+	position = 0;
+	isPlaying = false;
+	matches = true;
+}
+
+
+
+void RandomTape::Play()
+{
+	position = 0;
+	isPlaying = true;
+	matches = true;
+}
+
+
+
+bool RandomTape::Matches() const
+{
+	return matches;
+}
+
+
+
+bool RandomTape::IsFinished() const
+{
+	return position == entries.size();
+}
+
+
+
+double RandomTape::Draw(uint32_t modulus)
+{
+	if(!isPlaying)
+	{
+		const double value = modulus ? static_cast<double>(Random::Int(modulus)) : Random::Real();
+		entries.push_back({modulus, value});
+		return value;
+	}
+	if(position < entries.size() && entries[position].modulus == modulus)
+		return entries[position++].value;
+	// A different draw than before: what it gets no longer matters.
+	matches = false;
+	return 0.;
 }
 
 

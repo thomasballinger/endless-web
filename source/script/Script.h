@@ -176,6 +176,56 @@ private:
 
 
 
+// The random numbers that runs of programs draw. While a tape is in use on a
+// thread, the "random" and "random-int" builtins either note each number they
+// draw on it, or, while it plays back, get the numbers noted on it instead, in
+// order. That lets another version of a program run on exactly what an
+// earlier run saw.
+class RandomTape {
+public:
+	// Use the given tape (or none) on this thread until this is destroyed.
+	class Use {
+	public:
+		explicit Use(RandomTape *tape);
+		~Use();
+		Use(const Use &) = delete;
+		Use &operator=(const Use &) = delete;
+
+	private:
+		RandomTape *previous = nullptr;
+	};
+
+
+public:
+	// Start over with an empty tape, noting what is drawn.
+	void Record();
+	// Play back what was noted, from the start.
+	void Play();
+
+	// While playing back: whether every draw so far was the same kind as the
+	// one noted in its place, and whether every noted draw has been used.
+	bool Matches() const;
+	bool IsFinished() const;
+
+	// A number from [0, 1), or with a modulus, a whole number below it.
+	double Draw(uint32_t modulus = 0);
+
+
+private:
+	class Entry {
+	public:
+		uint32_t modulus = 0;
+		double value = 0.;
+	};
+
+	std::vector<Entry> entries;
+	size_t position = 0;
+	bool isPlaying = false;
+	bool matches = true;
+};
+
+
+
 // What happened during one run of a program, for showing a player how their
 // script ran: each statement executed, in order, with its line in the data
 // file and its result.

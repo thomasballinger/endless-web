@@ -35,6 +35,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -62,9 +64,12 @@ namespace {
 	const Color HIT(.30f, .90f, .45f, 1.f);
 	const Color MISS(.95f, .35f, .30f, 1.f);
 	const Color SELECTED(1.f, .95f, .40f, 1.f);
+	const Color MATTERED(.55f, .80f, 1.f, 1.f);
 	const Color PANEL(0.f, .03f, .015f, .85f);
 
 	const string NOT_RUNNING = "The script has mistakes, so the last version without any is running.";
+	// How long the old run's trails linger after the new run passes where it was.
+	const int GHOST_LINGER = 120;
 
 	// The lines of a data file that define the given node: from its first
 	// line up to the next line that isn't indented.
@@ -98,6 +103,20 @@ namespace {
 		if(!text.empty() && text.back() == '\n')
 			text.pop_back();
 		return text;
+	}
+
+	// With ES_SIMULATOR_LOG set, say what each edit did, for tests.
+	void LogEdit(const GuidanceSimulation::Difference &difference, int now)
+	{
+		static const bool log = getenv("ES_SIMULATOR_LOG");
+		if(!log)
+			return;
+		if(difference.step < 0)
+			printf("SIMULATOR edit at step %d: no difference\n", now);
+		else
+			printf("SIMULATOR edit at step %d: first difference at step %d, missile %d\n", now, difference.step,
+				difference.missile + 1);
+		fflush(stdout);
 	}
 
 	string FormatSpeed(double speed)
@@ -135,7 +154,9 @@ void SimulatorPanel::Step()
 		Recompile();
 	if(statusTime)
 		--statusTime;
-	if(!paused)
+	if(rewindFrames)
+		StepRewind();
+	else if(!paused)
 	{
 		// Fractional speeds step every few frames.
 		const double speed = SPEEDS[speedIndex];
@@ -144,7 +165,7 @@ void SimulatorPanel::Step()
 		for(int i = 0; i < steps; ++i)
 		{
 			if(simulation->CurrentStep() >= LOOP_STEPS)
-				simulation->Reset();
+				Restart();
 			simulation->Step();
 		}
 	}
@@ -167,6 +188,7 @@ void SimulatorPanel::Draw()
 
 	FillShader::Fill(Point(), Screen::Dimensions(), BACKGROUND);
 	DrawGrid();
+	DrawGhosts();
 	DrawTrails();
 
 	DrawList draw;
@@ -180,6 +202,7 @@ void SimulatorPanel::Draw()
 	draw.Draw();
 
 	DrawSelection();
+	DrawTimeline();
 	editor.Draw();
 	DrawInspector();
 	DrawStatus();
@@ -196,7 +219,7 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	else if(control && key == SDLK_SPACE)
 		paused = !paused;
 	else if(control && key == SDLK_r)
-		simulation->Reset();
+		Restart();
 	else if(editor.HasFocus())
 	{
 		if(key == SDLK_ESCAPE)
@@ -212,17 +235,21 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 		paused = !paused;
 	else if(key == SDLK_PERIOD)
 	{
+		FinishRewind();
 		paused = true;
 		simulation->Step();
 	}
 	else if(key == SDLK_r)
-		simulation->Reset();
+		Restart();
 	else if(key == SDLK_EQUALS || key == SDLK_PLUS || key == SDLK_KP_PLUS)
 		speedIndex = min(SPEED_COUNT - 1, speedIndex + 1);
 	else if(key == SDLK_MINUS || key == SDLK_KP_MINUS)
 		speedIndex = max(0, speedIndex - 1);
 	else if(key >= SDLK_1 && key <= SDLK_9)
+	{
+		Restart();
 		simulation->SetDrill(static_cast<int>(key - SDLK_1));
+	}
 	else
 		return false;
 	return true;
@@ -254,6 +281,7 @@ bool SimulatorPanel::Click(int x, int y, MouseButton button, int clicks)
 	editor.SetFocus(false);
 	if(view.Contains(point))
 	{
+		FinishRewind();
 		simulation->Select(simulation->MissileAt(ToWorld(point), 30. / zoom));
 		// Replaying is exact, so replay to now to trace the latest step, even
 		// while paused.
@@ -316,10 +344,91 @@ void SimulatorPanel::Recompile()
 	if(hasErrors)
 		return;
 
-	// It compiles: replay from the start with it, back to where things were.
+	// It compiles. Any rewind under way skips to its end, where the script in
+	// use takes over.
+	FinishRewind();
+	const int now = simulation->CurrentStep();
+	const bool isFirst = !guidance.IsValid();
+	difference = simulation->FirstDifference(candidate);
+	if(!isFirst)
+		LogEdit(difference, now);
+	previousGuidance = std::move(guidance);
 	guidance = std::move(candidate);
+	ghosts.clear();
+	ghostStep = -1;
+	if(difference.step < 0)
+	{
+		// Nothing would have been different. Replaying still matters, to give
+		// projectiles in flight what the new script would have remembered.
+		simulation->SetGuidance(&guidance);
+		simulation->ReplayTo(now);
+		if(!isFirst)
+		{
+			status = "No difference yet: so far, this steers exactly as the last version did.";
+			statusTime = 240;
+		}
+		return;
+	}
+
+	// Keep the old run's trails to compare with, and rewind through it to the
+	// step where the new script first steers differently.
+	for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
+		ghosts.push_back(missile.trail);
+	ghostStep = now;
+	simulation->SetGuidance(&previousGuidance);
+	rewindFrom = now;
+	rewindTo = difference.step;
+	rewindFrame = 0;
+	rewindFrames = static_cast<int>(round(6. + 14. * log10(now - difference.step + 1.)));
+	status = "This first makes a difference at step " + to_string(difference.step) + ", for missile #"
+		+ to_string(difference.missile + 1) + ".";
+	statusTime = 300;
+}
+
+
+
+void SimulatorPanel::StepRewind()
+{
+	if(++rewindFrame >= rewindFrames)
+	{
+		FinishRewind();
+		return;
+	}
+	// Speed up and then slow down, like winding back a tape.
+	const double t = static_cast<double>(rewindFrame) / rewindFrames;
+	const double eased = t * t * (3. - 2. * t);
+	simulation->ReplayTo(rewindFrom - static_cast<int>(lround((rewindFrom - rewindTo) * eased)));
+}
+
+
+
+void SimulatorPanel::FinishRewind()
+{
+	if(!rewindFrames)
+		return;
+	rewindFrames = 0;
 	simulation->SetGuidance(&guidance);
-	simulation->ReplayTo(simulation->CurrentStep());
+	simulation->ReplayTo(rewindTo);
+	// Show how the script ran for the projectile it first made a difference
+	// for, unless another one in flight is selected.
+	const GuidanceSimulation::Missile *selected = simulation->SelectedMissile();
+	if(!selected || selected->endStep >= 0)
+	{
+		simulation->Select(difference.missile);
+		simulation->ReplayTo(rewindTo);
+	}
+}
+
+
+
+void SimulatorPanel::Restart()
+{
+	rewindFrames = 0;
+	difference = GuidanceSimulation::Difference();
+	ghosts.clear();
+	ghostStep = -1;
+	simulation->SetGuidance(&guidance);
+	simulation->Reset();
 }
 
 
@@ -465,6 +574,54 @@ void SimulatorPanel::DrawTrails() const
 			RingShader::Draw(ToScreen(trail.back()), 9.f, 7.f, color);
 		}
 	}
+}
+
+
+
+void SimulatorPanel::DrawGhosts() const
+{
+	// The old run's trails, until the new run is well past where it was.
+	const int step = simulation->CurrentStep();
+	if(rewindFrames || ghosts.empty() || step > ghostStep + GHOST_LINGER)
+		return;
+	const float fade = .35f * min(1.f, (ghostStep + GHOST_LINGER - step) / static_cast<float>(GHOST_LINGER));
+	const Color color(MISSILE.Get()[0] * fade, MISSILE.Get()[1] * fade, MISSILE.Get()[2] * fade, fade);
+	for(const deque<Point> &trail : ghosts)
+		for(size_t i = 1; i < trail.size(); ++i)
+			LineShader::Draw(ToScreen(trail[i - 1]), ToScreen(trail[i]), 1.f, color, false);
+
+	// Where the new script first steered differently.
+	if(difference.step >= 0)
+	{
+		const Point at = ToScreen(difference.position);
+		RingShader::Draw(at, 7.f, 5.5f, MATTERED);
+		FontSet::Get(14).Draw("step " + to_string(difference.step), at + Point(10., -18.), MATTERED);
+	}
+}
+
+
+
+void SimulatorPanel::DrawTimeline() const
+{
+	// A bar under the range, from the start of the drill to where it loops.
+	const double left = view.Left() + 20.;
+	const double right = view.Right() - 20.;
+	const double y = view.Bottom() - 18.;
+	auto x = [left, right](int step) { return left + (right - left) * min(1., step / static_cast<double>(LOOP_STEPS)); };
+	LineShader::Draw(Point(left, y), Point(right, y), 2.f, GRID_MAJOR, false);
+	const int step = simulation->CurrentStep();
+	LineShader::Draw(Point(left, y), Point(x(step), y), 2.f, rewindFrames ? MATTERED : DIM, false);
+	if(ghostStep >= 0)
+		LineShader::Draw(Point(x(ghostStep), y - 4.), Point(x(ghostStep), y + 4.), 1.f, DIM, false);
+	if(difference.step >= 0)
+	{
+		const double at = x(difference.step);
+		LineShader::Draw(Point(at, y - 7.), Point(at, y + 7.), 2.f, MATTERED, false);
+		const Font &font = FontSet::Get(14);
+		const string label = "made a difference at step " + to_string(difference.step);
+		font.Draw(label, Point(min(at - 4., right - font.Width(label)), y - 26.), MATTERED);
+	}
+	FillShader::Fill(Point(x(step), y), Point(4., 12.), TEXT);
 }
 
 

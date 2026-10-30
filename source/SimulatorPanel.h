@@ -25,9 +25,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Rectangle.h"
 
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 class Outfit;
 class Ship;
@@ -37,9 +39,11 @@ class Ship;
 // A practice range for guidance scripts, set apart from the game itself: a
 // grid instead of stars and planets, where a launcher fires a homing weapon
 // at a target flying a drill. The weapon's guidance script is open in an
-// editor beside it. Every change that compiles replays the range from the
-// start to the current moment with the new script, so its effect shows at
-// once; mistakes are marked on their lines instead. Time can be paused,
+// editor beside it. Every change that compiles is checked against what the
+// script in use did: if it would have steered any projectile differently, the
+// range rewinds to the first step where it would have, and goes on from there
+// with the new script, with the old run's trails shown faintly beside the new
+// ones. Mistakes are marked on their lines instead. Time can be paused,
 // stepped, sped up, and restarted, and clicking a projectile shows, in the
 // editor, which lines of its script ran on the latest step and what they
 // produced.
@@ -60,8 +64,15 @@ protected:
 
 
 private:
-	// Compile the editor's text, and if it compiles, use it and replay.
+	// Compile the editor's text, and if it compiles, use it. If it would have
+	// steered differently than the script in use, rewind to where it first
+	// would have, and go on from there with it.
 	void Recompile();
+	// Show the next frame of a rewind, or end it at once.
+	void StepRewind();
+	void FinishRewind();
+	// Start over, forgetting the last edit's rewind and old trails.
+	void Restart();
 	// Show the selected projectile's latest run in the editor.
 	void UpdateRunNotes();
 	void Save();
@@ -72,6 +83,8 @@ private:
 	Point ToWorld(const Point &screen) const;
 	void DrawGrid() const;
 	void DrawTrails() const;
+	void DrawGhosts() const;
+	void DrawTimeline() const;
 	void DrawSelection() const;
 	void DrawInspector() const;
 	void DrawStatus() const;
@@ -86,6 +99,8 @@ private:
 	CodeDocument document;
 	CodeEditor editor;
 	MissileGuidance guidance;
+	// The script in use before the last edit, which a rewind shows going back.
+	MissileGuidance previousGuidance;
 	std::string guidanceName;
 	uint64_t compiledVersion = 0;
 	// Whether the text has mistakes, so an older version is still running.
@@ -94,6 +109,17 @@ private:
 	int statusTime = 0;
 	// Where the script came from, and where saving it puts it.
 	std::filesystem::path sourcePath;
+
+	// Where the last edit first mattered, and the trails from before it, which
+	// are shown faintly until the new run catches up with where the old one was.
+	GuidanceSimulation::Difference difference;
+	std::vector<std::deque<Point>> ghosts;
+	int ghostStep = -1;
+	// A rewind in progress: from which step to which, and its frames.
+	int rewindFrom = 0;
+	int rewindTo = 0;
+	int rewindFrame = 0;
+	int rewindFrames = 0;
 
 	bool paused = false;
 	// Steps per frame: 1/4, 1/2, 1, 2, 4 or 8.
