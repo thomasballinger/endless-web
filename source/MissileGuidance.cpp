@@ -34,8 +34,6 @@ namespace {
 		interface.AddInput("has-lock");
 		interface.AddInput("target-position");
 		interface.AddInput("target-velocity");
-		interface.AddInput("confused");
-		interface.AddInput("confusion-direction");
 		interface.AddInput("max-turn");
 		interface.AddInput("acceleration");
 		interface.AddInput("drag");
@@ -146,8 +144,6 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	variables[HAS_LOCK] = script::Value(locked);
 	variables[TARGET_POSITION] = script::Value(locked ? input.targetPosition : Point());
 	variables[TARGET_VELOCITY] = script::Value(locked ? input.targetVelocity : Point());
-	variables[CONFUSED] = script::Value(input.confused);
-	variables[CONFUSION_DIRECTION] = script::Value(static_cast<double>(input.confusionDirection));
 	variables[MAX_TURN] = script::Value(input.maxTurn);
 	variables[ACCELERATION] = script::Value(input.acceleration);
 	variables[DRAG] = script::Value(input.drag);

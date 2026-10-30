@@ -397,10 +397,11 @@ endless-sky --resources . --config tests/integration/config \
 ```
 drill                        script                           mattered   differed
 ahead, approaching           turns away                           1038       1038
-ahead, approaching           confused the other way                913        913
+ahead, approaching           no head-on lead                     never      never
 ahead, approaching           circles without a lock                451        451
 ahead, approaching           rolls dice                              1        913
 ahead, jinking               coasts sooner                         120        120
+ahead, jinking               no head-on lead                        66         66
 to the side, holding still   half fine turns                        26         26
 ...
 Every edit mattered first where the simulator said.
@@ -410,8 +411,9 @@ In all 64 cases the two agree, except for drawing an extra random number,
 where the records find the difference earlier than it shows, as they should.
 How far back an edit goes says something about it: making small corrections
 gentler matters within a few steps, coasting sooner only once a missile is
-nearly lined up, and turning the other way when confused only once a seeker is
-confused, which in most drills never happens.
+nearly lined up, and aiming straight at a target coming toward the missile
+only once one comes at it from the side (a target coming straight at it, as
+in the approaching drill, needs no lead).
 
 The editor (`CodeEditor`, over the text model `CodeDocument`) has the usual
 keys: selection with shift, words with ctrl, undo and redo, the clipboard, Tab
@@ -541,10 +543,33 @@ The script language is being designed as it's used. Rules so far, and why:
   along this", which it needed twice, and the intercept example plugin uses
   them to name the intercept time and the full angle to a point. Both give
   exactly the same results as before.
+- **Scripts are written from the missile's point of view, and what goes
+  wrong with the hardware isn't the script's choice.** The default scripts
+  used to end with `elif confused` / `set turn (* turn confusion-direction)`,
+  but nobody would choose to write that: a confused seeker doesn't know it's
+  confused. Confusion is now handled by the seeker before the script runs,
+  like a blind spot: a confused projectile turns as fast as it can, one way
+  or the other, and its script doesn't run that step (the simulator's
+  inspector says so). The `confused` and `confusion-direction` inputs are
+  gone. Behavior is exactly as before: the unit test that compares the
+  default scripts with the original C++ on random situations covers
+  confusion, and the AI scenarios match the reference build.
 - **Arithmetic works left to right, exactly as the C++ did.** `(* a b c)` is
   `(* (* a b) c)`, so scripts that copy C++ code give bit-identical results.
 
 Open questions:
+
+- **Fooling the script instead.** Confusion could be something the seeker
+  reports wrongly rather than a takeover: a confused seeker reports a lock
+  on a phantom target, and the script steers at it as at anything else. Then
+  a script could learn to distrust a target that jumps, which is a counter to
+  jamming that a player could write. It can't reproduce the old behavior,
+  though: the default scripts turn by `asin`, which never asks for more than
+  90 degrees, but some weapons turn 90, 180 or 360 degrees a step and spin
+  that fast when confused, and a projectile that isn't moving divides by
+  zero when it leads a phantom. So it would be a change to the game, with a
+  phantom placed somewhere that makes sense (where the target was, or a
+  decoy's position), not off to the side.
 
 - **Sensors as functions.** Should a sensor be an input, or a function
   called only when wanted, like `(seek)`? A function only pays off when

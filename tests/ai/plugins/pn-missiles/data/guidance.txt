@@ -22,10 +22,7 @@ guidance "proportional navigation" "basic" "throttle control" "leading" "leading
 
 	if (not has-lock)
 		set last-sight (vec 0 0)
-		if confused
-			set turn (* max-turn confusion-direction)
-		else
-			set turn 0
+		set turn 0
 		stop
 
 	let sight (unit (- target-position position))

@@ -39,9 +39,12 @@ class Weapon;
 // "guidance" attribute, which is used only if the weapon has every capability
 // the script needs.
 //
-// The script only decides how to steer. Whether the seeker has a lock or is
-// confused is still decided by the weapon's tracking attributes, and is given
-// to the script as an input.
+// The script only decides how to steer. Whether the seeker has a lock is still
+// decided by the weapon's tracking attributes, and is given to the script as
+// an input. A seeker that loses its lock may also be confused (by jamming, or
+// by poor tracking). That is the seeker's doing, not the script's: like a
+// blind spot, it is handled before the script runs. A confused projectile
+// turns as fast as it can, one way or the other, and its script does not run.
 class MissileGuidance {
 public:
 	// Variables available to guidance scripts, in the order they are added to
@@ -56,10 +59,6 @@ public:
 		HAS_LOCK,
 		TARGET_POSITION,
 		TARGET_VELOCITY,
-		// Whether the seeker is confused, and which way a confused projectile
-		// turns: 1 or -1.
-		CONFUSED,
-		CONFUSION_DIRECTION,
 		// The weapon's attributes.
 		MAX_TURN,
 		ACCELERATION,
@@ -91,8 +90,6 @@ public:
 		bool hasLock = false;
 		Point targetPosition;
 		Point targetVelocity;
-		bool confused = false;
-		int confusionDirection = 1;
 		double maxTurn = 0.;
 		double acceleration = 0.;
 		double drag = 0.;

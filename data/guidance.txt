@@ -21,6 +21,10 @@
 #   optical tracking   it can see which way its target faces ("target-facing")
 #   blindspot          it can't see behind itself: if its target is behind it,
 #                      it loses the target (this happens before the script runs)
+# A seeker that loses its lock may also be confused (depending on the weapon's
+# tracking attributes and the target's jamming). Then the seeker steers: the
+# projectile turns as fast as it can, one way or the other, and the script
+# doesn't run (this also happens before the script runs).
 # Each weapon uses the default script below for its capabilities, or the
 # script named by its "guidance" attribute if it has every capability that
 # script uses. A "guidance" node may give one script several names, so a
@@ -65,9 +69,8 @@
 #
 # Inputs (read only):
 #   position velocity facing                 this projectile (facing is a unit vector)
-#   has-lock                                 whether the seeker can see its target
+#   has-lock                                 whether the seeker sees a target
 #   target-position target-velocity          (zero without a lock)
-#   confused confusion-direction             the seeker's state (direction is 1 or -1)
 #   max-turn acceleration drag               the weapon's attributes
 #   age lifetime-left                        steps since it was fired, and until
 #                                            it expires
@@ -91,9 +94,6 @@ guidance "basic"
 			set turn (copysign turn desired-turn)
 		else
 			set turn desired-turn
-	# Turn in a random direction if this weapon is confused.
-	elif confused
-		set turn (* turn confusion-direction)
 	# If a weapon is homing but has no target, do not turn it.
 	else
 		set turn 0
@@ -116,8 +116,6 @@ guidance "throttle control"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -146,8 +144,6 @@ guidance "leading"
 			set turn (copysign turn desired-turn)
 		else
 			set turn desired-turn
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -178,7 +174,5 @@ guidance "leading and throttle control"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0

@@ -673,8 +673,14 @@ void SimulatorPanel::DrawInspector() const
 		line(string(missile->hit ? "Hit" : "Expired") + " at step " + to_string(missile->endStep) + ".", DIM);
 		return;
 	}
+	if(missile->projectile.IsConfused())
+	{
+		line("lock: no, and confused: the seeker", MISS);
+		line("is steering, not the script", MISS);
+		return;
+	}
 	const MissileGuidance::Input &input = missile->projectile.LastGuidanceInput();
-	line(string("lock: ") + (input.hasLock ? "yes" : input.confused ? "confused" : "no"), DIM);
+	line(string("lock: ") + (input.hasLock ? "yes" : "no"), DIM);
 	line("age " + to_string(input.age) + ", " + to_string(input.lifetimeLeft) + " steps left", DIM);
 	if(input.hasLock)
 	{

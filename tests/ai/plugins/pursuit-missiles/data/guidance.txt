@@ -6,7 +6,5 @@ guidance "basic" "throttle control" "leading" "leading and throttle control"
 		let to-target (- target-position position)
 		let bearing (* to-deg (atan2 (cross facing to-target) (dot facing to-target)))
 		set turn (max (- max-turn) (min max-turn bearing))
-	elif confused
-		set turn (* max-turn confusion-direction)
 	else
 		set turn 0

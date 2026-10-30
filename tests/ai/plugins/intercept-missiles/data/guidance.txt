@@ -41,7 +41,7 @@ guidance "intercept" "leading and throttle control"
 		return (* to-deg (atan2 (cross facing v) (dot facing v)))
 
 	if (not has-lock)
-		set turn (if confused (* turn confusion-direction) 0)
+		set turn 0
 		stop
 
 	let d (- target-position position)

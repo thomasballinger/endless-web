@@ -26,7 +26,7 @@
 # Aim at the latest fix.
 guidance "pursuit"
 	if (not has-lock)
-		set turn (if confused (* turn confusion-direction) 0)
+		set turn 0
 		stop
 	let aim (- target-position position)
 	let desired (* to-deg (atan2 (cross facing aim) (dot facing aim)))
@@ -39,7 +39,7 @@ guidance "raw lead"
 	memory has-fix false
 	if (not has-lock)
 		set has-fix false
-		set turn (if confused (* turn confusion-direction) 0)
+		set turn 0
 		stop
 	let estimate (if has-fix (- target-position last-fix) (vec 0 0))
 	set last-fix target-position
@@ -56,7 +56,7 @@ guidance "smoothed lead 0.2s"
 	memory estimate (vec 0 0)
 	if (not has-lock)
 		set has-fix false
-		set turn (if confused (* turn confusion-direction) 0)
+		set turn 0
 		stop
 	if has-fix
 		set estimate (+ estimate (* .1 (- (- target-position last-fix) estimate)))
@@ -73,7 +73,7 @@ guidance "smoothed lead 1s"
 	memory estimate (vec 0 0)
 	if (not has-lock)
 		set has-fix false
-		set turn (if confused (* turn confusion-direction) 0)
+		set turn 0
 		stop
 	if has-fix
 		set estimate (+ estimate (* .1 (- (- target-position last-fix) estimate)))

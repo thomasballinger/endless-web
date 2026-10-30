@@ -321,13 +321,26 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 // and how much to accelerate.
 void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 {
+	// The seeker itself steers in two cases, and then the guidance script
+	// does not run that step (and a trace of it shows nothing):
 	// A seeker with a blind spot can't see a target behind the projectile, so
-	// it loses the target. The guidance script does not run that step, so the
-	// projectile turns at its full turn rate, as it always has.
+	// it loses the target, and the projectile turns at its full turn rate, as
+	// it always has.
 	if(currentTarget && weapon->HasBlindspot()
 			&& (currentTarget->Position() - position).Dot(angle.Unit()) < 0.)
 	{
+		if(guidanceTrace)
+			guidanceTrace->Clear();
 		target.reset();
+		return;
+	}
+	// A seeker that has lost its lock and is confused turns the projectile as
+	// fast as it can, one way or the other.
+	if(isConfused && !(currentTarget && hasLock))
+	{
+		if(guidanceTrace)
+			guidanceTrace->Clear();
+		turn *= confusionDirection;
 		return;
 	}
 
@@ -376,8 +389,6 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 		input.targetVelocity = currentTarget->Velocity();
 		input.targetFacing = currentTarget->Facing().Unit();
 	}
-	input.confused = isConfused;
-	input.confusionDirection = confusionDirection;
 	input.maxTurn = turn;
 	input.acceleration = accel;
 	input.drag = weapon->Drag();
@@ -427,6 +438,13 @@ void Projectile::SetGuidanceTrace(script::Trace *trace)
 const MissileGuidance::Input &Projectile::LastGuidanceInput() const
 {
 	return lastGuidanceInput;
+}
+
+
+
+bool Projectile::IsConfused() const
+{
+	return isConfused && !hasLock;
 }
 
 

@@ -50,8 +50,6 @@ guidance "full turn"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -83,8 +81,6 @@ guidance "full throttle"
 		# Changed: never cut the engine to turn more tightly.
 		if false
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -115,7 +111,5 @@ guidance "no lead"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0

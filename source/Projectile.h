@@ -74,6 +74,9 @@ public:
 	void SetGuidanceTrace(script::Trace *trace);
 	// What the guidance script was given on the last step it was traced.
 	const MissileGuidance::Input &LastGuidanceInput() const;
+	// Whether the seeker has lost its lock and is confused, so that it steers
+	// the projectile instead of the guidance script.
+	bool IsConfused() const;
 	// Add a record of each run of the guidance script to the given list (or
 	// stop, with null), so that another script can be checked against them.
 	void SetGuidanceRecords(std::vector<MissileGuidance::Record> *records);

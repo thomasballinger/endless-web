@@ -46,8 +46,6 @@ guidance "same as before"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -77,8 +75,6 @@ guidance "turns away"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -108,8 +104,6 @@ guidance "half fine turns"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -139,13 +133,11 @@ guidance "coasts sooner"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 3) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
-# Turns the other way when confused: matters only once a seeker is confused.
-guidance "confused the other way"
+# Aims straight at a target coming toward it: matters only once one is.
+guidance "no head-on lead"
 	if has-lock
 		let d (- target-position position)
 		let direction (unit d)
@@ -155,7 +147,7 @@ guidance "confused the other way"
 			let normal (vec (y direction) (- (x direction)))
 			let normal-speed (dot normal target-velocity)
 			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
-			set d (+ (* closing-speed direction) (* normal-speed normal))
+			set d (* closing-speed direction)
 		else
 			set d (+ d (* steps-to-reach target-velocity))
 			set steps-to-reach (/ (length d) true-velocity)
@@ -170,12 +162,11 @@ guidance "confused the other way"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn (- confusion-direction))
 	else
 		set turn 0
 
-# Turns without a lock: matters only once a seeker loses its lock.
+# Turns without a lock: matters only once a seeker loses its lock (and isn't
+# confused, which looks like a lock to the script).
 guidance "circles without a lock"
 	if has-lock
 		let d (- target-position position)
@@ -201,8 +192,6 @@ guidance "circles without a lock"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 1
 
@@ -234,8 +223,6 @@ guidance "rolls dice"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0
 
@@ -266,7 +253,5 @@ guidance "remembers nothing useful"
 		let steps-to-face (/ desired-turn turn)
 		if (> (* steps-to-face 1.5) steps-to-reach)
 			set thrust 0
-	elif confused
-		set turn (* turn confusion-direction)
 	else
 		set turn 0

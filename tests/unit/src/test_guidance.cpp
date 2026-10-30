@@ -143,11 +143,13 @@ Steering BuiltInHoming(const Situation &s)
 }
 
 // The same decision, made the way Projectile::Steer makes it now: the seeker
-// handles the blind spot, then the weapon's default script runs.
+// handles the blind spot and confusion, then the weapon's default script runs.
 Steering Scripted(const MissileGuidance &guidance, const Situation &s)
 {
 	if(s.hasTarget && s.blindspot && (s.targetPosition - s.position).Dot(s.facing) < 0.)
 		return {s.turn, s.accel, true};
+	if(s.confused && !(s.hasTarget && s.hasLock))
+		return {s.turn * s.confusionDirection, s.accel, false};
 
 	MissileGuidance::Input input;
 	input.position = s.position;
@@ -156,8 +158,6 @@ Steering Scripted(const MissileGuidance &guidance, const Situation &s)
 	input.hasLock = s.hasTarget && s.hasLock;
 	input.targetPosition = s.targetPosition;
 	input.targetVelocity = s.targetVelocity;
-	input.confused = s.confused;
-	input.confusionDirection = s.confusionDirection;
 	input.maxTurn = s.turn;
 	input.acceleration = s.accel;
 	input.drag = s.drag;
