@@ -348,11 +348,9 @@ const GuidanceSimulation::Missile *GuidanceSimulation::Followed() const
 	const Missile *newest = nullptr;
 	for(const Missile &missile : missiles)
 	{
-		if(missile.endStep >= 0)
-			continue;
 		if(missile.id == selected)
 			return &missile;
-		if(!newest || missile.id > newest->id)
+		if(missile.endStep < 0 && (!newest || missile.id > newest->id))
 			newest = &missile;
 	}
 	return newest;

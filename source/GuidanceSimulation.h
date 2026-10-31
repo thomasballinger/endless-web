@@ -120,8 +120,9 @@ public:
 	// Choose a projectile to follow (-1 for none).
 	void Select(int id);
 	int Selected() const;
-	// The projectile being followed: the selected one while it is in flight,
-	// or else the newest one in flight (or null, if none is).
+	// The projectile being followed: the selected one (even after it hits or
+	// expires, as long as the simulation still has it), or else the newest one
+	// in flight (or null, if none is).
 	const Missile *Followed() const;
 	// How a projectile's guidance script ran on the last step it ran.
 	const script::Trace &TraceOf(int id) const;

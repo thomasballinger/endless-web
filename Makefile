@@ -122,7 +122,8 @@ dataversion.js: endless-sky.js
 output/index.html: endless-sky.js endless-sky.html favicon.ico Ubuntu-Regular.ttf dataversion.js js/cached-resource.js js/plugins.js js/save-games.js
 	rm -rf output
 	mkdir -p output
-	cp endless-sky.html to-be-modified-endless-sky.html
+	sed "s/__BUILD_SHA__/$$(git rev-parse --short HEAD 2> /dev/null || echo unknown)/g" endless-sky.html \
+		> to-be-modified-endless-sky.html
 	cp endless-sky.js to-be-modified-endless-sky.js
 	./copy-to-hashed-location.py endless-sky.wasm endless-sky.data output/
 	mkdir output/js

@@ -159,7 +159,33 @@ void SimulatorPanel::Step()
 			simulation->Step();
 		}
 	}
+	UpdateFollow();
 	UpdateRunNotes();
+}
+
+
+
+void SimulatorPanel::UpdateFollow()
+{
+	// Follow one missile from when it is fired until it hits or expires, and
+	// then the next one fired after that. With none chosen, start with the
+	// newest.
+	const GuidanceSimulation::Missile *followed = simulation->Followed();
+	if(!followed)
+		return;
+	if(followed->id != simulation->Selected())
+	{
+		simulation->Select(followed->id);
+		return;
+	}
+	if(followed->endStep < 0)
+		return;
+	for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
+		if(missile.endStep < 0 && missile.launchStep >= followed->endStep)
+		{
+			simulation->Select(missile.id);
+			return;
+		}
 }
 
 
@@ -173,8 +199,21 @@ void SimulatorPanel::Draw()
 	const Point target = simulation->Target().Position();
 	const Point span = Point(fabs(target.X() - launcher.X()), fabs(target.Y() - launcher.Y())) + Point(900., 900.);
 	const double fit = min(view.Width() / span.X(), view.Height() / span.Y()) * zoomFactor;
-	// Ease the camera toward where it should be.
-	center += ((launcher + target) / 2. - center) * .1;
+	// Ease the camera toward where it should be: between the two ships, but
+	// moved over far enough to keep the followed missile in view (which only
+	// matters when zoomed in).
+	Point desired = (launcher + target) / 2.;
+	const GuidanceSimulation::Missile *followed = simulation->Followed();
+	if(followed && followed->endStep < 0)
+	{
+		const Point offset = (followed->projectile.Position() - desired) * zoom;
+		const double marginX = max(0., view.Width() / 2. - 80.);
+		const double marginY = max(0., view.Height() / 2. - 80.);
+		const Point shift(copysign(max(0., fabs(offset.X()) - marginX), offset.X()),
+			copysign(max(0., fabs(offset.Y()) - marginY), offset.Y()));
+		desired += shift / zoom;
+	}
+	center += (desired - center) * .1;
 	zoom += (fit - zoom) * .1;
 
 	FillShader::Fill(Point(), Screen::Dimensions(), BACKGROUND);
@@ -584,16 +623,17 @@ void SimulatorPanel::UpdateRunNotes()
 	if(missile)
 	{
 		notes = CodeEditor::RunNotes(simulation->TraceOf(missile->id));
-		const bool isSelected = (missile->id == simulation->Selected());
-		editor.SetCaption("values from missile #" + to_string(missile->id + 1)
-			+ (isSelected ? " (selected)" : " (newest)"), FOLLOWED);
+		const string state = missile->endStep < 0 ? "" : missile->hit ? " (its last step: it hit)"
+			: " (its last step: it expired)";
+		editor.SetCaption("values from missile #" + to_string(missile->id + 1) + state, FOLLOWED);
 	}
 	else
 		editor.SetCaption("no missile in flight", DIM);
 	editor.SetRun(notes);
 	// The code stays readable while the seeker has taken over, since it can
 	// still be edited.
-	editor.SetGlitch(missile && missile->projectile.IsConfused() ? "SEEKER CONFUSED by " + Blame(*missile)
+	editor.SetGlitch(missile && missile->endStep < 0 && missile->projectile.IsConfused() ? "SEEKER CONFUSED by "
+		+ Blame(*missile)
 		+ ": it steers, not this code" : "", false);
 }
 
@@ -945,7 +985,7 @@ void SimulatorPanel::DrawSelection() const
 				text += " (not to scale)";
 			font.Draw(text, tip + note->vector.Unit() * 12. + Point(-font.Width(text) / 2., -7.), TEXT);
 		}
-	if(followed->projectile.IsConfused())
+	if(followed->endStep < 0 && followed->projectile.IsConfused())
 	{
 		// The seeker has lost the target and is steering on its own.
 		const double wobble = (frameCount / 3 % 3) - 1.;
@@ -958,7 +998,7 @@ void SimulatorPanel::DrawSelection() const
 	// Where the seeker thinks the target is, which with a noisy seeker is
 	// not quite where it really is.
 	const MissileGuidance::Input &input = followed->projectile.LastGuidanceInput();
-	if(input.hasLock)
+	if(input.hasLock && followed->endStep < 0)
 	{
 		const Point seen = ToScreen(input.targetPosition);
 		LineShader::DrawDashed(position, seen, (seen - position).Unit(), 1.f, FOLLOWED, 6., 6.);
@@ -988,9 +1028,12 @@ void SimulatorPanel::DrawInspector() const
 		line("No missile in flight.", DIM);
 		return;
 	}
-	const bool isSelected = (missile->id == simulation->Selected());
-	line("Missile #" + to_string(missile->id + 1) + (isSelected ? " (selected)" : " (newest)"), FOLLOWED);
-	line(isSelected ? "click empty space to follow the newest" : "click a missile to follow it", DIM);
+	line("Missile #" + to_string(missile->id + 1) + ", fired at step " + to_string(missile->launchStep), FOLLOWED);
+	if(missile->endStep >= 0)
+		line(string(missile->hit ? "Hit" : "Expired") + " at step " + to_string(missile->endStep)
+			+ "; next one soon", missile->hit ? HIT : MISS);
+	else
+		line("[ ] or click to follow another", DIM);
 	y += 6.;
 	DrawCloseUp(*missile, Rectangle(Point(left + INSPECTOR_WIDTH / 2., y + CLOSE_UP_SIZE / 2.),
 		Point(CLOSE_UP_SIZE, CLOSE_UP_SIZE)));
@@ -1000,7 +1043,7 @@ void SimulatorPanel::DrawInspector() const
 	const Projectile &projectile = missile->projectile;
 	const Weapon &weapon = simulation->GetWeapon();
 	const MissileGuidance::Input &input = projectile.LastGuidanceInput();
-	const bool confused = projectile.IsConfused();
+	const bool confused = missile->endStep < 0 && projectile.IsConfused();
 	if(confused)
 		line((frameCount / 15) % 2 ? "SEEKER CONFUSED" : "", CONFUSED);
 	else
@@ -1056,7 +1099,7 @@ void SimulatorPanel::DrawCloseUp(const GuidanceSimulation::Missile &missile, con
 	// headed and where its seeker sees the target.
 	FillShader::Fill(box.Center(), box.Dimensions(), BACKGROUND);
 	const Projectile &projectile = missile.projectile;
-	const bool confused = projectile.IsConfused();
+	const bool confused = missile.endStep < 0 && projectile.IsConfused();
 	const Color &frame = confused ? CONFUSED : FOLLOWED;
 	const double wobble = confused ? (frameCount / 3 % 3) - 1. : 0.;
 	const Point corners[] = {box.TopLeft(), Point(box.Right(), box.Top()), box.BottomRight(),

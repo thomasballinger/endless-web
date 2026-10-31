@@ -107,6 +107,8 @@ private:
 	void DrawCloseUp(const GuidanceSimulation::Missile &missile, const Rectangle &box) const;
 	// Follow the next (or previous) missile in flight.
 	void CycleMissile(int direction);
+	// Keep following one missile until it is gone, and then the next.
+	void UpdateFollow();
 	// Fly the launcher with the arrow keys.
 	void FlyLauncher();
 	// What confused a missile's seeker, e.g. "the Carrier's radar jamming".
