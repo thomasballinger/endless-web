@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "MissileGuidance.h"
 #include "Point.h"
 #include "Projectile.h"
+#include "Random.h"
 #include "script/Script.h"
 #include "Ship.h"
 #include "Weapon.h"
@@ -156,6 +157,8 @@ private:
 	int nextId = 0;
 	int hits = 0;
 
+	// The simulation's own random numbers (see OwnRandom).
+	Random::Saved random;
 	// How each projectile's guidance script ran, by projectile.
 	std::map<int, std::vector<MissileGuidance::Record>> records;
 

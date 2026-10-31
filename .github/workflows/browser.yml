@@ -59,7 +59,10 @@ jobs:
           path: build
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.EM_VERSION }}
 
+      # Only the branches that deploy need (or, in a fork, have) credentials;
+      # elsewhere this workflow just checks that the web build builds.
       - name: Configure AWS Credentials
+        if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/endless-web' || github.ref == 'refs/heads/scriptable') }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}

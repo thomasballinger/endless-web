@@ -16,6 +16,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
 #include <cstdint>
+#include <random>
 
 
 
@@ -79,6 +80,19 @@ public:
 	// A stream for effects that only change how the game looks, and so should
 	// not take numbers from any object's stream.
 	static Stream &EffectStream();
+
+	// Everything about the main generator that decides what it draws next, so
+	// that something can set it aside and put it back: e.g. a simulation that
+	// runs between frames of the game, which needs its own sequence of numbers
+	// whatever else draws numbers in between.
+	class Saved {
+	private:
+		friend class Random;
+		std::mt19937_64 generator;
+		std::normal_distribution<double> normal;
+	};
+	static Saved Save();
+	static void Restore(const Saved &saved);
 
 	// Seed the generator (e.g. to make it produce exactly the same random
 	// numbers it produced previously).

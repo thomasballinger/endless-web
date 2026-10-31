@@ -168,6 +168,26 @@ Random::Stream &Random::EffectStream()
 
 // Seed the generator (e.g. to make it produce exactly the same random
 // numbers it produced previously).
+Random::Saved Random::Save()
+{
+	lock_guard<mutex> lock(generatorMutex);
+	Saved saved;
+	saved.generator = gen;
+	saved.normal = normal;
+	return saved;
+}
+
+
+
+void Random::Restore(const Saved &saved)
+{
+	lock_guard<mutex> lock(generatorMutex);
+	gen = saved.generator;
+	normal = saved.normal;
+}
+
+
+
 void Random::Seed(uint64_t seed)
 {
 	lock_guard<mutex> lock(generatorMutex);

@@ -39,6 +39,31 @@ namespace {
 	// The random seed everything starts from.
 	const uint64_t SEED = 1;
 
+	// While one exists, random numbers come from a simulation's own sequence,
+	// which picks up where it left off, rather than the game's: anything else
+	// that draws numbers between steps (while the game draws a frame, say)
+	// must not change what the simulation does, or replaying it to a step
+	// wouldn't show what happened there.
+	class OwnRandom {
+	public:
+		explicit OwnRandom(Random::Saved &own)
+			: own(own), outside(Random::Save())
+		{
+			Random::Restore(own);
+		}
+		~OwnRandom()
+		{
+			own = Random::Save();
+			Random::Restore(outside);
+		}
+		OwnRandom(const OwnRandom &) = delete;
+		OwnRandom &operator=(const OwnRandom &) = delete;
+
+	private:
+		Random::Saved &own;
+		Random::Saved outside;
+	};
+
 	bool Same(double a, double b)
 	{
 		return a == b || (isnan(a) && isnan(b));
@@ -118,6 +143,7 @@ void GuidanceSimulation::SetDrill(int index)
 
 void GuidanceSimulation::Reset()
 {
+	OwnRandom ownRandom(random);
 	Random::Seed(SEED);
 	missiles.clear();
 	step = 0;
@@ -143,6 +169,7 @@ void GuidanceSimulation::Reset()
 
 void GuidanceSimulation::Step()
 {
+	OwnRandom ownRandom(random);
 	++step;
 	// As in the game, ships move before projectiles do.
 	const GuidanceDrill &current = drills[drill];

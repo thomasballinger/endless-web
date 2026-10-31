@@ -186,6 +186,23 @@ namespace {
 			{
 				original.Step();
 				seen.push_back(See(original));
+				// Between steps the game may draw random numbers of its own (in the
+				// simulator, between frames), which must not change anything.
+				Random::Real();
+			}
+			// Going back to a step, and stepping on from there, must show exactly
+			// what running straight through did.
+			for(int step : {1, 2, 89, 90, 91, 300, 517, 600, 901, STEPS - 1})
+			{
+				original.ReplayTo(step);
+				bool same = (See(original) == seen[step]);
+				original.Step();
+				same &= (See(original) == seen[step + 1]);
+				if(!same)
+				{
+					printf("%-28s replaying to step %d is NOT exact\n", original.Drills()[d].name.c_str(), step);
+					ok = false;
+				}
 			}
 			for(size_t w = 1; w < weapons.size(); ++w)
 			{
