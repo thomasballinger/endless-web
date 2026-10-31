@@ -26,8 +26,12 @@ Build as usual, then start a new pilot (or load one). Things to look for:
     scanners). Your own ships' code never needs one.
   - **Code Jammer** and **Code Injector**, sold wherever the Common Outfits
     are: the jammer garbles your code for other scanners; the injector
-    (with **X**, or the pane's HACK button) crashes a scanned ship's scripts
-    for a few seconds (it drifts, without firing) or spins a missile away.
+    crashes a scanned ship's scripts for a few seconds (it drifts, without
+    firing) or spins a missile away. With the pane open, **X** (or HACK) arms
+    it: within five seconds, click a line of the code that ran on this step
+    (a lit one) to inject there; a line that didn't run misses, and still
+    costs the injector its energy and recharge. Without the pane, X hacks the
+    target outright.
     It costs 200 energy and needs ten seconds to recharge.
   - **Cognition Accelerator**, also with the Common Outfits: while the code
     pane is open, time runs at a quarter speed (the edges of the screen turn

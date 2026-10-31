@@ -170,7 +170,18 @@ bool ScriptWatchDisplay::Click(const Point &point, string &hack)
 		if(closeBox.Contains(point))
 			shown.clear();
 		else if(hackBox.Contains(point) && injector.isReady)
-			hack = shown;
+			Arm();
+		else if(armedFrames && editor.Area().Contains(point))
+		{
+			// Inject into the line clicked: only one that ran is reachable.
+			const CodeEditor::LineNote *note = editor.NoteAt(point);
+			const bool ran = note && !note->isError;
+			hack = (ran ? "" : "!") + shown;
+			armedFrames = 0;
+			injectResult = ran ? "INJECTED: that line ran, and the scripts crash" : "MISSED: that line didn't run";
+			resultFrames = 120;
+			return true;
+		}
 		for(const auto &[box, key] : entryButtons)
 			if(box.Contains(point) && key != shown)
 			{
@@ -203,6 +214,31 @@ bool ScriptWatchDisplay::Click(const Point &point, string &hack)
 	else
 		Show(clicked);
 	return true;
+}
+
+
+
+bool ScriptWatchDisplay::Arm()
+{
+	const Entry *entry = Find(shown);
+	if(!entry || entry->isOwn || !injector.isReady)
+		return false;
+	armedFrames = 300;
+	resultFrames = 0;
+	return true;
+}
+
+
+
+void ScriptWatchDisplay::Step()
+{
+	if(armedFrames && !--armedFrames)
+	{
+		injectResult = "The injector disarmed: no line was chosen.";
+		resultFrames = 120;
+	}
+	if(resultFrames)
+		--resultFrames;
 }
 
 
@@ -510,7 +546,8 @@ void ScriptWatchDisplay::DrawPane() const
 	// With a code injector, someone else's code can be hacked.
 	if(entry && !entry->isOwn && injector.isInstalled)
 	{
-		const string label = injector.isReady ? "HACK" : injector.status;
+		const string label = armedFrames ? "ARMED " + to_string((armedFrames + 59) / 60) : injector.isReady ? "HACK"
+			: injector.status;
 		FillShader::Fill(hackBox.Center(), hackBox.Dimensions(), injector.isReady ? HACK_BUTTON : BUTTON);
 		const string text = Fit(font, label, hackBox.Width() - 8.);
 		font.Draw(text, hackBox.Center() - Point(font.Width(text) / 2., 8.), injector.isReady ? HACK : LABEL);
@@ -549,4 +586,24 @@ void ScriptWatchDisplay::DrawPane() const
 		font.Draw(Fit(font, rules, pane.Width() - 20.), pane.TopLeft() + Point(10., 72.), LABEL);
 
 	editor.Draw();
+	// While the injector is armed, say how to aim it; afterward, how it went.
+	if(armedFrames || resultFrames)
+	{
+		const string text = armedFrames ? "INJECT: click a line that ran on this step (lit), in "
+			+ to_string((armedFrames + 59) / 60) + " s" : injectResult;
+		// (Above the bar that says why code is breaking up, which a hack shows.)
+		const double height = 26.;
+		const Point center(pane.Center().X(), pane.Bottom() - height / 2. - 40.);
+		FillShader::Fill(center, Point(pane.Width() - 8., height), Color(.25f, .07f, .04f, .95f));
+		font.Draw(text, Point(center.X() - font.Width(text) / 2., center.Y() - 8.), HACK);
+		if(armedFrames && (armedFrames / 10) % 2)
+		{
+			const Rectangle box = editor.Area();
+			const Color edge = HACK;
+			LineShader::Draw(box.TopLeft(), Point(box.Right(), box.Top()), 1.5f, edge, false);
+			LineShader::Draw(Point(box.Left(), box.Bottom()), box.BottomRight(), 1.5f, edge, false);
+			LineShader::Draw(box.TopLeft(), Point(box.Left(), box.Bottom()), 1.5f, edge, false);
+			LineShader::Draw(Point(box.Right(), box.Top()), box.BottomRight(), 1.5f, edge, false);
+		}
+	}
 }

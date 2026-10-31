@@ -26,6 +26,8 @@ Usage:
   simulator-ui.py lit IMAGE L T R B    exit 0 if code that ran is lit up in that
                                        part of the screen
   simulator-ui.py pane IMAGE           exit 0 if the game shows a script's code
+  simulator-ui.py litrow IMAGE         print the height of a line of code in the
+                                       game's pane that ran (exit 1 if none)
   simulator-ui.py hacked IMAGE         exit 0 if the game's pane of code shows
                                        it breaking up
   simulator-ui.py slowed IMAGE         exit 0 if the game says time is slowed
@@ -129,6 +131,19 @@ def pane(image):
     return dark_green and lit(image, PANE_GUTTER)
 
 
+def litrow(image):
+    # The middle of the first run of lit gutter rows: a line that ran.
+    left, top, right, bottom = PANE_GUTTER
+    rows = [y for y in range(top, bottom) if any(is_lit(*image.getpixel((x, y))) for x in range(left, right))]
+    if not rows:
+        return False
+    end = 0
+    while end + 1 < len(rows) and rows[end + 1] == rows[end] + 1:
+        end += 1
+    print((rows[0] + rows[end]) // 2)
+    return True
+
+
 # The bar across the bottom of the pane that says why its code is breaking up.
 PANE_GLITCH_BAR = (274, 796, 906, 826)
 
@@ -184,6 +199,8 @@ def main(args):
         return lit(load(args[1]), tuple(int(a) for a in args[2:]))
     if len(args) == 2 and args[0] == 'pane':
         return pane(load(args[1]))
+    if len(args) == 2 and args[0] == 'litrow':
+        return litrow(load(args[1]))
     if len(args) == 2 and args[0] == 'hacked':
         return hacked(load(args[1]))
     if len(args) == 2 and args[0] == 'slowed':

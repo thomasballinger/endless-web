@@ -467,6 +467,7 @@ void Engine::Step(bool isActive)
 	const WatchedScripts &watched = watchedScripts[currentDrawBuffer];
 	if(watched.isFresh)
 		scriptDisplay.Update(watched.entries, watched.injector);
+	scriptDisplay.Step();
 	// (It waits for a step that time moves on, which carries it out.)
 	if(!scriptHackNextStep.empty())
 		scriptHack = scriptHackNextStep;
@@ -1476,8 +1477,12 @@ void Engine::ToggleScripts()
 
 void Engine::HackScripts()
 {
-	// Hack what the pane shows, or else the target.
-	scriptHackNextStep = scriptDisplay.Shown().empty() ? "target" : scriptDisplay.Shown();
+	// With the pane open, arm the injector, to aim it at a line of the code;
+	// otherwise, hack the target outright.
+	if(!scriptDisplay.Shown().empty())
+		scriptDisplay.Arm();
+	else
+		scriptHackNextStep = "target";
 }
 
 
@@ -2259,8 +2264,13 @@ void Engine::CarryOutHack(WatchedScripts &watched)
 {
 	if(scriptHack.empty())
 		return;
-	const string key = scriptHack;
+	string key = scriptHack;
 	scriptHack.clear();
+	// An injection aimed at a line that didn't run misses, but still costs the
+	// injector its energy and its recharge.
+	const bool missed = (key[0] == '!');
+	if(missed)
+		key = key.substr(1);
 	const shared_ptr<Ship> &flagship = player.FlagshipPtr();
 	auto message = [](const string &text) {
 		Messages::Add({text, GameData::MessageCategories().Get("normal")});
@@ -2278,6 +2288,13 @@ void Engine::CarryOutHack(WatchedScripts &watched)
 	}
 	if(entry.isOwn)
 		return;
+	if(missed)
+	{
+		flagship->TransferEnergy(flagship->Attributes().Get("code hack energy"), nullptr);
+		scriptHackCooldown = 600;
+		message("Your code injection missed: that line of " + entry.name + "'s code didn't run.");
+		return;
+	}
 	// The injector works through the scanner: it can only hack what it reads.
 	if(!entry.unreadable.empty() && entry.interference.empty())
 	{

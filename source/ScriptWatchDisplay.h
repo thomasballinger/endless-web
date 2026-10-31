@@ -93,6 +93,14 @@ public:
 	// Which entry the pane shows, if it is open.
 	const std::string &Shown() const;
 
+	// Arm the code injector on what the pane shows: for a few seconds, a click
+	// on a line of its code that ran on the latest step injects there (and
+	// hacks it); a click on one that didn't misses. Returns false if the pane
+	// isn't showing something the injector can hack.
+	bool Arm();
+	// Count down an armed injector, once a frame.
+	void Step();
+
 
 private:
 	// What a script's source looks like, for drawing its map.
@@ -129,6 +137,11 @@ private:
 private:
 	std::vector<Entry> entries;
 	Injector injector;
+	// While the injector is armed, frames left to aim it; then, for a while, how
+	// the injection went.
+	int armedFrames = 0;
+	std::string injectResult;
+	int resultFrames = 0;
 	// The last run of each entry's most important script, kept so the pane
 	// can show it after it stops (e.g. when a missile is gone).
 	std::map<std::string, script::Activity::Run> lastRuns;

@@ -162,10 +162,16 @@ else
 	echo "ok: the Show scripts key closes it again"
 fi
 
-# Hack the target, with its code open.
+# Hack the target, with its code open: arm the injector, and aim it at a line
+# of code that ran (one that is lit).
 target_running
 key k
 key x
+shot armed
+ROW=$("$LOOK" litrow "$OUT/armed.png")
+if [ -n "$ROW" ]; then
+	xdotool mousemove 500 "$ROW" click 1
+fi
 # (With time slowed, the hack takes a few more frames to land.)
 sleep 1
 shot hacked
