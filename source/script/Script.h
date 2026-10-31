@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -137,6 +138,14 @@ public:
 	const std::string &VariableName(int variable) const;
 	const std::string &EffectName(int effect) const;
 	int Find(const std::string &name) const;
+	// Another name for a variable, e.g. "target" for "has-lock".
+	void AddAlias(const std::string &alias, int variable);
+	// The variable's alias, if it has one, or else its name.
+	const std::string &AliasOf(int variable) const;
+	// Mark a variable as only meaningful while another one is true; scripts
+	// written in infix may only read it where that is certain.
+	void SetGuard(int variable, int guard);
+	int Guard(int variable) const;
 	bool IsOutput(int variable) const;
 	bool IsList(int variable) const;
 	// The names of the fields of a list's records, or -1 if there is no such field.
@@ -150,6 +159,9 @@ public:
 private:
 	std::vector<std::string> variables;
 	std::vector<bool> outputs;
+	std::map<std::string, int> aliases;
+	// For each variable, the one that must be true for it to be read, or -1.
+	std::vector<int> guards;
 	// For each list input, the names of its records' fields.
 	std::vector<std::vector<std::string>> listFields;
 	std::vector<std::string> effects;

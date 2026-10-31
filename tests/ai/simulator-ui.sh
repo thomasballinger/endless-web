@@ -108,7 +108,7 @@ xdotool key space
 sleep 2
 shot before
 
-# Line 21 is "set turn desired-turn"; add a word to the end of it.
+# Line 21 is "turn = desired_turn"; add a word to the end of it.
 xdotool mousemove 600 "$(line 21)" click 1
 xdotool type --delay 20 " oops"
 sleep 0.5
@@ -123,10 +123,10 @@ check_not "the mistake doesn't change the battle" differ "$OUT/before.png" "$OUT
 edits() { grep -c '^SIMULATOR edit' "$OUT/game.log"; }
 EDITS=$(edits)
 
-# Line 24 is "if (> (* steps-to-face 1.5) steps-to-reach)"; coast sooner.
+# Line 24 is "if steps_to_face * 1.5 > steps_to_reach"; coast sooner.
 xdotool mousemove 600 "$(line 24)" click 1
 xdotool key End shift+Home
-xdotool type --delay 20 "if (> (* steps-to-face 3) steps-to-reach)"
+xdotool type --delay 20 "if steps_to_face * 3 > steps_to_reach"
 # Let the rewind finish.
 sleep 2
 shot after
@@ -146,7 +146,7 @@ fi
 xdotool key ctrl+s
 sleep 0.5
 SAVED="$OUT/config/plugins/simulator scripts/data/guidance leading and throttle control.txt"
-if grep -q "if (> (\* steps-to-face 3) steps-to-reach)" "$SAVED" 2> /dev/null; then
+if grep -q "if steps_to_face \* 3 > steps_to_reach" "$SAVED" 2> /dev/null; then
 	echo "ok: saving writes the edited script"
 else
 	echo "FAILED: saving writes the edited script"

@@ -117,7 +117,7 @@ check "choosing a weapon opens it in the simulator" ready "$OUT/simulator.png"
 # Turn half as hard: add a line at the end of the program, and install it.
 key e
 key ctrl+End Return
-xdotool type --delay 30 "set turn (* turn .5)"
+xdotool type --delay 30 "turn = turn * .5"
 sleep 1
 key ctrl+s
 shot installed
@@ -131,7 +131,7 @@ key Escape
 key d
 sleep 3
 SAVE=$(grep -l "guidance program" "$OUT"/config/saves/*.txt 2> /dev/null | head -1)
-if [ -n "$SAVE" ] && grep -q "set turn (\* turn .5)" "$SAVE"; then
+if [ -n "$SAVE" ] && grep -q "turn = turn \* .5" "$SAVE"; then
 	echo "ok: taking off saves the program with the game"
 else
 	echo "FAILED: taking off saves the program with the game"

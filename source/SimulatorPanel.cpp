@@ -57,6 +57,8 @@ namespace {
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often, so replaying after an edit is quick.
 	const int LOOP_STEPS = 1200;
+	// How long typing must pause before the script is compiled and run.
+	const int QUIET_FRAMES = 20;
 
 	// The simulator's look: a dark green grid, not the game's starry space.
 	const Color BACKGROUND(.02f, .06f, .04f, 1.f);
@@ -131,7 +133,16 @@ SimulatorPanel::SimulatorPanel(const Outfit &outfit, const Ship &target, PlayerI
 void SimulatorPanel::Step()
 {
 	justFocused = false;
-	if(document.Version() != compiledVersion)
+	// Recompile once typing pauses, rather than after every key: halfway
+	// through typing a line, it may well compile, and do something else.
+	if(document.Version() != seenVersion)
+	{
+		seenVersion = document.Version();
+		quietFrames = 0;
+	}
+	else if(quietFrames < QUIET_FRAMES)
+		++quietFrames;
+	if(document.Version() != compiledVersion && quietFrames >= QUIET_FRAMES)
 		Recompile();
 	if(statusTime)
 		--statusTime;
@@ -641,6 +652,8 @@ void SimulatorPanel::UpdateRunNotes()
 
 void SimulatorPanel::Save()
 {
+	if(document.Version() != compiledVersion)
+		Recompile();
 	if(hasErrors)
 	{
 		status = "Fix the mistakes before saving.";

@@ -542,6 +542,93 @@ R"(program test
 		}
 	}
 }
+SCENARIO( "Infix scripts", "[Script]" ) {
+	GIVEN( "infix scripts and the same programs in prefix form" ) {
+		// Each pair must compile to the same program, so give the same result
+		// for any input.
+		const std::vector<std::pair<std::string, std::string>> pairs = {
+			{"out = a * 2 + 1 - 3", "set out (- (+ (* a 2) 1) 3)"},
+			{"out = -(a - 1) * 2", "set out (* (- (- a 1)) 2)"},
+			{"out = a / 2 / 4", "set out (/ (/ a 2) 4)"},
+			{"out = a > 3 && !(a > 10) ? 1 : 2", "set out (if (and (> a 3) (not (> a 10))) 1 2)"},
+			{"out = a < 0 || a >= 7 ? a : -a", "set out (if (or (< a 0) (>= a 7)) a (- a))"},
+			{"out = v.x + v.y * 2", "set out (+ (x v) (* (y v) 2))"},
+			{"out = length(v) + copysign(1, a)", "set out (+ (length v) (copysign 1 a))"},
+			{"out = to_deg * asin(cross(unit(v), vec(0, -1)))",
+				"set out (* to-deg (asin (cross (unit v) (vec 0 -1))))"},
+			{"out = a == 5 ? 1e3 : 2.5e-1", "set out (if (== a 5) 1e3 2.5e-1)"},
+			{"out = max(a, 1, 2) - min(a, 3)", "set out (- (max (max a 1) 2) (min a 3))"},
+		};
+		for(const auto &[infix, prefix] : pairs)
+			for(double a : {-4., 0., 5., 8., 12.})
+			{
+				auto x = Run("program test\n\t" + infix + "\n", a, Point(3., 4.));
+				auto y = Run("program test\n\t" + prefix + "\n", a, Point(3., 4.));
+				INFO( infix );
+				REQUIRE( x.ran );
+				REQUIRE( y.ran );
+				CHECK( x.out.Number() == y.out.Number() );
+			}
+	}
+	GIVEN( "infix statements" ) {
+		THEN( "let, set, if, else if, else and functions work" ) {
+			CHECK( Run("program test\n\tlet my_value = a + 1\n\tout = my_value\n", 5.).out.Number() == 6. );
+			const std::string chain = "program test\n\tif a > 10\n\t\tout = 1\n\telse if a > 5\n\t\tout = 2\n"
+				"\telse\n\t\tout = 3\n";
+			CHECK( Run(chain, 11.).out.Number() == 1. );
+			CHECK( Run(chain, 6.).out.Number() == 2. );
+			CHECK( Run(chain, 1.).out.Number() == 3. );
+			CHECK( Run("program test\n\tfunction twice(x, y)\n\t\treturn x * 2 + y\n\tout = twice(a, 1)\n", 5.)
+				.out.Number() == 11. );
+			CHECK( Run("program test\n\tif a > 1\n\t\tping\n", 5.).effects == 1 );
+		}
+		THEN( "mistakes are rejected" ) {
+			CHECK_FALSE( Run("program test\n\tout = a +\n").valid );
+			CHECK_FALSE( Run("program test\n\tlet = 3\n").valid );
+			CHECK_FALSE( Run("program test\n\tout = (a + 1\n").valid );
+			CHECK_FALSE( Run("program test\n\tout = a $ 1\n").valid );
+			CHECK_FALSE( Run("program test\n\ta = 1\n").valid );
+			CHECK_FALSE( Run("program test\n\tout = nothing_here\n").valid );
+		}
+	}
+	GIVEN( "an input that is only known while another is true" ) {
+		script::Interface interface;
+		const int lock = interface.AddInput("has-lock");
+		interface.SetGuard(interface.AddInput("target-position"), lock);
+		interface.AddAlias("target", lock);
+		interface.AddOutput("out");
+		auto valid = [&interface](const std::string &text) {
+			script::Program program;
+			program.Load(AsDataNode(text), interface, false);
+			return program.IsValid();
+		};
+		THEN( "infix scripts may only read it where that is certain" ) {
+			CHECK_FALSE( valid("program test\n\tout = target.position.x\n") );
+			CHECK_FALSE( valid("program test\n\tif !target\n\t\tout = target.position.x\n") );
+			CHECK_FALSE( valid("program test\n\tif target\n\t\tout = 1\n\telse\n\t\tout = target_position.x\n") );
+			CHECK( valid("program test\n\tif target\n\t\tout = target.position.x\n") );
+			CHECK( valid("program test\n\tif target && out > 1\n\t\tout = target_position.y\n") );
+			CHECK( valid("program test\n\tif !target\n\t\tstop\n\tout = target.position.x\n") );
+			CHECK_FALSE( valid("program test\n\tfunction f(z)\n\t\treturn target.position.x\n\tif target\n"
+				"\t\tout = f(1)\n") );
+		}
+		THEN( "prefix scripts are not held to it" ) {
+			CHECK( valid("program test\n\tset out (x target-position)\n") );
+		}
+	}
+	GIVEN( "a traced infix script" ) {
+		script::Program program;
+		program.Load(AsDataNode("program test\n\tlet my_value = a + 1\n\tout = my_value\n"), MakeInterface());
+		std::vector<script::Value> variables(program.SlotCount());
+		uint32_t effects = 0;
+		script::Trace trace;
+		REQUIRE( program.Run(variables, effects, nullptr, &trace) );
+		THEN( "names are shown as they were written" ) {
+			REQUIRE( trace.steps.size() == 2 );
+			CHECK( trace.steps[0].name == "my_value" );
+		}
+	}
+}
 // #endregion unit tests
 
 

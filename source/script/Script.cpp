@@ -22,10 +22,12 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 
 using namespace std;
@@ -242,7 +244,41 @@ int Interface::Find(const string &name) const
 	for(size_t i = 0; i < variables.size(); ++i)
 		if(variables[i] == name)
 			return static_cast<int>(i);
-	return -1;
+	auto alias = aliases.find(name);
+	return alias == aliases.end() ? -1 : alias->second;
+}
+
+
+
+void Interface::AddAlias(const string &alias, int variable)
+{
+	aliases[alias] = variable;
+}
+
+
+
+const string &Interface::AliasOf(int variable) const
+{
+	for(const auto &it : aliases)
+		if(it.second == variable)
+			return it.first;
+	return variables[variable];
+}
+
+
+
+void Interface::SetGuard(int variable, int guard)
+{
+	if(guards.size() < variables.size())
+		guards.resize(variables.size(), -1);
+	guards[variable] = guard;
+}
+
+
+
+int Interface::Guard(int variable) const
+{
+	return variable < static_cast<int>(guards.size()) ? guards[variable] : -1;
 }
 
 bool Interface::IsOutput(int variable) const
@@ -350,8 +386,14 @@ namespace {
 	class SExpression {
 	public:
 		bool IsAtom() const { return items.empty() && !isList; }
+		// The name as the script wrote it, for showing to a player.
+		const string &Name() const { return display.empty() ? atom : display; }
 
 		string atom;
+		// In infix scripts, names are written with underscores where the
+		// game's names have hyphens ("target_position" for "target-position");
+		// the atom is the game's name, and this is how it was written.
+		string display;
 		bool isList = false;
 		vector<SExpression> items;
 	};
@@ -403,6 +445,406 @@ namespace {
 		if(line.items.empty() || !line.items.front().IsAtom())
 			return "A line must begin with a statement keyword:";
 		return "";
+	}
+
+	// Infix scripts: a C-like way of writing the same programs. Each line is
+	// read into the same s-expressions a prefix line would be, so the two
+	// compile to exactly the same thing:
+	//   let d = target_position - position     (let d (- target-position position))
+	//   turn = copysign(turn, desired_turn)     (set turn (copysign turn desired-turn))
+	//   if a > b && !c                          (if (and (> a b) (not c)))
+	//   else if ...  /  else                    (elif ...) / (else)
+	//   x = c ? a : b                           (set x (if c a b))
+	//   v.x, v.y                                (x v), (y v)
+	class InfixReader {
+	public:
+		explicit InfixReader(const string &text)
+		{
+			Tokenize(text);
+		}
+
+		// Read a statement, or return an error message.
+		string ReadStatement(SExpression &line)
+		{
+			if(!error.empty())
+				return error;
+			line = SExpression();
+			line.isList = true;
+			if(tokens.empty())
+				return "A line must begin with a statement keyword:";
+			const string first = tokens[0].text;
+			auto keyword = [&line](const string &word) {
+				line.items.emplace_back();
+				line.items.back().atom = word;
+			};
+			if(first == "let" || first == "memory")
+			{
+				// "let <name> = <expression>"
+				keyword(first);
+				Take();
+				if(!Name(line) || !Expect("="))
+					return Error("Expected \"" + first + " <name> = <expression>\":");
+				if(!Expression(line))
+					return error;
+			}
+			else if(first == "if" || first == "elif")
+			{
+				keyword(first);
+				Take();
+				if(!Expression(line))
+					return error;
+			}
+			else if(first == "else")
+			{
+				Take();
+				if(At("if"))
+				{
+					Take();
+					keyword("elif");
+					if(!Expression(line))
+						return error;
+				}
+				else
+					keyword("else");
+			}
+			else if(first == "return")
+			{
+				keyword(first);
+				Take();
+				if(!Expression(line))
+					return error;
+			}
+			else if(first == "for")
+			{
+				// "for <name> in <list>"
+				keyword(first);
+				Take();
+				if(!Name(line) || !At("in"))
+					return Error("Expected \"for <name> in <list>\":");
+				Take();
+				keyword("in");
+				if(!Name(line))
+					return Error("Expected \"for <name> in <list>\":");
+			}
+			else if(first == "function")
+			{
+				// "function <name>(<parameter>, ...)"
+				keyword(first);
+				Take();
+				if(!Name(line) || !Expect("("))
+					return Error("Expected \"function <name>(<parameter>, ...)\":");
+				while(!At(")"))
+				{
+					if(!Name(line))
+						return Error("Expected \"function <name>(<parameter>, ...)\":");
+					if(!At(")") && !Expect(","))
+						return Error("Expected \"function <name>(<parameter>, ...)\":");
+				}
+				Take();
+			}
+			else if(tokens.size() >= 2 && tokens[1].text == "=" && IsName(tokens[0]))
+			{
+				// "<name> = <expression>" changes a variable or an output.
+				keyword("set");
+				if(!Name(line))
+					return error;
+				Take();
+				if(!Expression(line))
+					return error;
+			}
+			else if(tokens.size() == 1 && IsName(tokens[0]))
+			{
+				// A statement that is a single word, like "stop".
+				if(!Name(line))
+					return error;
+			}
+			else
+				return Error("Expected a statement, like \"let x = 1\", \"x = 2\" or \"if x > 1\":");
+			if(position < tokens.size())
+				return Error("Unexpected \"" + tokens[position].text + "\":");
+			return "";
+		}
+
+
+	private:
+		class Token {
+		public:
+			string text;
+			// A number or a name, rather than an operator.
+			bool isWord = false;
+		};
+
+		void Tokenize(const string &text)
+		{
+			static const vector<string> OPERATORS = {"==", "!=", "<=", ">=", "&&", "||", "+", "-", "*", "/", "<", ">",
+				"!", "(", ")", ",", "?", ":", "="};
+			size_t i = 0;
+			while(i < text.size())
+			{
+				const char c = text[i];
+				if(c == ' ' || c == '\t')
+				{
+					++i;
+					continue;
+				}
+				if(isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.')
+				{
+					// A number (with an exponent, maybe signed) or a name, which
+					// may have fields ("target.position").
+					size_t end = i;
+					const bool isNumber = isdigit(static_cast<unsigned char>(c)) || c == '.';
+					while(end < text.size() && (isalnum(static_cast<unsigned char>(text[end])) || text[end] == '_'
+							|| text[end] == '.' || (isNumber && (text[end] == '+' || text[end] == '-')
+								&& (text[end - 1] == 'e' || text[end - 1] == 'E'))))
+						++end;
+					tokens.push_back({text.substr(i, end - i), true});
+					i = end;
+					continue;
+				}
+				bool found = false;
+				for(const string &op : OPERATORS)
+					if(text.compare(i, op.size(), op) == 0)
+					{
+						tokens.push_back({op, false});
+						i += op.size();
+						found = true;
+						break;
+					}
+				if(!found)
+				{
+					error = string("Unexpected \"") + c + "\":";
+					return;
+				}
+			}
+		}
+
+		bool At(const string &text) const
+		{
+			return position < tokens.size() && tokens[position].text == text;
+		}
+
+		void Take()
+		{
+			++position;
+		}
+
+		bool Expect(const string &text)
+		{
+			if(!At(text))
+				return false;
+			Take();
+			return true;
+		}
+
+		string Error(const string &message)
+		{
+			if(error.empty())
+				error = message;
+			return error;
+		}
+
+		static bool IsName(const Token &token)
+		{
+			return token.isWord && !isdigit(static_cast<unsigned char>(token.text[0])) && token.text[0] != '.';
+		}
+
+		// The game's name for a name written with underscores.
+		static SExpression Atom(const string &written)
+		{
+			SExpression atom;
+			atom.atom = written;
+			replace(atom.atom.begin(), atom.atom.end(), '_', '-');
+			if(atom.atom != written)
+				atom.display = written;
+			return atom;
+		}
+
+		bool Name(SExpression &line)
+		{
+			if(position >= tokens.size() || !IsName(tokens[position]))
+			{
+				Error("Expected a name:");
+				return false;
+			}
+			line.items.push_back(Atom(tokens[position].text));
+			Take();
+			return true;
+		}
+
+		bool Expression(SExpression &line)
+		{
+			line.items.emplace_back();
+			return Parse(line.items.back(), 0);
+		}
+
+		// How tightly each binary operator binds, and the builtin it is.
+		static int Precedence(const string &op)
+		{
+			static const map<string, int> PRECEDENCE = {{"?", 1}, {"||", 2}, {"or", 2}, {"&&", 3}, {"and", 3},
+				{"==", 4}, {"!=", 4}, {"<", 5}, {">", 5}, {"<=", 5}, {">=", 5}, {"+", 6}, {"-", 6}, {"*", 7}, {"/", 7}};
+			auto it = PRECEDENCE.find(op);
+			return it == PRECEDENCE.end() ? -1 : it->second;
+		}
+
+		static SExpression Call(const string &function, vector<SExpression> &&arguments)
+		{
+			SExpression call;
+			call.isList = true;
+			call.items.emplace_back();
+			call.items.back().atom = function;
+			for(SExpression &argument : arguments)
+				call.items.push_back(std::move(argument));
+			return call;
+		}
+
+		bool Parse(SExpression &result, int minimum)
+		{
+			if(!Primary(result))
+				return false;
+			while(position < tokens.size())
+			{
+				const string op = tokens[position].text;
+				const int precedence = Precedence(op);
+				if(precedence < 0 || precedence <= minimum - (op == "?" ? 1 : 0))
+					break;
+				Take();
+				if(op == "?")
+				{
+					// "c ? a : b", which groups from the right.
+					SExpression yes;
+					SExpression no;
+					if(!Parse(yes, 0) || !Expect(":") || !Parse(no, precedence - 1))
+					{
+						Error("Expected \"<condition> ? <value> : <value>\":");
+						return false;
+					}
+					vector<SExpression> arguments;
+					arguments.push_back(std::move(result));
+					arguments.push_back(std::move(yes));
+					arguments.push_back(std::move(no));
+					result = Call("if", std::move(arguments));
+					continue;
+				}
+				SExpression right;
+				if(!Parse(right, precedence))
+					return false;
+				const string function = (op == "&&") ? "and" : (op == "||") ? "or" : op;
+				vector<SExpression> arguments;
+				arguments.push_back(std::move(result));
+				arguments.push_back(std::move(right));
+				result = Call(function, std::move(arguments));
+			}
+			return true;
+		}
+
+		bool Primary(SExpression &result)
+		{
+			if(position >= tokens.size())
+			{
+				Error("An expression is missing:");
+				return false;
+			}
+			const Token token = tokens[position];
+			Take();
+			if(token.text == "(")
+			{
+				if(!Parse(result, 0))
+					return false;
+				if(!Expect(")"))
+				{
+					Error("Unmatched \"(\":");
+					return false;
+				}
+				return true;
+			}
+			if(token.text == "-" || token.text == "!" || token.text == "not")
+			{
+				// Unary operators bind tighter than any binary one.
+				SExpression operand;
+				if(!Parse(operand, 8))
+					return false;
+				vector<SExpression> arguments;
+				arguments.push_back(std::move(operand));
+				result = Call(token.text == "-" ? "-" : "not", std::move(arguments));
+				return true;
+			}
+			if(!token.isWord)
+			{
+				Error("Unexpected \"" + token.text + "\":");
+				return false;
+			}
+			if(!IsName(token))
+			{
+				result = SExpression();
+				result.atom = token.text;
+				return true;
+			}
+			result = Atom(token.text);
+			if(At("("))
+			{
+				// A call: "name(argument, ...)".
+				Take();
+				vector<SExpression> arguments;
+				while(!At(")"))
+				{
+					arguments.emplace_back();
+					if(!Parse(arguments.back(), 0))
+						return false;
+					if(!At(")") && !Expect(","))
+					{
+						Error("Expected \",\" or \")\" in a call to \"" + token.text + "\":");
+						return false;
+					}
+				}
+				Take();
+				SExpression call = Call(result.atom, std::move(arguments));
+				call.items.front().display = result.display;
+				result = std::move(call);
+			}
+			return true;
+		}
+
+
+	private:
+		vector<Token> tokens;
+		size_t position = 0;
+		string error;
+	};
+
+	// Whether a line can only be infix: it assigns with "=", uses an operator
+	// between two things (in prefix, operators only come right after "("),
+	// calls a function as "f(x)", uses an operator only infix has, has a name
+	// with an underscore, or says "else if".
+	bool IsInfixLine(const DataNode &node)
+	{
+		static const vector<string> BINARY = {"<", ">", "<=", ">=", "==", "!=", "+", "-", "*", "/"};
+		if(node.Size() >= 2 && node.Token(0) == "else" && node.Token(1) == "if")
+			return true;
+		for(int i = 0; i < node.Size(); ++i)
+		{
+			const string &token = node.Token(i);
+			if(token == "=" || find(BINARY.begin(), BINARY.end(), token) != BINARY.end())
+				return true;
+			if(token.find("&&") != string::npos || token.find("||") != string::npos || token.find('?') != string::npos
+					|| token.find('_') != string::npos || token.find(',') != string::npos || token[0] == '!')
+				return true;
+			// "f(x)", or an operator inside a token, like "a>1".
+			const size_t paren = token.find('(');
+			if(paren != string::npos && paren > 0 && token[paren - 1] != '(')
+				return true;
+			for(size_t j = 1; j < token.size(); ++j)
+				if(strchr("<>=*/", token[j]) && isalnum(static_cast<unsigned char>(token[j - 1])))
+					return true;
+		}
+		return false;
+	}
+
+	bool IsInfix(const DataNode &node)
+	{
+		for(const DataNode &child : node)
+			if(IsInfixLine(child) || IsInfix(child))
+				return true;
+		return false;
 	}
 
 	bool ParseNumber(const string &text, double &value)
@@ -514,6 +956,14 @@ private:
 	bool CompileExpression(const SExpression &source, const DataNode &node, Expression &expression);
 	int Lookup(const string &name) const;
 	bool IsTaken(const string &name) const;
+	// Read a line in whichever way this program is written.
+	string ReadStatement(const DataNode &node, SExpression &line) const;
+	// Whether the given variable is known to be true here (it is the
+	// condition, or part of an "and" condition, of an "if" around this code,
+	// or an earlier "if not" stopped otherwise).
+	bool IsKnown(int slot) const;
+	// The variables an "if" or "elif" condition being true guarantees.
+	static void Guarantees(const Expression &condition, vector<int> &slots);
 
 	enum class Result { CONTINUE, STOP, RETURN, ERROR };
 	Result RunBlock(const Block &block, vector<Value> &variables, uint32_t &effects, Memory *memory,
@@ -556,6 +1006,10 @@ private:
 	// The loop variables in scope, which hold records, and the list input
 	// each one loops over.
 	map<int, int> recordSlots;
+	// Whether the program is written in infix (C-like) form.
+	bool infix = false;
+	// For each block being compiled, the variables known to be true in it.
+	vector<vector<int>> known;
 	size_t statementCount = 0;
 	mutable bool reportedError = false;
 	mutable string error;
@@ -578,6 +1032,8 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 	compilingFunction = nullptr;
 	recordSlots.clear();
 	scopes.assign(1, {});
+	known.clear();
+	infix = IsInfix(node);
 	body = Block();
 	valid = CompileBlock(node, body);
 	scopes.clear();
@@ -586,15 +1042,46 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 
 
 
+string Program::Implementation::ReadStatement(const DataNode &node, SExpression &line) const
+{
+	if(!infix)
+		return ReadLine(node, line);
+	return InfixReader(Describe(node)).ReadStatement(line);
+}
+
+
+
+bool Program::Implementation::IsKnown(int slot) const
+{
+	for(const vector<int> &slots : known)
+		if(find(slots.begin(), slots.end(), slot) != slots.end())
+			return true;
+	return false;
+}
+
+
+
+void Program::Implementation::Guarantees(const Expression &condition, vector<int> &slots)
+{
+	if(condition.kind == Expression::Kind::VARIABLE)
+		slots.push_back(condition.slot);
+	else if(condition.kind == Expression::Kind::CALL && condition.builtin == Builtin::AND)
+		for(const Expression &argument : condition.arguments)
+			Guarantees(argument, slots);
+}
+
+
+
 bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 {
 	scopes.emplace_back();
+	known.emplace_back();
 	bool ok = true;
 	for(auto it = node.begin(); it != node.end(); ++it)
 	{
 		const DataNode &child = *it;
 		SExpression line;
-		string message = ReadLine(child, line);
+		string message = ReadStatement(child, line);
 		if(!message.empty())
 		{
 			Report(child, message);
@@ -698,7 +1185,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				continue;
 			}
 			const string &variable = line.items[1].atom;
-			statement.name = variable;
+			statement.name = line.items[1].Name();
 			if(!CompileExpression(line.items[2], child, statement.expression))
 			{
 				// Still define the variable, so that this one mistake isn't
@@ -747,13 +1234,13 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				statement.slot = Lookup(variable);
 				if(statement.slot < 0)
 				{
-					Report(child, "Unknown variable \"" + variable + "\":");
+					Report(child, "Unknown variable \"" + statement.name + "\":");
 					ok = false;
 					continue;
 				}
 				if(statement.slot < interface->VariableCount() && !interface->IsOutput(statement.slot))
 				{
-					Report(child, "\"" + variable + "\" is an input and can't be changed:");
+					Report(child, "\"" + statement.name + "\" is an input and can't be changed:");
 					ok = false;
 					continue;
 				}
@@ -775,9 +1262,11 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			while(true)
 			{
 				SExpression branchLine;
-				ReadLine(*branch, branchLine);
+				ReadStatement(*branch, branchLine);
 				const string &branchKeyword = branchLine.items.front().atom;
 				bool isElse = (branchKeyword == "else");
+				// In an "if" or "elif" block, what its condition says holds.
+				vector<int> guaranteed;
 				if(isElse ? branchLine.items.size() != 1 : branchLine.items.size() != 2)
 				{
 					Report(*branch, isElse ? "Expected \"else\" alone on its line:"
@@ -789,16 +1278,19 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 					statement.branchLines.push_back(branch->LineNumber());
 					statement.conditions.emplace_back();
 					ok &= CompileExpression(branchLine.items[1], *branch, statement.conditions.back());
+					Guarantees(statement.conditions.back(), guaranteed);
 				}
+				known.push_back(guaranteed);
 				statement.blocks.emplace_back();
 				ok &= CompileBlock(*branch, statement.blocks.back());
+				known.pop_back();
 
 				auto next = branch;
 				++next;
 				if(isElse || next == node.end())
 					break;
 				SExpression nextLine;
-				if(!ReadLine(*next, nextLine).empty())
+				if(!ReadStatement(*next, nextLine).empty())
 					break;
 				const string &nextKeyword = nextLine.items.front().atom;
 				if(nextKeyword != "elif" && nextKeyword != "else")
@@ -806,6 +1298,16 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				branch = next;
 			}
 			it = branch;
+			// After "if not x" whose block always stops (with no other branch),
+			// x is known to be true for the rest of this block.
+			if(statement.conditions.size() == 1 && statement.blocks.size() == 1)
+			{
+				const Expression &condition = statement.conditions.front();
+				const vector<Statement> &inside = statement.blocks.front().statements;
+				if(condition.kind == Expression::Kind::CALL && condition.builtin == Builtin::NOT && !inside.empty()
+						&& (inside.back().kind == Statement::Kind::STOP || inside.back().kind == Statement::Kind::RETURN))
+					Guarantees(condition.arguments.front(), known.back());
+			}
 		}
 		else if(keyword == "elif" || keyword == "else")
 		{
@@ -828,7 +1330,7 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			statement.effect = interface->FindEffect(keyword);
 			if(statement.effect < 0)
 			{
-				Report(child, "Unknown statement \"" + keyword + "\":");
+				Report(child, "Unknown statement \"" + line.items.front().Name() + "\":");
 				ok = false;
 				continue;
 			}
@@ -839,12 +1341,13 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 				continue;
 			}
 			statement.kind = Statement::Kind::EFFECT;
-			statement.name = keyword;
+			statement.name = line.items.front().Name();
 			triggers[statement.effect] = true;
 		}
 		block.statements.push_back(std::move(statement));
 	}
 	scopes.pop_back();
+	known.pop_back();
 	return ok;
 }
 
@@ -871,7 +1374,9 @@ bool Program::Implementation::CompileFunction(const DataNode &node, const SExpre
 	// The function sees only its parameters and its own variables, along with
 	// the inputs and outputs, constants, and functions defined above it.
 	vector<map<string, int>> outerScopes = std::move(scopes);
+	vector<vector<int>> outerKnown = std::move(known);
 	scopes.assign(1, {});
+	known.clear();
 	bool ok = true;
 	for(size_t i = 2; i < line.items.size(); ++i)
 	{
@@ -890,6 +1395,7 @@ bool Program::Implementation::CompileFunction(const DataNode &node, const SExpre
 	ok &= CompileBlock(node, function.body);
 	compilingFunction = nullptr;
 	scopes = std::move(outerScopes);
+	known = std::move(outerKnown);
 	// Only now can later code call the function, so it can't call itself.
 	functions.push_back(std::move(function));
 	return ok;
@@ -923,16 +1429,39 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 			return true;
 		}
 		// A loop variable's fields: "name.field".
-		size_t dot = source.atom.find('.');
+		size_t dot = infix ? source.atom.rfind('.') : source.atom.find('.');
 		if(dot != string::npos)
 		{
 			const string base = source.atom.substr(0, dot);
 			const string field = source.atom.substr(dot + 1);
-			expression.slot = Lookup(base);
+			expression.slot = (base.find('.') == string::npos) ? Lookup(base) : -1;
 			auto record = recordSlots.find(expression.slot);
 			if(record == recordSlots.end())
 			{
-				Report(node, "\"" + base + "\" has no fields; only a \"for\" loop's variable does:");
+				// In infix, "target.position" is "target-position", and "v.x" and
+				// "v.y" are a vector's coordinates (so "target.position.x" is
+				// the x coordinate of "target-position").
+				if(infix)
+				{
+					const string written = source.Name();
+					SExpression named;
+					named.atom = base + "-" + field;
+					named.display = written;
+					if(base.find('.') == string::npos && Lookup(named.atom) >= 0)
+						return CompileExpression(named, node, expression);
+					if(field == "x" || field == "y")
+					{
+						expression.kind = Expression::Kind::CALL;
+						expression.builtin = (field == "x") ? Builtin::X : Builtin::Y;
+						expression.arguments.resize(1);
+						SExpression vector;
+						vector.atom = base;
+						vector.display = written.substr(0, written.rfind('.'));
+						return CompileExpression(vector, node, expression.arguments.front());
+					}
+				}
+				Report(node, "\"" + source.Name().substr(0, source.Name().find('.'))
+					+ "\" has no fields; only a \"for\" loop's variable does:");
 				return false;
 			}
 			expression.kind = Expression::Kind::FIELD;
@@ -948,7 +1477,18 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 		expression.slot = Lookup(source.atom);
 		if(expression.slot < 0)
 		{
-			Report(node, "Unknown variable \"" + source.atom + "\":");
+			Report(node, "Unknown variable \"" + source.Name() + "\":");
+			return false;
+		}
+		// Some inputs only mean something while another is true, like what a
+		// seeker sees of its target while it sees it. Infix scripts may only
+		// read them where that is certain.
+		const int guard = (expression.slot < interface->VariableCount()) ? interface->Guard(expression.slot) : -1;
+		if(infix && guard >= 0 && (compilingFunction || !IsKnown(guard)))
+		{
+			const string guardName = interface->AliasOf(guard);
+			Report(node, "\"" + source.Name() + "\" is only known while \"" + guardName + "\" is true: use it inside \"if "
+				+ guardName + "\"" + (compilingFunction ? " and pass it to the function" : "") + ":");
 			return false;
 		}
 		// Lists and records can't be copied or compared, only looped over
@@ -975,6 +1515,7 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 		return false;
 	}
 	const string &function = source.items.front().atom;
+	const string &functionName = source.items.front().Name();
 	int count = static_cast<int>(source.items.size()) - 1;
 	auto it = BUILTINS.find(function);
 	// The script may define functions of its own.
@@ -984,7 +1525,7 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	{
 		if(count != static_cast<int>(defined->parameterSlots.size()))
 		{
-			Report(node, "Wrong number of arguments to \"" + function + "\":");
+			Report(node, "Wrong number of arguments to \"" + functionName + "\":");
 			return false;
 		}
 		expression.kind = Expression::Kind::FUNCTION;
@@ -1001,12 +1542,12 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 		int host = interface->FindFunction(function);
 		if(host < 0)
 		{
-			Report(node, "Unknown function \"" + function + "\":");
+			Report(node, "Unknown function \"" + functionName + "\":");
 			return false;
 		}
 		if(count != interface->FunctionArgumentCount(host))
 		{
-			Report(node, "Wrong number of arguments to \"" + function + "\":");
+			Report(node, "Wrong number of arguments to \"" + functionName + "\":");
 			return false;
 		}
 		expression.kind = Expression::Kind::HOST;
@@ -1019,7 +1560,7 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	}
 	if(count < it->second.minArgs || (it->second.maxArgs >= 0 && count > it->second.maxArgs))
 	{
-		Report(node, "Wrong number of arguments to \"" + function + "\":");
+		Report(node, "Wrong number of arguments to \"" + functionName + "\":");
 		return false;
 	}
 	expression.kind = Expression::Kind::CALL;

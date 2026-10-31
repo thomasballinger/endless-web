@@ -16,9 +16,9 @@
 # ("thrust").
 #
 # A weapon's homing attributes are the capabilities of its guidance hardware:
-#   leading            it can measure its target's velocity ("target-velocity")
+#   leading            it can measure its target's velocity ("target.velocity")
 #   throttle control   it can change its thrust (set "thrust")
-#   optical tracking   it can see which way its target faces ("target-facing")
+#   optical tracking   it can see which way its target faces ("target.facing")
 #   blindspot          it can't see behind itself: if its target is behind it,
 #                      it loses the target (this happens before the script runs)
 # A seeker that loses its lock may also be confused (depending on the weapon's
@@ -31,51 +31,48 @@
 # plugin can replace several defaults at once:
 #   guidance "basic" "throttle control" "leading" "leading and throttle control"
 #
-# Scripts are written one expression per line, in prefix notation, with
-# parentheses for nested expressions. Indented lines are the block of the line
-# above them. Statements:
-#   let <name> <expression>      define a variable (visible to the end of its block);
-#                                it may reuse the name of an input, hiding it
-#   set <name> <expression>      change a variable or an output
-#   memory <name> <expression>   define a variable that keeps its value from one
-#                                step to the next, for each projectile; the
-#                                expression is only its starting value (only
-#                                allowed outside of any block)
-#   if / elif / else             choose a block
-#   drop-target                  forget the current target
-#   stop                         end the script for this step
-#   function <name> <parameter>...
-#                                define a function, with its statements below
-#                                (only allowed outside of any block); call it
-#                                like any other, as (<name> <argument>...)
-#   return <expression>          give a function's value and end it
-#   for <name> in <list>         run the statements below once for each
-#                                record in a list the game provides (none do
-#                                for guidance yet; see choices.txt), reading
-#                                its fields as <name>.<field>, and its place
-#                                in the list as <name>.index
+# Scripts are written one statement per line. Indented lines are the block of
+# the line above them. Statements:
+#   let <name> = <expression>      define a variable (visible to the end of its
+#                                  block); it may reuse the name of an input
+#   <name> = <expression>          change a variable or an output
+#   memory <name> = <expression>   define a variable that keeps its value from
+#                                  one step to the next, for each projectile;
+#                                  the expression is only its starting value
+#                                  (only allowed outside of any block)
+#   if / else if / else            choose a block
+#   drop_target                    forget the current target
+#   stop                           end the script for this step
+#   function <name>(<parameter>, ...)
+#                                  define a function, with its statements below
+#                                  (only allowed outside of any block); call it
+#                                  like any other, as <name>(<argument>, ...)
+#   return <expression>            give a function's value and end it
 # A function sees its parameters, its own variables, the inputs and outputs,
 # and functions defined above it; it can't change outputs, use memory or
 # effects, or stop the script.
-# Expressions: numbers, true, false, pi, to-deg, to-rad, variables, and
-#   + - * /  < > <= >= == !=  and or not  (if c a b)
-#   abs sqrt asin acos sin cos atan2 min max copysign (clamp x low high)
-#   (vec x y) x y dot cross unit length
-#   (random)        a random number from 0 up to 1
-#   (random-int n)  a random whole number from 0 up to n - 1
+# Expressions: numbers, true, false, pi, to_deg, to_rad, variables, and
+#   + - * /  < > <= >= == !=  && || !  (also "and", "or", "not")
+#   <condition> ? <value> : <value>
+#   abs sqrt asin acos sin cos atan2 min max copysign clamp(x, low, high)
+#   vec(x, y), v.x, v.y, dot cross unit length
+#   random()        a random number from 0 up to 1
+#   random_int(n)   a random whole number from 0 up to n - 1
 # Arithmetic works on numbers, and +, -, * and / also on vectors where it
-# makes sense. +, *, min, max, and, and or take any number of arguments, and
-# work from left to right: (* a b c) is the same as (* (* a b) c).
+# makes sense. Operators group as in C: * and / before + and -, then
+# comparisons, then &&, then ||. min and max take any number of arguments.
+# (Scripts may also be written in prefix form, as the game's other scripts
+# are: "let d (- target-position position)".)
 #
 # Inputs (read only):
 #   position velocity facing                 this projectile (facing is a unit vector)
-#   has-lock                                 whether the seeker sees a target
-#   target-position target-velocity          (zero without a lock)
-#   max-turn acceleration drag               the weapon's attributes
-#   age lifetime-left                        steps since it was fired, and until
+#   max_turn acceleration drag               the weapon's attributes
+#   age lifetime_left                        steps since it was fired, and until
 #                                            it expires
-#   target-facing                            the unit vector the target faces
-#                                            (zero without a lock)
+#   target                                   whether the seeker sees a target;
+#                                            only inside "if target" can it read:
+#   target.position target.velocity          where the target is, and how it moves
+#   target.facing                            the unit vector the target faces
 # Outputs (start at the weapon's turn rate and acceleration, and are limited to
 # those after the script runs):
 #   turn thrust
@@ -87,92 +84,92 @@
 
 # Turn towards the target.
 guidance "basic"
-	if has-lock
-		let direction (unit (- target-position position))
-		let desired-turn (* to-deg (asin (cross facing direction)))
-		if (> (abs desired-turn) turn)
-			set turn (copysign turn desired-turn)
+	if target
+		let direction = unit(target.position - position)
+		let desired_turn = to_deg * asin(cross(facing, direction))
+		if abs(desired_turn) > turn
+			turn = copysign(turn, desired_turn)
 		else
-			set turn desired-turn
+			turn = desired_turn
 	# If a weapon is homing but has no target, do not turn it.
 	else
-		set turn 0
+		turn = 0
 
 # Turn towards the target, and stop accelerating when facing away from it.
 guidance "throttle control"
-	if has-lock
-		let d (- target-position position)
-		let direction (unit d)
-		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
-		let steps-to-reach (/ (length d) true-velocity)
-		let desired-turn (* to-deg (asin (cross facing direction)))
-		if (> (abs desired-turn) turn)
-			set turn (copysign turn desired-turn)
+	if target
+		let d = target.position - position
+		let direction = unit(d)
+		let true_velocity = drag != 0 ? acceleration / drag : length(velocity)
+		let steps_to_reach = length(d) / true_velocity
+		let desired_turn = to_deg * asin(cross(facing, direction))
+		if abs(desired_turn) > turn
+			turn = copysign(turn, desired_turn)
 		else
-			set turn desired-turn
+			turn = desired_turn
 
 		# This is measured with the turn just chosen, so it is 1 unless the
 		# projectile is turning as fast as it can.
-		let steps-to-face (/ desired-turn turn)
-		if (> (* steps-to-face 1.5) steps-to-reach)
-			set thrust 0
+		let steps_to_face = desired_turn / turn
+		if steps_to_face * 1.5 > steps_to_reach
+			thrust = 0
 	else
-		set turn 0
+		turn = 0
 
 # Turn towards where the target will be.
 guidance "leading"
-	if has-lock
-		let d (- target-position position)
-		let direction (unit d)
-		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
-		if (< (dot direction target-velocity) 0)
+	if target
+		let d = target.position - position
+		let direction = unit(d)
+		let true_velocity = drag != 0 ? acceleration / drag : length(velocity)
+		if dot(direction, target.velocity) < 0
 			# If the target is moving toward this projectile, the intercept
 			# course is where the target and the projectile have the same
 			# velocity normal to the distance between them.
-			let normal (vec (y direction) (- (x direction)))
-			let normal-speed (dot normal target-velocity)
-			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
-			set d (+ (* closing-speed direction) (* normal-speed normal))
+			let normal = vec(direction.y, -direction.x)
+			let normal_speed = dot(normal, target.velocity)
+			let closing_speed = sqrt(max(0, true_velocity * true_velocity - normal_speed * normal_speed))
+			d = closing_speed * direction + normal_speed * normal
 		else
 			# Aim where the target will be when this projectile reaches it.
-			let steps-to-reach (/ (length d) true-velocity)
-			set d (+ d (* steps-to-reach target-velocity))
-		set direction (unit d)
+			let steps_to_reach = length(d) / true_velocity
+			d = d + steps_to_reach * target.velocity
+		direction = unit(d)
 
-		let desired-turn (* to-deg (asin (cross facing direction)))
-		if (> (abs desired-turn) turn)
-			set turn (copysign turn desired-turn)
+		let desired_turn = to_deg * asin(cross(facing, direction))
+		if abs(desired_turn) > turn
+			turn = copysign(turn, desired_turn)
 		else
-			set turn desired-turn
+			turn = desired_turn
 	else
-		set turn 0
+		turn = 0
 
 # Turn towards where the target will be, and stop accelerating when facing
 # away from it.
 guidance "leading and throttle control"
-	if has-lock
-		let d (- target-position position)
-		let direction (unit d)
-		let true-velocity (if (!= drag 0) (/ acceleration drag) (length velocity))
-		let steps-to-reach (/ (length d) true-velocity)
-		if (< (dot direction target-velocity) 0)
-			let normal (vec (y direction) (- (x direction)))
-			let normal-speed (dot normal target-velocity)
-			let closing-speed (sqrt (max 0 (- (* true-velocity true-velocity) (* normal-speed normal-speed))))
-			set d (+ (* closing-speed direction) (* normal-speed normal))
+	if target
+		let d = target.position - position
+		let direction = unit(d)
+		let true_velocity = drag != 0 ? acceleration / drag : length(velocity)
+		let steps_to_reach = length(d) / true_velocity
+		if dot(direction, target.velocity) < 0
+			let normal = vec(direction.y, -direction.x)
+			let normal_speed = dot(normal, target.velocity)
+			let closing_speed = sqrt(max(0, true_velocity * true_velocity - normal_speed * normal_speed))
+			d = closing_speed * direction + normal_speed * normal
 		else
-			set d (+ d (* steps-to-reach target-velocity))
-			set steps-to-reach (/ (length d) true-velocity)
-		set direction (unit d)
+			d = d + steps_to_reach * target.velocity
+			steps_to_reach = length(d) / true_velocity
+		direction = unit(d)
 
-		let desired-turn (* to-deg (asin (cross facing direction)))
-		if (> (abs desired-turn) turn)
-			set turn (copysign turn desired-turn)
+		let desired_turn = to_deg * asin(cross(facing, direction))
+		if abs(desired_turn) > turn
+			turn = copysign(turn, desired_turn)
 		else
-			set turn desired-turn
+			turn = desired_turn
 
-		let steps-to-face (/ desired-turn turn)
-		if (> (* steps-to-face 1.5) steps-to-reach)
-			set thrust 0
+		let steps_to_face = desired_turn / turn
+		if steps_to_face * 1.5 > steps_to_reach
+			thrust = 0
 	else
-		set turn 0
+		turn = 0

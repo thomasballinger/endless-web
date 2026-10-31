@@ -131,6 +131,9 @@ private:
 	MissileGuidance previousGuidance;
 	std::string guidanceName;
 	uint64_t compiledVersion = 0;
+	// The document's version on the last frame, and frames since it changed.
+	uint64_t seenVersion = 0;
+	int quietFrames = 0;
 	// Whether the text has mistakes, so an older version is still running.
 	bool hasErrors = false;
 	std::string status;

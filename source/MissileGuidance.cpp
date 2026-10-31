@@ -59,6 +59,13 @@ namespace {
 		interface.AddOutput("turn");
 		interface.AddOutput("thrust");
 		interface.AddEffect("drop-target");
+		// In infix scripts, what the seeker sees of its target is
+		// "target.position" and so on, which can only be read inside
+		// "if target" (that is, while it has a lock).
+		const int hasLock = interface.Find("has-lock");
+		interface.AddAlias("target", hasLock);
+		for(const char *input : {"target-position", "target-velocity", "target-facing"})
+			interface.SetGuard(interface.Find(input), hasLock);
 		return interface;
 	}
 }
