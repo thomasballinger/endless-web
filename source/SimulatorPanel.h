@@ -32,6 +32,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <vector>
 
 class Outfit;
+class PlayerInfo;
 class Ship;
 
 
@@ -49,7 +50,9 @@ class Ship;
 // produced.
 class SimulatorPanel : public Panel {
 public:
-	SimulatorPanel(const Outfit &outfit, const Ship &target);
+	// With a player, this is the missile workshop: saving installs the
+	// program on the player's ships, rather than in a plugin.
+	SimulatorPanel(const Outfit &outfit, const Ship &target, PlayerInfo *player = nullptr);
 
 	virtual void Step() override;
 	virtual void Draw() override;
@@ -76,6 +79,10 @@ private:
 	// Show the selected projectile's latest run in the editor.
 	void UpdateRunNotes();
 	void Save();
+	// The weapon's own guidance, as text.
+	std::string FactoryText() const;
+	// Fire at the next of the practice targets.
+	void NextTarget();
 	void Layout();
 
 	// Convert between positions in the simulation and on the screen.
@@ -92,7 +99,9 @@ private:
 
 private:
 	const Outfit &outfit;
+	PlayerInfo *player = nullptr;
 	std::unique_ptr<GuidanceSimulation> simulation;
+	size_t targetIndex = 0;
 
 	// The script being edited, the version of it in use, and the last
 	// version of the text that was compiled.
@@ -120,6 +129,10 @@ private:
 	int rewindTo = 0;
 	int rewindFrame = 0;
 	int rewindFrames = 0;
+
+	// Whether a key gave the editor the keyboard on this frame, so that the
+	// text of that same key press isn't typed into it.
+	bool justFocused = false;
 
 	bool paused = false;
 	// Steps per frame: 1/4, 1/2, 1, 2, 4 or 8.

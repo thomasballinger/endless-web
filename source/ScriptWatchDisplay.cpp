@@ -21,6 +21,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "text/FontSet.h"
 #include "GameData.h"
 #include "shader/LineShader.h"
+#include "MissileGuidance.h"
 #include "Point.h"
 #include "Screen.h"
 
@@ -224,13 +225,19 @@ const string &ScriptWatchDisplay::Shown() const
 
 const ScriptWatchDisplay::Source &ScriptWatchDisplay::GetSource(const string &kind, const string &name) const
 {
+	// The player's own missile programs aren't in any data file.
 	const string key = kind + " " + name;
+	const string playerText = (kind == "guidance") ? MissileGuidance::PlayerProgramText(name) : string();
 	auto it = sources.find(key);
-	if(it != sources.end())
+	if(it != sources.end() && (playerText.empty() || it->second.text == playerText))
 		return it->second;
 
 	Source &source = sources[key];
-	source.text = GameData::ScriptText(kind, name, &source.firstLine);
+	source = Source();
+	if(!playerText.empty())
+		source.text = playerText;
+	else
+		source.text = GameData::ScriptText(kind, name, &source.firstLine);
 	istringstream in(source.text);
 	for(string line; getline(in, line); )
 	{

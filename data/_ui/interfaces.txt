@@ -1726,6 +1726,16 @@ interface "planet"
 		align right
 		pad 10 0
 	
+	visible if "has workshop"
+	sprite "ui/planet dialog button"
+		center 340 255
+	button w "_Workshop"
+		center 340 255
+		dimensions 140 40
+		size 18
+		align right
+		pad 10 0
+	
 	visible
 	active if "has ship"
 	sprite "ui/planet dialog button"
@@ -1826,6 +1836,16 @@ interface "planet (small screen)"
 		center 280 200
 	button h "_Hire Crew"
 		center 280 200
+		dimensions 140 40
+		size 18
+		align right
+		pad 10 0
+	
+	visible if "has workshop"
+	sprite "ui/planet dialog button"
+		center 280 255
+	button w "_Workshop"
+		center 280 255
 		dimensions 140 40
 		size 18
 		align right

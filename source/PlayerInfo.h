@@ -232,6 +232,15 @@ public:
 	double GetPlayTime() const noexcept;
 	void AddPlayTime(std::chrono::nanoseconds timeVal, bool isIdle);
 
+	// Guidance programs the player has written for their ships' homing
+	// weapons (in the workshop), by launcher outfit, as the text of a
+	// "guidance" node.
+	const std::map<const Outfit *, std::string> &GuidancePrograms() const;
+	// Install a program on all the player's weapons of this kind, or remove
+	// it (with empty text). Returns false, and installs nothing, if it doesn't
+	// compile or needs more than the weapon has.
+	bool SetGuidanceProgram(const Outfit *outfit, const std::string &text);
+
 	// Get the player's logbook.
 	const std::map<Date, BookEntry> &Logbook() const;
 	void AddLogEntry(const BookEntry &logbookEntry);
@@ -603,6 +612,7 @@ private:
 
 	// Currently collapsed categories for various panels.
 	std::map<std::string, std::set<std::string>> collapsed;
+	std::map<const Outfit *, std::string> guidancePrograms;
 
 	bool freshlyLoaded = true;
 	int desiredCrew = 0;

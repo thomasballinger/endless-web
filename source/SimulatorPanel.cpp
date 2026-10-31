@@ -28,6 +28,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "shader/LineShader.h"
 #include "MouseButton.h"
 #include "Outfit.h"
+#include "PlayerInfo.h"
 #include "shader/RingShader.h"
 #include "Screen.h"
 #include "Ship.h"
@@ -95,18 +96,25 @@ namespace {
 
 
 
-SimulatorPanel::SimulatorPanel(const Outfit &outfit, const Ship &target)
-	: outfit(outfit), simulation(make_unique<GuidanceSimulation>(outfit, target)), editor(document)
+SimulatorPanel::SimulatorPanel(const Outfit &outfit, const Ship &target, PlayerInfo *player)
+	: outfit(outfit), player(player), simulation(make_unique<GuidanceSimulation>(outfit, target)), editor(document)
 {
 	SetIsFullScreen(true);
-	// Start with the script this weapon really uses.
+	// Escape belongs to this panel (to stop editing, or leave), not the menu.
+	SetInterruptible(false);
+	// Start with the script this weapon really uses: the player's program, if
+	// there is one, or the factory's.
 	const Weapon &weapon = simulation->GetWeapon();
 	const MissileGuidance *original = weapon.Guidance() ? weapon.Guidance() : MissileGuidance::Default(weapon);
 	guidanceName = original ? original->Name() : "basic";
 	sourcePath = GameData::ScriptSource("guidance", guidanceName);
-	string text = GameData::ScriptText("guidance", guidanceName);
-	if(text.empty())
-		text = "guidance \"" + guidanceName + "\"\n\tset turn 0";
+	string text = FactoryText();
+	if(player)
+	{
+		auto it = player->GuidancePrograms().find(&outfit);
+		if(it != player->GuidancePrograms().end())
+			text = it->second;
+	}
 	document.SetText(text);
 	Recompile();
 	Layout();
@@ -116,6 +124,7 @@ SimulatorPanel::SimulatorPanel(const Outfit &outfit, const Ship &target)
 
 void SimulatorPanel::Step()
 {
+	justFocused = false;
 	if(document.Version() != compiledVersion)
 		Recompile();
 	if(statusTime)
@@ -185,6 +194,14 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 		Save();
 	else if(control && key == SDLK_SPACE)
 		paused = !paused;
+	else if(control && key == SDLK_d && player)
+	{
+		// Back to the factory's program, on the player's ships too.
+		document.SetText(FactoryText());
+		player->SetGuidanceProgram(&outfit, "");
+		status = "Restored the factory's guidance.";
+		statusTime = 300;
+	}
 	else if(control && key == SDLK_r)
 		Restart();
 	else if(editor.HasFocus())
@@ -197,7 +214,10 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	else if(key == SDLK_ESCAPE)
 		GetUI().Pop(this);
 	else if(key == SDLK_e || key == SDLK_RETURN)
+	{
 		editor.SetFocus(true);
+		justFocused = true;
+	}
 	else if(key == SDLK_SPACE)
 		paused = !paused;
 	else if(key == SDLK_PERIOD)
@@ -208,6 +228,8 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	}
 	else if(key == SDLK_r)
 		Restart();
+	else if(key == SDLK_t)
+		NextTarget();
 	else if(key == SDLK_EQUALS || key == SDLK_PLUS || key == SDLK_KP_PLUS)
 		speedIndex = min(SPEED_COUNT - 1, speedIndex + 1);
 	else if(key == SDLK_MINUS || key == SDLK_KP_MINUS)
@@ -226,6 +248,11 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 
 bool SimulatorPanel::TextInput(const string &text)
 {
+	if(justFocused)
+	{
+		justFocused = false;
+		return true;
+	}
 	return editor.TextInput(text);
 }
 
@@ -415,14 +442,39 @@ void SimulatorPanel::UpdateRunNotes()
 
 void SimulatorPanel::Save()
 {
-	// Saving puts the script in a plugin, where it replaces the script of
-	// the same name everywhere in the game.
 	if(hasErrors)
 	{
 		status = "Fix the mistakes before saving.";
 		statusTime = 300;
 		return;
 	}
+	// In the workshop, saving installs the program on the player's ships,
+	// named for the weapon, so that it can't be mistaken for any other.
+	if(player)
+	{
+		const bool isFactory = (document.Text() == FactoryText());
+		const string programName = outfit.DisplayName() + " program";
+		string text = document.Text();
+		if(!isFactory && text.compare(0, 9, "guidance ") == 0)
+		{
+			const size_t end = text.find('\n');
+			const string firstLine = "guidance \"" + programName + "\"";
+			if(text.substr(0, end) != firstLine)
+			{
+				text = firstLine + (end == string::npos ? string() : text.substr(end));
+				document.SetText(text);
+			}
+		}
+		if(player->SetGuidanceProgram(&outfit, isFactory ? string() : text))
+			status = isFactory ? "Your " + outfit.DisplayName() + "s fly the factory's guidance."
+				: "Installed: your " + outfit.DisplayName() + "s will fly this program.";
+		else
+			status = "This weapon's hardware can't run that program.";
+		statusTime = 300;
+		return;
+	}
+	// Otherwise, saving puts the script in a plugin, where it replaces the
+	// script of the same name everywhere in the game.
 	const filesystem::path folder = Files::Config() / "plugins" / "simulator scripts" / "data";
 	Files::CreateFolder(Files::Config() / "plugins");
 	Files::CreateFolder(Files::Config() / "plugins" / "simulator scripts");
@@ -431,6 +483,36 @@ void SimulatorPanel::Save()
 	Files::Write(path, document.Text() + "\n");
 	status = "Saved to the \"simulator scripts\" plugin.";
 	statusTime = 300;
+}
+
+
+
+string SimulatorPanel::FactoryText() const
+{
+	string text = GameData::ScriptText("guidance", guidanceName);
+	return text.empty() ? "guidance \"" + guidanceName + "\"\n\tset turn 0" : text;
+}
+
+
+
+void SimulatorPanel::NextTarget()
+{
+	// Ships that fly differently, and one with radar jammers.
+	static const vector<string> TARGETS = {"Argosy", "Carrier", "Headhunter", "Clipper", "Bastion"};
+	for(size_t tries = 0; tries < TARGETS.size(); ++tries)
+	{
+		targetIndex = (targetIndex + 1) % TARGETS.size();
+		const Ship *model = GameData::Ships().Find(TARGETS[targetIndex]);
+		if(!model)
+			continue;
+		const int drill = simulation->Drill();
+		simulation = make_unique<GuidanceSimulation>(outfit, *model);
+		simulation->SetDrill(drill);
+		Restart();
+		status = "Firing at a " + model->DisplayModelName() + ".";
+		statusTime = 180;
+		return;
+	}
 }
 
 
@@ -643,7 +725,8 @@ void SimulatorPanel::DrawStatus() const
 {
 	const Font &font = FontSet::Get(14);
 	FillShader::Fill(Point(0., Screen::Top() + STATUS_HEIGHT / 2.), Point(Screen::Width(), STATUS_HEIGHT), PANEL);
-	string line = "SIMULATOR   " + outfit.DisplayName() + " vs. " + simulation->Target().DisplayModelName()
+	string line = string(player ? "WORKSHOP   " : "SIMULATOR   ") + outfit.DisplayName() + " vs. "
+		+ simulation->Target().DisplayModelName()
 		+ "   guidance \"" + guidanceName + "\"   step " + to_string(simulation->CurrentStep())
 		+ (paused ? "  (paused)" : "  " + FormatSpeed(SPEEDS[speedIndex]));
 	font.Draw(line, Point(Screen::Left() + 14., Screen::Top() + 11.), TEXT);
@@ -652,8 +735,10 @@ void SimulatorPanel::DrawStatus() const
 		statusTime ? SELECTED : MISS);
 
 	FillShader::Fill(Point(0., Screen::Bottom() - FOOTER_HEIGHT / 2.), Point(Screen::Width(), FOOTER_HEIGHT), PANEL);
+	const string save = player ? "ctrl+s install   ctrl+d factory" : "ctrl+s save";
 	const string help = editor.HasFocus()
-		? "editing: esc stop editing   ctrl+s save   ctrl+space pause   ctrl+r restart   ctrl+z undo"
-		: "e edit   space pause   . step   - + speed   1-8 drill   r restart   click a missile   esc exit";
+		? "editing: esc stop editing   " + save + "   ctrl+space pause   ctrl+r restart   ctrl+z undo"
+		: "e edit   space pause   . step   - + speed   1-8 drill   t target   r restart   click a missile   "
+			+ save + "   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }

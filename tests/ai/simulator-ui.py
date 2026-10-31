@@ -12,8 +12,8 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Look at screenshots of the simulator and the game, for simulator-ui.sh and
-watch-ui.sh.
+"""Look at screenshots of the simulator and the game, for simulator-ui.sh,
+watch-ui.sh and workshop-ui.sh.
 
 Usage:
   simulator-ui.py ready IMAGE          exit 0 if the simulator is showing
@@ -28,6 +28,9 @@ Usage:
   simulator-ui.py pane IMAGE           exit 0 if the game shows a script's code
   simulator-ui.py hacked IMAGE         exit 0 if the game's pane of code shows
                                        it breaking up
+  simulator-ui.py workshop IMAGE       exit 0 if the missile workshop is showing
+  simulator-ui.py programmed IMAGE     exit 0 if the workshop lists a
+                                       weapon as running the player's program
 
 Screenshots are of a 1600x1000 screen.
 """
@@ -136,6 +139,24 @@ def hacked(image):
     return count > 30
 
 
+# The missile workshop: a box in the middle of the screen, and the weapons'
+# rows in it.
+WORKSHOP_POINTS = [(600, 580), (1000, 580), (800, 590)]
+WORKSHOP_STATUS = (440, 300, 1160, 760)
+
+
+def workshop(image):
+    return all(g > r and g > b and g < 30 for r, g, b in (image.getpixel(p) for p in WORKSHOP_POINTS))
+
+
+def programmed(image):
+    # PROGRAMMED in WorkshopPanel, the color of "your program".
+    left, top, right, bottom = WORKSHOP_STATUS
+    count = sum(1 for y in range(top, bottom) for x in range(left, right)
+                if (lambda r, g, b: b > 200 and g > 150 and r < 170)(*image.getpixel((x, y))))
+    return workshop(image) and count > 10
+
+
 def main(args):
     if len(args) == 2 and args[0] == 'ready':
         return ready(load(args[1]))
@@ -153,6 +174,10 @@ def main(args):
         return pane(load(args[1]))
     if len(args) == 2 and args[0] == 'hacked':
         return hacked(load(args[1]))
+    if len(args) == 2 and args[0] == 'workshop':
+        return workshop(load(args[1]))
+    if len(args) == 2 and args[0] == 'programmed':
+        return programmed(load(args[1]))
     print(__doc__)
     sys.exit(2)
 

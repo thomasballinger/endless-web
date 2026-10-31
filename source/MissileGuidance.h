@@ -125,6 +125,17 @@ public:
 	// The name of the default script for a weapon with the given capabilities.
 	static std::string DefaultName(bool leading, bool throttleControl);
 
+	// The player can program the guidance of their own ships' homing weapons
+	// (see WorkshopPanel). Programs are given as the text of a "guidance"
+	// node, and are kept compiled here, by weapon, for projectiles to use.
+	// Setting a program that doesn't compile, or an empty one, clears it.
+	// Returns whether the weapon now has a program.
+	static bool SetPlayerProgram(const Weapon *weapon, const std::string &text);
+	static const MissileGuidance *PlayerProgram(const Weapon *weapon);
+	// The text of the player's program with the given name, or empty.
+	static std::string PlayerProgramText(const std::string &name);
+	static void ClearPlayerPrograms();
+
 
 public:
 	// Load a script. With logErrors false (e.g. while a player is typing it),

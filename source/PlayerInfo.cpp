@@ -36,6 +36,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Government.h"
 #include "Logger.h"
 #include "Messages.h"
+#include "MissileGuidance.h"
 #include "Outfit.h"
 #include "Person.h"
 #include "PilotProfile.h"
@@ -245,6 +246,7 @@ bool PlayerInfo::ScheduledEvent::operator<(const ScheduledEvent &other) const
 void PlayerInfo::Clear()
 {
 	*this = PlayerInfo();
+	MissileGuidance::ClearPlayerPrograms();
 
 	Random::Seed(time(nullptr));
 	GameData::Revert();
@@ -385,6 +387,14 @@ void PlayerInfo::Load(const filesystem::path &path, const shared_ptr<PilotProfil
 		{
 			for(const DataNode &grand : child)
 				collapsed[child.Token(1)].insert(grand.Token(0));
+		}
+		else if(key == "guidance program" && hasValue)
+		{
+			string text;
+			for(const DataNode &grand : child)
+				if(grand.Token(0) == "line")
+					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
+			SetGuidanceProgram(GameData::Outfits().Get(child.Token(1)), text);
 		}
 		else if(key == "reputation with")
 		{
@@ -5034,6 +5044,37 @@ void PlayerInfo::Autosave() const
 
 
 
+const map<const Outfit *, string> &PlayerInfo::GuidancePrograms() const
+{
+	return guidancePrograms;
+}
+
+
+
+bool PlayerInfo::SetGuidanceProgram(const Outfit *outfit, const string &text)
+{
+	if(!outfit || !outfit->GetWeapon())
+		return false;
+	if(text.empty())
+	{
+		guidancePrograms.erase(outfit);
+		MissileGuidance::SetPlayerProgram(outfit->GetWeapon().get(), "");
+		return true;
+	}
+	if(!MissileGuidance::SetPlayerProgram(outfit->GetWeapon().get(), text))
+	{
+		// Keep the program that was installed before, if any.
+		auto it = guidancePrograms.find(outfit);
+		if(it != guidancePrograms.end())
+			MissileGuidance::SetPlayerProgram(outfit->GetWeapon().get(), it->second);
+		return false;
+	}
+	guidancePrograms[outfit] = text;
+	return true;
+}
+
+
+
 void PlayerInfo::Save(const string &filePath) const
 {
 	if(transactionSnapshot)
@@ -5111,6 +5152,18 @@ void PlayerInfo::Save(DataWriter &out) const
 		{
 			for(const auto &cit : it.second)
 				out.Write(cit);
+		}
+		out.EndChild();
+	}
+
+	for(const auto &[outfit, text] : guidancePrograms)
+	{
+		out.Write("guidance program", outfit->TrueName());
+		out.BeginChild();
+		{
+			istringstream in(text);
+			for(string line; getline(in, line); )
+				out.Write("line", line);
 		}
 		out.EndChild();
 	}

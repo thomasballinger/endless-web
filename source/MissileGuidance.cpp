@@ -15,15 +15,31 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "MissileGuidance.h"
 
+#include "DataFile.h"
 #include "DataNode.h"
 #include "GameData.h"
 #include "Weapon.h"
 
+#include <map>
+#include <sstream>
 #include <vector>
 
 using namespace std;
 
 namespace {
+	// The guidance programs the player has written, by weapon, and their text.
+	map<const Weapon *, MissileGuidance> &PlayerPrograms()
+	{
+		static map<const Weapon *, MissileGuidance> programs;
+		return programs;
+	}
+
+	map<const Weapon *, string> &PlayerProgramTexts()
+	{
+		static map<const Weapon *, string> texts;
+		return texts;
+	}
+
 	script::Interface MakeInterface()
 	{
 		script::Interface interface;
@@ -65,6 +81,58 @@ const MissileGuidance *MissileGuidance::Default(const Weapon &weapon)
 	if(!guidance)
 		guidance = GameData::Guidance().Find(DefaultName(weapon.Leading(), weapon.ThrottleControl()));
 	return guidance;
+}
+
+
+
+bool MissileGuidance::SetPlayerProgram(const Weapon *weapon, const string &text)
+{
+	map<const Weapon *, MissileGuidance> &programs = PlayerPrograms();
+	programs.erase(weapon);
+	PlayerProgramTexts().erase(weapon);
+	if(!weapon || text.empty())
+		return false;
+	istringstream in(text);
+	DataFile file(in);
+	for(const DataNode &node : file)
+		if(node.Token(0) == "guidance" && node.Size() >= 2)
+		{
+			MissileGuidance guidance;
+			guidance.Load(node, node.Token(1), false);
+			if(!guidance.IsValid() || !guidance.MissingCapability(*weapon).empty())
+				return false;
+			programs[weapon] = std::move(guidance);
+			PlayerProgramTexts()[weapon] = text;
+			return true;
+		}
+	return false;
+}
+
+
+
+const MissileGuidance *MissileGuidance::PlayerProgram(const Weapon *weapon)
+{
+	const map<const Weapon *, MissileGuidance> &programs = PlayerPrograms();
+	auto it = programs.find(weapon);
+	return it == programs.end() ? nullptr : &it->second;
+}
+
+
+
+string MissileGuidance::PlayerProgramText(const string &name)
+{
+	for(const auto &[weapon, guidance] : PlayerPrograms())
+		if(guidance.Name() == name)
+			return PlayerProgramTexts()[weapon];
+	return "";
+}
+
+
+
+void MissileGuidance::ClearPlayerPrograms()
+{
+	PlayerPrograms().clear();
+	PlayerProgramTexts().clear();
 }
 
 

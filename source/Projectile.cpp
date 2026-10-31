@@ -82,6 +82,9 @@ Projectile::Projectile(const Ship &parent, Point position, Angle angle, const We
 
 	government = parent.GetGovernment();
 	hitsRemaining = weapon->PenetrationCount();
+	// The player's own missiles fly the guidance the player programmed.
+	if(parent.IsYours() && weapon->Homing())
+		playerGuidance = MissileGuidance::PlayerProgram(weapon);
 
 	// If you are boarding your target, do not fire on it.
 	if(parent.IsBoarding() || parent.Commands().Has(Command::BOARD))
@@ -349,7 +352,7 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 		return;
 	}
 
-	const MissileGuidance *guidance = weapon->Guidance();
+	const MissileGuidance *guidance = playerGuidance ? playerGuidance : weapon->Guidance();
 	if(guidance && guidance->IsValid())
 	{
 		string missing = guidance->MissingCapability(*weapon);

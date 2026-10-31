@@ -398,6 +398,8 @@ target_sources(EndlessSkyLib PRIVATE
 	Weather.cpp
 	Weather.h
 	WeightedList.h
+	WorkshopPanel.cpp
+	WorkshopPanel.h
 	Wormhole.cpp
 	Wormhole.h
 	WormholeStrategy.h

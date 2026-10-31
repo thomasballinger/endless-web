@@ -50,6 +50,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "TextArea.h"
 #include "TradingPanel.h"
 #include "UI.h"
+#include "WorkshopPanel.h"
 
 #include <memory>
 #include <sstream>
@@ -232,6 +233,9 @@ void PlanetPanel::Draw()
 
 		if(hasOutfitter)
 			info.SetCondition("has outfitter");
+		// The missile workshop is wherever there is a spaceport or outfitter.
+		if(hasOutfitter || planet.HasNamedPort())
+			info.SetCondition("has workshop");
 	}
 
 	const Interface *ui = GameData::Interfaces().Get(Screen::Width() < 1280 ? "planet (small screen)" : "planet");
@@ -312,6 +316,12 @@ bool PlanetPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command, b
 	{
 		UI::PlaySound(UI::UISound::NORMAL);
 		GetUI().Push(new OutfitterPanel(player, outfitterStock));
+		return true;
+	}
+	else if(key == 'w' && hasAccess && (hasOutfitter || planet.HasNamedPort()))
+	{
+		// The missile workshop.
+		GetUI().Push(new WorkshopPanel(player));
 		return true;
 	}
 	else if(key == 'j' && hasAccess && planet.GetPort().HasService(Port::ServicesType::JobBoard))
