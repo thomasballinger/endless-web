@@ -47,12 +47,13 @@ mkdir -p "$OUT"
 cp -r "$ROOT/tests/integration/config" "$OUT/config"
 LOOK="$HERE/simulator-ui.py"
 
-# The Al Dhanab scenario's saved game, with code scanners (64, for a range of
-# 4,000, so that ships nearby are in range) and an injector on the flagship,
+# The Al Dhanab scenario's saved game, with code scanners (256, for a range of
+# 8,000, so that ships nearby are well in range), an injector and a cognition
+# accelerator on the flagship,
 # and a test that departs and then waits, so there is time to look.
 TESTS="$OUT/config/plugins/integration-tests/data/tests"
 "$HERE/add-outfits.py" "$TESTS/tests_ai_scenarios.txt" "AI Combat Carriers Save" "Watch Scripts Save" \
-	"Code Scanner:64" "Code Injector" > "$TESTS/tests_watch_ui.txt"
+	"Code Scanner:256" "Code Injector" "Cognition Accelerator" > "$TESTS/tests_watch_ui.txt"
 cat >> "$TESTS/tests_watch_ui.txt" << EOF
 test "Watch scripts"
 	status active
@@ -81,7 +82,9 @@ trap 'kill $GAME $XVFB 2> /dev/null' EXIT
 sleep 1
 
 # With --debug, a test draws the game as it runs.
-"$BINARY" --config "$OUT/config" --resources "$ROOT" --test "Watch scripts" --debug > "$OUT/game.log" 2>&1 &
+ES_STATE_HASH=1 "$BINARY" --config "$OUT/config" --resources "$ROOT" --test "Watch scripts" --debug > "$OUT/game.log" 2>&1 &
+# (With ES_STATE_HASH set, the game logs a line every 60 steps, which shows
+# how fast time is passing.)
 GAME=$!
 WINDOW=
 for i in $(seq 100); do
@@ -163,8 +166,35 @@ fi
 target_running
 key k
 key x
+# (With time slowed, the hack takes a few more frames to land.)
+sleep 1
 shot hacked
 check "hacking the target makes its code break up" hacked "$OUT/hacked.png"
+key k
+
+# With the cognition accelerator, reading code slows time: over the same
+# few seconds, far fewer steps pass with the pane open than without.
+steps() { echo $(( $(grep -c '^STATEHASH' "$OUT/game.log") * 60 )); }
+target_running
+BEFORE=$(steps)
+sleep 6
+NORMAL=$(( $(steps) - BEFORE ))
+key k
+sleep 0.5
+shot slowed
+BEFORE=$(steps)
+sleep 6
+SLOWED=$(( $(steps) - BEFORE ))
+key k
+echo "  about $NORMAL steps passed in 6 seconds, and $SLOWED while reading code"
+if [ "$NORMAL" -gt 0 ] && [ $((SLOWED * 2)) -lt "$NORMAL" ]; then
+	echo "ok: reading code with a cognition accelerator slows time"
+else
+	echo "FAILED: reading code with a cognition accelerator slows time"
+	FAILED=1
+fi
+check "slowed time says so" slowed "$OUT/slowed.png"
+
 
 echo "Screenshots in $OUT"
 exit $FAILED

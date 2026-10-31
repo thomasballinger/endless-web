@@ -28,6 +28,7 @@ Usage:
   simulator-ui.py pane IMAGE           exit 0 if the game shows a script's code
   simulator-ui.py hacked IMAGE         exit 0 if the game's pane of code shows
                                        it breaking up
+  simulator-ui.py slowed IMAGE         exit 0 if the game says time is slowed
   simulator-ui.py workshop IMAGE       exit 0 if the missile workshop is showing
   simulator-ui.py programmed IMAGE     exit 0 if the workshop lists a
                                        weapon as running the player's program
@@ -157,6 +158,17 @@ def programmed(image):
     return workshop(image) and count > 10
 
 
+# Where the game says time is slowed, above the middle of the screen.
+SLOWED_LABEL = (560, 30, 1040, 70)
+
+
+def slowed(image):
+    left, top, right, bottom = SLOWED_LABEL
+    count = sum(1 for y in range(top, bottom) for x in range(left, right)
+                if (lambda r, g, b: b > 170 and r > 110 and g > 80 and g < r)(*image.getpixel((x, y))))
+    return count > 20
+
+
 def main(args):
     if len(args) == 2 and args[0] == 'ready':
         return ready(load(args[1]))
@@ -174,6 +186,8 @@ def main(args):
         return pane(load(args[1]))
     if len(args) == 2 and args[0] == 'hacked':
         return hacked(load(args[1]))
+    if len(args) == 2 and args[0] == 'slowed':
+        return slowed(load(args[1]))
     if len(args) == 2 and args[0] == 'workshop':
         return workshop(load(args[1]))
     if len(args) == 2 and args[0] == 'programmed':

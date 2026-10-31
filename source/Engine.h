@@ -342,6 +342,14 @@ private:
 	// Count steps for UI elements separately, because they shouldn't be affected by pausing.
 	mutable int uiStep = 0;
 	bool timePaused = false;
+	// While the player reads code with a "time dilation" outfit, time runs
+	// slower: the world only moves on one step in this many.
+	bool timeSlowed = false;
+	int slowFactor = 1;
+	int slowPhase = 0;
+	// Whether the step being calculated leaves the world where it is (time is
+	// paused, or slowed and this is not one of the steps it moves on).
+	bool calcPaused = false;
 
 	std::list<ShipEvent> eventQueue;
 	std::list<ShipEvent> events;

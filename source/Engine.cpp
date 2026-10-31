@@ -467,7 +467,9 @@ void Engine::Step(bool isActive)
 	const WatchedScripts &watched = watchedScripts[currentDrawBuffer];
 	if(watched.isFresh)
 		scriptDisplay.Update(watched.entries, watched.injector);
-	scriptHack = scriptHackNextStep;
+	// (It waits for a step that time moves on, which carries it out.)
+	if(!scriptHackNextStep.empty())
+		scriptHack = scriptHackNextStep;
 	scriptHackNextStep.clear();
 
 	// About twice a second, pick up any edits to script files. The previous
@@ -493,12 +495,27 @@ void Engine::Step(bool isActive)
 
 	// The calculation thread was paused by MainPanel before calling this function, so it is safe to access things.
 	const shared_ptr<Ship> flagship = player.FlagshipPtr();
+	// Reading code (with the pane open) with a time dilation outfit slows
+	// time, while it has the energy to.
+	timeSlowed = false;
+	if(isActive && flagship && !timePaused && !scriptDisplay.Shown().empty())
+	{
+		const double dilation = flagship->Attributes().Get("time dilation");
+		const double cost = flagship->Attributes().Get("time dilation energy");
+		if(dilation > 0. && flagship->EnergyFraction() * flagship->MaxEnergy() >= cost)
+		{
+			timeSlowed = true;
+			slowFactor = 1 + max(1, static_cast<int>(round(dilation)));
+			if(cost > 0.)
+				flagship->TransferEnergy(cost, nullptr);
+		}
+	}
 	const StellarObject *object = player.GetStellarObject();
 	if(object)
 		camera.SnapTo(object->Position());
 	else if(flagship)
 	{
-		if(isActive && !timePaused)
+		if(isActive && !calcPaused)
 			camera.MoveTo(flagship->Center(), hyperspacePercentage);
 
 		if(doEnterLabels)
@@ -568,7 +585,7 @@ void Engine::Step(bool isActive)
 		}
 
 		// Step the background to account for the current velocity and zoom.
-		GameData::StepBackground(timePaused ? Point() : camera.Velocity(), zoom);
+		GameData::StepBackground(calcPaused ? Point() : camera.Velocity(), zoom);
 	}
 
 	outlines.clear();
@@ -1149,7 +1166,13 @@ void Engine::Step(bool isActive)
 // Begin the next step of calculations.
 void Engine::Go()
 {
-	if(!timePaused)
+	// With time slowed, the world moves on only one step in so many.
+	calcPaused = timePaused;
+	if(timeSlowed && !timePaused)
+		calcPaused = (++slowPhase % slowFactor) != 0;
+	else
+		slowPhase = 0;
+	if(!calcPaused)
 		++step;
 	currentCalcBuffer = currentCalcBuffer ? 0 : 1;
 	queue.Run([this] { CalculateStep(); });
@@ -1342,6 +1365,20 @@ void Engine::Draw() const
 
 	// Draw the heads-up display.
 	hud->Draw(info);
+	// Slowed time edges the view in violet (leaving what is being read clear),
+	// and says so.
+	if(timeSlowed)
+	{
+		const Color edge(.20f, .10f, .40f, .35f);
+		const double band = 24.;
+		FillShader::Fill(Point(0., Screen::Top() + band / 2.), Point(Screen::Width(), band), edge);
+		FillShader::Fill(Point(0., Screen::Bottom() - band / 2.), Point(Screen::Width(), band), edge);
+		FillShader::Fill(Point(Screen::Left() + band / 2., 0.), Point(band, Screen::Height() - 2. * band), edge);
+		FillShader::Fill(Point(Screen::Right() - band / 2., 0.), Point(band, Screen::Height() - 2. * band), edge);
+		const Font &bigFont = FontSet::Get(18);
+		const string text = "TIME SLOWED (1/" + to_string(slowFactor) + ")";
+		bigFont.Draw(text, Point(-bigFont.Width(text) / 2., Screen::Top() + 40.), Color(.75f, .6f, 1.f, .9f));
+	}
 	scriptDisplay.Draw(hud->GetBox("player code"), hud->GetBox("target code"));
 	if(hud->HasPoint("radar"))
 	{
@@ -1707,11 +1744,11 @@ void Engine::CalculateStep()
 	const System *playerSystem = player.GetSystem();
 
 	// When ES_STATE_HASH is set, print a hash of all ship and projectile
-	// kinematics every 60 steps. tests/ai/compare-runs.sh uses this to check that runs with the same
+	// kinematics every 60 steps (that time moves on). tests/ai/compare-runs.sh uses this to check that runs with the same
 	// --rngseed are identical, and that AI changes don't alter behavior.
 	static const bool printStateHash = getenv("ES_STATE_HASH");
 	static uint64_t probeStep = 0;
-	if(printStateHash && !(++probeStep % 60))
+	if(printStateHash && !calcPaused && !(++probeStep % 60))
 	{
 		uint64_t h = 1469598103934665603ull;
 		auto mix = [&h](double d) { uint64_t b; memcpy(&b, &d, sizeof(b)); h = (h ^ b) * 1099511628211ull; };
@@ -1788,11 +1825,15 @@ void Engine::CalculateStep()
 		fflush(stdout);
 	}
 
-	if(timePaused)
+	if(calcPaused)
 	{
-		// Only process player commands and handle mouse clicks.
-		ai.MovePlayer(*player.Flagship(), activeCommands);
-		activeCommands.Clear();
+		// Only process player commands and handle mouse clicks. (While time is
+		// only slowed, the commands wait for the next step that time moves on.)
+		if(timePaused)
+		{
+			ai.MovePlayer(*player.Flagship(), activeCommands);
+			activeCommands.Clear();
+		}
 		HandleMouseClicks();
 	}
 	else
@@ -1800,7 +1841,7 @@ void Engine::CalculateStep()
 
 	// Draw the objects. Start by figuring out where the view should be centered:
 	Camera newCamera = camera;
-	if(flagship && !timePaused)
+	if(flagship && !calcPaused)
 	{
 		if(flagship->IsHyperspacing())
 			hyperspacePercentage = flagship->GetHyperspacePercentage() / 100.;
@@ -1838,7 +1879,7 @@ void Engine::CalculateStep()
 			if(ship.get() != flagship)
 			{
 				ship->Draw(draw[currentCalcBuffer], visuals);
-				if(timePaused)
+				if(calcPaused)
 					continue;
 				if(ship->IsThrusting() && !ship->EnginePoints().empty())
 				{
@@ -1862,7 +1903,7 @@ void Engine::CalculateStep()
 
 	if(flagship && showFlagship)
 		flagship->Draw(draw[currentCalcBuffer], visuals);
-	if(!timePaused && flagship && showFlagship)
+	if(!calcPaused && flagship && showFlagship)
 	{
 		if(flagship->IsThrusting() && !flagship->EnginePoints().empty())
 		{

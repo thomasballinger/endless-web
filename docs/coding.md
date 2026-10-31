@@ -29,6 +29,10 @@ Build as usual, then start a new pilot (or load one). Things to look for:
     (with **X**, or the pane's HACK button) crashes a scanned ship's scripts
     for a few seconds (it drifts, without firing) or spins a missile away.
     It costs 200 energy and needs ten seconds to recharge.
+  - **Cognition Accelerator**, also with the Common Outfits: while the code
+    pane is open, time runs at a quarter speed (the edges of the screen turn
+    violet), long enough to read an incoming missile's code and hack it. It
+    drains energy while it runs, and stops when the ship runs low.
 - **Factions' code looks like theirs.** The Navy's is stamped "cleared for
   fleet use", the Syndicate's threatens your warranty, pirates' code was
   "ripped out of a dead merchant's flight computer", and alien code (Hai,

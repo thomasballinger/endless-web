@@ -204,6 +204,18 @@ outfit "Code Injector"
 	description "Working through your code scanner, this device feeds a ship's flight computer (or a missile's) garbage until its scripts crash, leaving the ship drifting without firing, or the missile spinning, until they recover a few seconds later (four, against a ship without a code jammer). It needs ten seconds and a burst of energy to recharge, and a code jammer shortens or blocks its attacks."
 
 
+outfit "Cognition Accelerator"
+	category "Systems"
+	series "Scanners"
+	index 01070
+	cost 95000
+	thumbnail "outfit/outfit scanner"
+	"mass" 3
+	"outfit space" -3
+	"time dilation" 3
+	"time dilation energy" 1
+	description "A neural interface that speeds up how fast you think, at the price of the power it draws. While you read code (with your scripts pane open), time seems to pass at a quarter of its usual speed: long enough to watch an incoming missile's guidance think, and to hack it before it arrives. It drains energy the whole time it runs, and stops when your ship runs low."
+
 outfit "Ramscoop"
 	category "Systems"
 	series "Ramscoops"
