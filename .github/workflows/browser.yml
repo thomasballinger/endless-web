@@ -71,3 +71,6 @@ jobs:
       - name: Deploy
         if: ${{ github.ref == 'refs/heads/endless-web' && github.event_name == 'push' }}
         run: source emsdk/emsdk_env.sh; make deploy
+      - name: Deploy the scriptable fork
+        if: ${{ github.ref == 'refs/heads/scriptable' && github.event_name == 'push' }}
+        run: source emsdk/emsdk_env.sh; make deploy-scriptable SCRIPTABLE_DISTRIBUTION_ID=${{ vars.SCRIPTABLE_DISTRIBUTION_ID }}

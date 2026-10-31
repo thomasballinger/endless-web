@@ -148,3 +148,14 @@ deploy: output/index.html
 	aws s3 sync --exclude '*' --include index.html output s3://play-endless-sky.com/live --cache-control 'max-age=0'
 	aws cloudfront create-invalidation --distribution-id E2TZUW922XPLEF --paths / /index.html
 	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths / /index.html
+
+# The scriptable fork has its own subdomain, served by its own CloudFront
+# distribution from this prefix of the same bucket.
+SCRIPTABLE_PREFIX := s3://play-endless-sky.com/live/scriptable
+deploy-scriptable: output/index.html
+ifndef SCRIPTABLE_DISTRIBUTION_ID
+	$(error "set SCRIPTABLE_DISTRIBUTION_ID to the scriptable subdomain's CloudFront distribution")
+endif
+	aws s3 sync --size-only --exclude index.html output $(SCRIPTABLE_PREFIX) --cache-control 'public, max-age=604800, immutable'
+	aws s3 sync --exclude '*' --include index.html output $(SCRIPTABLE_PREFIX) --cache-control 'max-age=0'
+	aws cloudfront create-invalidation --distribution-id $(SCRIPTABLE_DISTRIBUTION_ID) --paths / /index.html
