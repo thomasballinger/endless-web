@@ -58,10 +58,13 @@ private:
 private:
 	void FindWeapons();
 	void Open(const Outfit &outfit);
+	// Open the escort workshop, for how the player's escorts keep station.
+	void OpenEscorts();
 
 
 private:
 	PlayerInfo &player;
 	std::vector<Row> rows;
 	Rectangle closeBox;
+	Rectangle escortBox;
 };

@@ -52,6 +52,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "ScanType.h"
 #include "Ship.h"
 #include "ShipEvent.h"
+#include "ShipManeuver.h"
 #include "image/SpriteLoadManager.h"
 #include "StartConditions.h"
 #include "StellarObject.h"
@@ -247,6 +248,7 @@ void PlayerInfo::Clear()
 {
 	*this = PlayerInfo();
 	MissileGuidance::ClearPlayerPrograms();
+	ShipManeuver::ClearPlayerPrograms();
 
 	Random::Seed(time(nullptr));
 	GameData::Revert();
@@ -387,6 +389,14 @@ void PlayerInfo::Load(const filesystem::path &path, const shared_ptr<PilotProfil
 		{
 			for(const DataNode &grand : child)
 				collapsed[child.Token(1)].insert(grand.Token(0));
+		}
+		else if(key == "maneuver program" && hasValue)
+		{
+			string text;
+			for(const DataNode &grand : child)
+				if(grand.Token(0) == "line")
+					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
+			SetManeuverProgram(child.Token(1), text);
 		}
 		else if(key == "guidance program" && hasValue)
 		{
@@ -5044,6 +5054,35 @@ void PlayerInfo::Autosave() const
 
 
 
+const map<string, string> &PlayerInfo::ManeuverPrograms() const
+{
+	return maneuverPrograms;
+}
+
+
+
+bool PlayerInfo::SetManeuverProgram(const string &name, const string &text)
+{
+	if(text.empty())
+	{
+		maneuverPrograms.erase(name);
+		ShipManeuver::SetPlayerProgram(name, "");
+		return true;
+	}
+	if(!ShipManeuver::SetPlayerProgram(name, text))
+	{
+		// Keep the program that was installed before, if any.
+		auto it = maneuverPrograms.find(name);
+		if(it != maneuverPrograms.end())
+			ShipManeuver::SetPlayerProgram(name, it->second);
+		return false;
+	}
+	maneuverPrograms[name] = text;
+	return true;
+}
+
+
+
 const map<const Outfit *, string> &PlayerInfo::GuidancePrograms() const
 {
 	return guidancePrograms;
@@ -5156,6 +5195,17 @@ void PlayerInfo::Save(DataWriter &out) const
 		out.EndChild();
 	}
 
+	for(const auto &[name, text] : maneuverPrograms)
+	{
+		out.Write("maneuver program", name);
+		out.BeginChild();
+		{
+			istringstream in(text);
+			for(string line; getline(in, line); )
+				out.Write("line", line);
+		}
+		out.EndChild();
+	}
 	for(const auto &[outfit, text] : guidancePrograms)
 	{
 		out.Write("guidance program", outfit->TrueName());

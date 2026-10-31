@@ -17,6 +17,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Color.h"
 #include "Command.h"
+#include "EscortWorkshopPanel.h"
 #include "shader/FillShader.h"
 #include "text/Font.h"
 #include "text/FontSet.h"
@@ -79,7 +80,7 @@ void WorkshopPanel::Draw()
 
 	const Font &font = FontSet::Get(14);
 	const Font &bigFont = FontSet::Get(18);
-	const double height = 150. + max<size_t>(1, rows.size()) * ROW_HEIGHT;
+	const double height = 150. + max<size_t>(1, rows.size()) * ROW_HEIGHT + ROW_HEIGHT + 30.;
 	const Rectangle box(Point(), Point(WIDTH, height));
 	FillShader::Fill(box.Center(), box.Dimensions(), BACKGROUND);
 	FillShader::Fill(Point(box.Center().X(), box.Top() + 1.), Point(WIDTH, 2.), BORDER);
@@ -97,10 +98,23 @@ void WorkshopPanel::Draw()
 		Point(box.Left() + 24., y), TEXT);
 	y += 34.;
 
+	// How the player's escorts fly, last.
+	auto drawEscorts = [&](double top) {
+		escortBox = Rectangle::WithCorners(Point(box.Left() + 16., top), Point(box.Right() - 16., top + ROW_HEIGHT - 6.));
+		const bool hover = escortBox.Contains(UI::GetMouse());
+		FillShader::Fill(escortBox.Center(), escortBox.Dimensions(), hover ? Color(.06f, .14f, .09f, 1.f) : ROW);
+		font.Draw("Escort flight: keeping station  (e)", escortBox.TopLeft() + Point(10., 4.), TITLE);
+		font.Draw("how your escorts hold position near your ship", escortBox.TopLeft() + Point(10., 21.), DIM);
+		const bool programmed = player.ManeuverPrograms().contains("keep station");
+		const string status = programmed ? "your program" : "factory: keep station";
+		font.Draw(status, Point(escortBox.Right() - 10. - font.Width(status), escortBox.Top() + 12.),
+			programmed ? PROGRAMMED : DIM);
+	};
 	if(rows.empty())
 	{
 		font.Draw("None of your ships carries a guided weapon. Missile launchers are sold at outfitters.",
 			Point(box.Left() + 24., y + 12.), DIM);
+		drawEscorts(y + ROW_HEIGHT + 30.);
 		return;
 	}
 	for(Row &row : rows)
@@ -126,6 +140,7 @@ void WorkshopPanel::Draw()
 			programmed ? PROGRAMMED : DIM);
 		y += ROW_HEIGHT;
 	}
+	drawEscorts(y + 30.);
 }
 
 
@@ -136,6 +151,8 @@ bool WorkshopPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command,
 		GetUI().Pop(this);
 	else if(key >= '1' && key <= '9' && static_cast<size_t>(key - '1') < rows.size())
 		Open(*rows[key - '1'].outfit);
+	else if(key == 'e')
+		OpenEscorts();
 	else
 		return false;
 	return true;
@@ -159,7 +176,31 @@ bool WorkshopPanel::Click(int x, int y, MouseButton button, int clicks)
 			Open(*row.outfit);
 			return true;
 		}
+	if(escortBox.Contains(point))
+		OpenEscorts();
 	return true;
+}
+
+
+
+void WorkshopPanel::OpenEscorts()
+{
+	// The player's flagship leads; the escort is one of the player's own, if
+	// they have any, or else a light warship.
+	const Ship *leader = player.Flagship();
+	const Ship *escort = nullptr;
+	for(const shared_ptr<Ship> &ship : player.Ships())
+		if(ship.get() != leader && !ship->IsDestroyed() && !ship->IsParked() && !ship->CanBeCarried())
+		{
+			escort = ship.get();
+			break;
+		}
+	if(!escort)
+		escort = GameData::Ships().Find("Sparrow");
+	if(!leader)
+		leader = GameData::Ships().Find("Argosy");
+	if(leader && escort)
+		GetUI().Push(new EscortWorkshopPanel(&player, *leader, *escort));
 }
 
 

@@ -126,6 +126,19 @@ key Escape
 shot programmed
 check "installing the program makes the workshop list it as the player's" programmed "$OUT/programmed.png"
 
+# The escort workshop: hold station farther out (line 4 is the position
+# deadband, 200), and install that for the player's escorts.
+key e
+shot escorts
+check "the workshop opens the escort workshop" escorts "$OUT/escorts.png"
+xdotool mousemove 300 112 click 1
+key End BackSpace BackSpace BackSpace
+xdotool type --delay 30 "600"
+sleep 1
+key ctrl+s
+key Escape
+key Escape
+
 # Take off, which saves the game.
 key Escape
 key d
@@ -135,6 +148,12 @@ if [ -n "$SAVE" ] && grep -q "turn = turn \* .5" "$SAVE"; then
 	echo "ok: taking off saves the program with the game"
 else
 	echo "FAILED: taking off saves the program with the game"
+	FAILED=1
+fi
+if [ -n "$SAVE" ] && grep -q "maneuver program" "$SAVE" && grep -q "let position-deadband 600" "$SAVE"; then
+	echo "ok: and the escorts' program"
+else
+	echo "FAILED: and the escorts' program"
 	FAILED=1
 fi
 

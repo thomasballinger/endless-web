@@ -31,6 +31,7 @@ Usage:
   simulator-ui.py hacked IMAGE         exit 0 if the game's pane of code shows
                                        it breaking up
   simulator-ui.py slowed IMAGE         exit 0 if the game says time is slowed
+  simulator-ui.py escorts IMAGE        exit 0 if the escort workshop is showing
   simulator-ui.py workshop IMAGE       exit 0 if the missile workshop is showing
   simulator-ui.py programmed IMAGE     exit 0 if the workshop lists a
                                        weapon as running the player's program
@@ -184,6 +185,15 @@ def slowed(image):
     return count > 20
 
 
+# Points in the escort workshop's view, whose background is a dark blue.
+ESCORT_POINTS = [(900, 300), (1100, 700), (1250, 200)]
+
+
+def escorts(image):
+    blue = [b > g > r and b < 50 for r, g, b in (image.getpixel(p) for p in ESCORT_POINTS)]
+    return sum(blue) >= 2
+
+
 def main(args):
     if len(args) == 2 and args[0] == 'ready':
         return ready(load(args[1]))
@@ -203,6 +213,8 @@ def main(args):
         return litrow(load(args[1]))
     if len(args) == 2 and args[0] == 'hacked':
         return hacked(load(args[1]))
+    if len(args) == 2 and args[0] == 'escorts':
+        return escorts(load(args[1]))
     if len(args) == 2 and args[0] == 'slowed':
         return slowed(load(args[1]))
     if len(args) == 2 and args[0] == 'workshop':

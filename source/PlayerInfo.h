@@ -236,6 +236,11 @@ public:
 	// weapons (in the workshop), by launcher outfit, as the text of a
 	// "guidance" node.
 	const std::map<const Outfit *, std::string> &GuidancePrograms() const;
+	// The player's own maneuver programs (see ShipManeuver), which the
+	// player's escorts fly, by maneuver name. An empty text removes one;
+	// returns false if the program doesn't compile.
+	const std::map<std::string, std::string> &ManeuverPrograms() const;
+	bool SetManeuverProgram(const std::string &name, const std::string &text);
 	// Install a program on all the player's weapons of this kind, or remove
 	// it (with empty text). Returns false, and installs nothing, if it doesn't
 	// compile or needs more than the weapon has.
@@ -613,6 +618,7 @@ private:
 	// Currently collapsed categories for various panels.
 	std::map<std::string, std::set<std::string>> collapsed;
 	std::map<const Outfit *, std::string> guidancePrograms;
+	std::map<std::string, std::string> maneuverPrograms;
 
 	bool freshlyLoaded = true;
 	int desiredCrew = 0;

@@ -22,6 +22,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataFile.h"
 #include "DataNode.h"
 #include "Engine.h"
+#include "EscortWorkshopPanel.h"
 #include "Files.h"
 #include "text/Font.h"
 #include "text/Format.h"
@@ -528,7 +529,12 @@ void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversa
 				simulatorOpened = true;
 				const Outfit *outfit = GameData::Outfits().Find(simulatorOutfit);
 				const Ship *target = GameData::Ships().Find(simulatorTarget);
-				if(outfit && outfit->GetWeapon() && outfit->GetWeapon()->Homing() && target)
+				// "--simulator escort" opens the escort workshop instead, with the
+				// target as the escort, keeping station on an Argosy.
+				const Ship *leader = GameData::Ships().Find("Argosy");
+				if(simulatorOutfit == "escort" && target && leader)
+					menuPanels.Push(new EscortWorkshopPanel(nullptr, *leader, *target));
+				else if(outfit && outfit->GetWeapon() && outfit->GetWeapon()->Homing() && target)
 					menuPanels.Push(new SimulatorPanel(*outfit, *target));
 				else
 					Logger::Log("Can't open the simulator: \"" + simulatorOutfit + "\" must be a homing weapon and \""
@@ -728,7 +734,8 @@ void PrintHelp()
 		" and the latest save game, and inspect data for errors." << endl;
 	cerr << "    --tests: print table of available tests, then exit." << endl;
 	cerr << "    --simulator <outfit>: open a practice range for the given homing weapon's guidance"
-		" script, with --simulator-target <ship model> to fire at (default: Argosy)." << endl;
+		" script, with --simulator-target <ship model> to fire at (default: Argosy). With \"escort\" for the"
+		" outfit, open the escort workshop, with the target as the escort." << endl;
 	cerr << "    --watch-scripts: while playing, reload guidance scripts, maneuvers and AI rules"
 		" when their data files change." << endl;
 	cerr << "    --guidance-bench <outfit>: fire the given homing weapon at a target flying"

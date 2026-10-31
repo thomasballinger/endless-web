@@ -169,14 +169,24 @@ public:
 
 
 public:
-	void Load(const DataNode &node);
+	// Load a maneuver, logging any mistakes in it unless told not to.
+	void Load(const DataNode &node, bool logErrors = true);
 
 	const std::string &Name() const;
 	bool IsValid() const;
 
 	// Run the script. Returns false, with no command, if the script fails.
 	// Scripts that call the ship functions need a context.
-	bool Run(const Input &input, Output &output, const Context *context = nullptr) const;
+	bool Run(const Input &input, Output &output, const Context *context = nullptr,
+		script::Trace *trace = nullptr) const;
+	const script::Program &Program() const;
+
+	// The player's own version of a maneuver, which the player's escorts fly
+	// instead of the game's. Setting one that doesn't compile (or an empty
+	// text) removes it, returning false.
+	static bool SetPlayerProgram(const std::string &name, const std::string &text);
+	static const ShipManeuver *PlayerProgram(const std::string &name);
+	static void ClearPlayerPrograms();
 
 
 private:

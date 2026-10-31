@@ -198,6 +198,10 @@ namespace {
 		}
 		if(!maneuver)
 			maneuver = GameData::Maneuvers().Find(name);
+		// The player's escorts fly the player's own version, if there is one.
+		if(ship.IsYours() && ship.GetParent())
+			if(const ShipManeuver *player = ShipManeuver::PlayerProgram(name))
+				maneuver = player;
 		if(!maneuver || !maneuver->IsValid())
 		{
 			static set<string> warned;

@@ -75,6 +75,17 @@ Build as usual, then start a new pilot (or load one). Things to look for:
     read `target.velocity` or `target.intercept`, only "throttle control"
     can set `thrust`.
 
+- **The escort workshop.** In the workshop, **E** (or the last row) opens how
+  your escorts keep station near your ship: the "keep station" maneuver.
+  Your ship flies a drill (cruising, zigzagging, sprinting then stopping,
+  holding still; **D** changes it, and the arrow keys fly it yourself) and
+  an escort keeps station on it with the program being edited; **T** tries
+  another escort ship. Every edit replays the run with the new program,
+  the old escort's course showing faintly, and the inspector says how far
+  off station it is, now and on average. **Ctrl+S** installs it for your
+  escorts (no outfit needed, for now; you don't even need an escort to try
+  it).
+
 Things worth trying: make your Meteors lead their targets (they can't, on
 basic hardware: the workshop will tell you why), make them coast instead of
 overshooting, or make a missile that gives up and flies straight when it

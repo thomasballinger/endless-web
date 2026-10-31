@@ -17,8 +17,12 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "AI.h"
 #include "Angle.h"
+#include "DataFile.h"
 #include "DataNode.h"
 
+#include <map>
+#include <sstream>
+#include <string>
 #include <vector>
 
 using namespace std;
@@ -159,10 +163,64 @@ const script::Interface &ShipManeuver::GetInterface()
 
 
 
-void ShipManeuver::Load(const DataNode &node)
+void ShipManeuver::Load(const DataNode &node, bool logErrors)
 {
 	program = script::Program();
-	program.Load(node, GetInterface());
+	program.Load(node, GetInterface(), logErrors);
+}
+
+
+
+const script::Program &ShipManeuver::Program() const
+{
+	return program;
+}
+
+
+
+namespace {
+	map<string, ShipManeuver> &PlayerManeuvers()
+	{
+		static map<string, ShipManeuver> maneuvers;
+		return maneuvers;
+	}
+}
+
+
+
+bool ShipManeuver::SetPlayerProgram(const string &name, const string &text)
+{
+	PlayerManeuvers().erase(name);
+	if(text.empty())
+		return false;
+	istringstream in(text);
+	DataFile file(in);
+	for(const DataNode &node : file)
+		if(node.Token(0) == "maneuver" && node.Size() >= 2)
+		{
+			ShipManeuver maneuver;
+			maneuver.Load(node, false);
+			if(!maneuver.IsValid())
+				return false;
+			PlayerManeuvers()[name] = std::move(maneuver);
+			return true;
+		}
+	return false;
+}
+
+
+
+const ShipManeuver *ShipManeuver::PlayerProgram(const string &name)
+{
+	auto it = PlayerManeuvers().find(name);
+	return it == PlayerManeuvers().end() ? nullptr : &it->second;
+}
+
+
+
+void ShipManeuver::ClearPlayerPrograms()
+{
+	PlayerManeuvers().clear();
 }
 
 
@@ -181,7 +239,7 @@ bool ShipManeuver::IsValid() const
 
 
 
-bool ShipManeuver::Run(const Input &input, Output &output, const Context *context) const
+bool ShipManeuver::Run(const Input &input, Output &output, const Context *context, script::Trace *trace) const
 {
 	// Each thread reuses its own variables.
 	thread_local vector<Value> variables;
@@ -227,7 +285,7 @@ bool ShipManeuver::Run(const Input &input, Output &output, const Context *contex
 	output = Output();
 	const Context *previousContext = currentContext;
 	currentContext = context;
-	bool ran = program.Run(variables, effects, nullptr, script::Activity::Begin("maneuver", Name()));
+	bool ran = program.Run(variables, effects, nullptr, trace ? trace : script::Activity::Begin("maneuver", Name()));
 	currentContext = previousContext;
 	if(!ran || variables[TURN].GetType() != Value::Type::NUMBER
 			|| variables[FORWARD].GetType() != Value::Type::BOOLEAN || variables[BACK].GetType() != Value::Type::BOOLEAN

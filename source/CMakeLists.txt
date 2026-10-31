@@ -129,6 +129,10 @@ target_sources(EndlessSkyLib PRIVATE
 	EsUuid.h
 	EscortDisplay.cpp
 	EscortDisplay.h
+	EscortSimulation.cpp
+	EscortSimulation.h
+	EscortWorkshopPanel.cpp
+	EscortWorkshopPanel.h
 	ExclusiveItem.h
 	FighterHitHelper.h
 	Files.cpp
