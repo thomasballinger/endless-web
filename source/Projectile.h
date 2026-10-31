@@ -25,6 +25,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstdint>
 #include <memory>
 #include <set>
+#include <string>
 #include <vector>
 
 class Collision;
@@ -77,6 +78,18 @@ public:
 	// Whether the seeker has lost its lock and is confused, so that it steers
 	// the projectile instead of the guidance script.
 	bool IsConfused() const;
+	// Whether its seeker has a target and sees it.
+	bool HasLock() const;
+	// The chance that its seeker will see its target after its next check
+	// (which happens, on average, every 30 steps).
+	double LockChance() const;
+	// How far from a ship its jamming reaches. (Jamming is strongest at the
+	// ship, and fades out evenly to nothing at this distance.)
+	static double JammingRange(double jamming);
+	// What confused its seeker, if it is confused: "radar jamming", "optical
+	// jamming", "radar and optical jamming" (from its target), or, with no
+	// jamming to blame, "poor tracking".
+	std::string ConfusionCause() const;
 	// The ship whose watcher sees this projectile's guidance script run, if
 	// any (used only to tell ships apart). Projectiles it creates are not
 	// watched.
@@ -144,6 +157,7 @@ public:
 
 private:
 	void CheckLock(const Entity &target);
+	std::vector<double> LockProbabilities(const Entity &target) const;
 	void CheckConfused(const Entity &target);
 	// Run the guidance script to set this step's turn and acceleration.
 	void Steer(const Entity *currentTarget, double &turn, double &accel);
@@ -172,6 +186,9 @@ private:
 	uint16_t hitsRemaining = 1U;
 	bool hasLock = true;
 	bool isConfused = false;
+	// Which of its target's jamming was confusing it when it got confused:
+	// 1 for radar, 2 for optical.
+	int confusingJamming = 0;
 	// What this projectile's guidance script remembers between steps.
 	script::Memory guidanceMemory;
 	// Where to record how the guidance script ran, if anywhere, and what it

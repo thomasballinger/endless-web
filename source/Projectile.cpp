@@ -42,10 +42,14 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 using namespace std;
 
 namespace {
+	// How often a seeker that has lost its lock gets it back, compared to
+	// keeping one it has.
+	const double RELOCK_RATE = .3;
+
 	// Get the current power of jamming at a specified range.
 	double RangeFraction(double distance, double jamming)
 	{
-		return 1. - min(1., distance / (500. + sqrt(jamming) * 500.));
+		return 1. - min(1., distance / Projectile::JammingRange(jamming));
 	}
 
 	// Given the probability of losing a lock in five tries, check randomly
@@ -471,6 +475,26 @@ void Projectile::Hack(int steps)
 
 
 
+bool Projectile::HasLock() const
+{
+	return hasLock && weapon->Homing() && TargetPtr();
+}
+
+
+
+string Projectile::ConfusionCause() const
+{
+	if(confusingJamming == 3)
+		return "radar and optical jamming";
+	if(confusingJamming == 2)
+		return "optical jamming";
+	if(confusingJamming == 1)
+		return "radar jamming";
+	return "poor tracking";
+}
+
+
+
 bool Projectile::IsConfused() const
 {
 	return isConfused && !hasLock;
@@ -601,18 +625,27 @@ void Projectile::BreakTarget()
 // guided missiles.
 void Projectile::CheckLock(const Entity &target)
 {
-	static const double RELOCK_RATE = .3;
 	double base = hasLock ? 1. : RELOCK_RATE;
 	hasLock = false;
-
-	// For each tracking type, calculate the probability twice every second that a
-	// lock will be lost.
-	if(weapon->Tracking())
-	{
-		double lockChance = (weapon ->Tracking());
-		double probability = lockChance / (RELOCK_RATE - (lockChance * RELOCK_RATE) + lockChance);
+	// Each tracking method this weapon has gets a try (drawing a random number
+	// whether or not an earlier one succeeded).
+	for(double probability : LockProbabilities(target))
 		hasLock |= Check(probability, base);
-	}
+}
+
+
+
+// For each tracking type, the probability twice every second that a lock will be
+// lost, for the tracking types this projectile's weapon has, in the order they
+// are checked.
+vector<double> Projectile::LockProbabilities(const Entity &target) const
+{
+	vector<double> probabilities;
+	auto add = [&probabilities](double lockChance) {
+		probabilities.push_back(lockChance / (RELOCK_RATE - (lockChance * RELOCK_RATE) + lockChance));
+	};
+	if(weapon->Tracking())
+		add(weapon->Tracking());
 
 	// Optical tracking is about 1.5% for an average interceptor (250 mass),
 	// about 50% for an average medium warship (1000 mass),
@@ -625,9 +658,7 @@ void Projectile::CheckLock(const Entity &target)
 			opticalJamming *= RangeFraction(position.Distance(target.Position()), opticalJamming);
 		double opticalSize = target.OpticalSize() / (1. + opticalJamming);
 		double weight = opticalSize * opticalSize * opticalSize / 1e9;
-		double lockChance = weapon->OpticalTracking() * weight / (1. + weight);
-		double probability = lockChance / (RELOCK_RATE - (lockChance * RELOCK_RATE) + lockChance);
-		hasLock |= Check(probability, base);
+		add(weapon->OpticalTracking() * weight / (1. + weight));
 	}
 
 	// Infrared tracking is zero when heat is zero and 100% when heat is full.
@@ -641,9 +672,7 @@ void Projectile::CheckLock(const Entity &target)
 		double multiplier = 1.;
 		if(distance <= shortRange)
 			multiplier = 2. - distance / shortRange;
-		double lockChance = weapon->InfraredTracking() * min(1., target.HeatFraction() * multiplier);
-		double probability = lockChance / (RELOCK_RATE - (lockChance * RELOCK_RATE) + lockChance);
-		hasLock |= Check(probability, base);
+		add(weapon->InfraredTracking() * min(1., target.HeatFraction() * multiplier));
 	}
 
 	// Radar tracking depends on whether the target ship has jamming capabilities.
@@ -656,10 +685,30 @@ void Projectile::CheckLock(const Entity &target)
 		double radarJamming = target.IsDisabled() ? 0. : target.RadarJamming();
 		if(radarJamming)
 			radarJamming *= RangeFraction(position.Distance(target.Position()), radarJamming);
-		double lockChance = weapon->RadarTracking() / (1. + radarJamming);
-		double probability = lockChance / (RELOCK_RATE - (lockChance * RELOCK_RATE) + lockChance);
-		hasLock |= Check(probability, base);
+		add(weapon->RadarTracking() / (1. + radarJamming));
 	}
+	return probabilities;
+}
+
+
+
+double Projectile::LockChance() const
+{
+	const shared_ptr<Entity> target = TargetPtr();
+	if(!target || !weapon->Homing())
+		return 0.;
+	const double base = hasLock ? 1. : RELOCK_RATE;
+	double miss = 1.;
+	for(double probability : LockProbabilities(*target))
+		miss *= 1. - min(1., base * probability);
+	return 1. - miss;
+}
+
+
+
+double Projectile::JammingRange(double jamming)
+{
+	return 500. + sqrt(jamming) * 500.;
 }
 
 
@@ -708,6 +757,15 @@ void Projectile::CheckConfused(const Entity &target)
 	}
 
 	isConfused = trackingConfused && infraredConfused && opticalConfused && radarConfused;
+	// Remember what to blame (without drawing any more random numbers).
+	confusingJamming = 0;
+	if(isConfused)
+	{
+		if(weapon->RadarTracking() && target.RadarJamming())
+			confusingJamming |= 1;
+		if(weapon->OpticalTracking() && target.OpticalJamming())
+			confusingJamming |= 2;
+	}
 }
 
 

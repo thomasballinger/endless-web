@@ -121,7 +121,7 @@ void GuidanceSimulation::Reset()
 	nextId = 0;
 	hits = 0;
 	records.clear();
-	selectedTrace.Clear();
+	traces.clear();
 
 	target = make_shared<Ship>(*targetModel);
 	target->Recharge();
@@ -181,7 +181,10 @@ void GuidanceSimulation::Step()
 	}
 	// Forget projectiles that have been gone for a while.
 	missiles.erase(remove_if(missiles.begin(), missiles.end(), [this](const Missile &missile) {
-		return missile.endStep >= 0 && step - missile.endStep > LINGER && missile.id != selected; }), missiles.end());
+		const bool forget = missile.endStep >= 0 && step - missile.endStep > LINGER && missile.id != selected;
+		if(forget)
+			traces.erase(missile.id);
+		return forget; }), missiles.end());
 }
 
 
@@ -275,9 +278,6 @@ int GuidanceSimulation::Hits() const
 void GuidanceSimulation::Select(int id)
 {
 	selected = id;
-	selectedTrace.Clear();
-	for(Missile &missile : missiles)
-		missile.projectile.SetGuidanceTrace(missile.id == selected ? &selectedTrace : nullptr);
 }
 
 
@@ -289,19 +289,36 @@ int GuidanceSimulation::Selected() const
 
 
 
-const GuidanceSimulation::Missile *GuidanceSimulation::SelectedMissile() const
+const GuidanceSimulation::Missile *GuidanceSimulation::Followed() const
 {
+	const Missile *newest = nullptr;
 	for(const Missile &missile : missiles)
+	{
+		if(missile.endStep >= 0)
+			continue;
 		if(missile.id == selected)
 			return &missile;
-	return nullptr;
+		if(!newest || missile.id > newest->id)
+			newest = &missile;
+	}
+	return newest;
 }
 
 
 
-const script::Trace &GuidanceSimulation::SelectedTrace() const
+const script::Trace &GuidanceSimulation::TraceOf(int id) const
 {
-	return selectedTrace;
+	static const script::Trace NONE;
+	auto it = traces.find(id);
+	return it == traces.end() ? NONE : it->second;
+}
+
+
+
+const MissileGuidance::Record *GuidanceSimulation::LastRecord(int id) const
+{
+	auto it = records.find(id);
+	return (it == records.end() || it->second.empty()) ? nullptr : &it->second.back();
 }
 
 
@@ -330,7 +347,6 @@ void GuidanceSimulation::Fire()
 {
 	missiles.emplace_back(nextId, step, Projectile(launcher, Point(), Angle(), &weapon));
 	missiles.back().projectile.SetGuidanceRecords(&records[nextId]);
-	if(nextId == selected)
-		missiles.back().projectile.SetGuidanceTrace(&selectedTrace);
+	missiles.back().projectile.SetGuidanceTrace(&traces[nextId]);
 	++nextId;
 }

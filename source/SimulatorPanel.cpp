@@ -50,6 +50,8 @@ namespace {
 	const int SPEED_COUNT = 6;
 	const double INSPECTOR_WIDTH = 270.;
 	const double STATUS_HEIGHT = 36.;
+	// The size of the close-up of the followed missile.
+	const double CLOSE_UP_SIZE = 200.;
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often, so replaying after an edit is quick.
 	const int LOOP_STEPS = 1200;
@@ -64,6 +66,8 @@ namespace {
 	const Color HIT(.30f, .90f, .45f, 1.f);
 	const Color MISS(.95f, .35f, .30f, 1.f);
 	const Color SELECTED(1.f, .95f, .40f, 1.f);
+	// The missile whose values the editor shows.
+	const Color FOLLOWED = SELECTED;
 	const Color MATTERED(.55f, .80f, 1.f, 1.f);
 	const Color CONFUSED(.95f, .40f, .95f, 1.f);
 	const Color PANEL(0.f, .03f, .015f, .85f);
@@ -164,6 +168,7 @@ void SimulatorPanel::Draw()
 
 	FillShader::Fill(Point(), Screen::Dimensions(), BACKGROUND);
 	DrawGrid();
+	DrawJamming();
 	DrawGhosts();
 	DrawTrails();
 
@@ -230,6 +235,8 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 		Restart();
 	else if(key == SDLK_t)
 		NextTarget();
+	else if(key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET)
+		CycleMissile(key == SDLK_RIGHTBRACKET ? 1 : -1);
 	else if(key == SDLK_EQUALS || key == SDLK_PLUS || key == SDLK_KP_PLUS)
 		speedIndex = min(SPEED_COUNT - 1, speedIndex + 1);
 	else if(key == SDLK_MINUS || key == SDLK_KP_MINUS)
@@ -273,14 +280,10 @@ bool SimulatorPanel::Click(int x, int y, MouseButton button, int clicks)
 		return true;
 	}
 	editor.SetFocus(false);
+	// Clicking a missile follows it; clicking anywhere else goes back to
+	// following the newest one.
 	if(view.Contains(point))
-	{
-		FinishRewind();
-		simulation->Select(simulation->MissileAt(ToWorld(point), 30. / zoom));
-		// Replaying is exact, so replay to now to trace the latest step, even
-		// while paused.
-		simulation->ReplayTo(simulation->CurrentStep());
-	}
+		simulation->Select(simulation->MissileAt(ToWorld(point), 60. / zoom));
 	return true;
 }
 
@@ -302,6 +305,36 @@ bool SimulatorPanel::Scroll(double dx, double dy)
 		return editor.Scroll(dy);
 	zoomFactor = max(.25, min(4., zoomFactor * pow(1.2, dy)));
 	return true;
+}
+
+
+
+string SimulatorPanel::Blame(const GuidanceSimulation::Missile &missile) const
+{
+	// Jamming comes from the target; otherwise the seeker just isn't good
+	// enough to hold on.
+	const string cause = missile.projectile.ConfusionCause();
+	if(cause == "poor tracking")
+		return "its own poor tracking";
+	return "the " + simulation->Target().DisplayModelName() + "'s " + cause;
+}
+
+
+
+void SimulatorPanel::CycleMissile(int direction)
+{
+	// Missiles in flight, oldest first.
+	vector<int> ids;
+	for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
+		if(missile.endStep < 0)
+			ids.push_back(missile.id);
+	if(ids.empty())
+		return;
+	const GuidanceSimulation::Missile *followed = simulation->Followed();
+	auto it = followed ? find(ids.begin(), ids.end(), followed->id) : ids.end();
+	int index = (it == ids.end()) ? static_cast<int>(ids.size()) - 1 : static_cast<int>(it - ids.begin());
+	index = (index + direction + static_cast<int>(ids.size())) % static_cast<int>(ids.size());
+	simulation->Select(ids[index]);
 }
 
 
@@ -405,12 +438,9 @@ void SimulatorPanel::FinishRewind()
 	simulation->ReplayTo(rewindTo);
 	// Show how the script ran for the projectile it first made a difference
 	// for, unless another one in flight is selected.
-	const GuidanceSimulation::Missile *selected = simulation->SelectedMissile();
-	if(!selected || selected->endStep >= 0)
-	{
+	const GuidanceSimulation::Missile *followed = simulation->Followed();
+	if(!followed || followed->id != simulation->Selected())
 		simulation->Select(difference.missile);
-		simulation->ReplayTo(rewindTo);
-	}
 }
 
 
@@ -429,13 +459,24 @@ void SimulatorPanel::Restart()
 
 void SimulatorPanel::UpdateRunNotes()
 {
+	// The notes are always for one missile in flight: the one clicked on, or
+	// the newest. The caption says which, in the color it is drawn in.
 	map<size_t, CodeEditor::LineNote> notes;
-	const GuidanceSimulation::Missile *missile = simulation->SelectedMissile();
-	if(missile && missile->endStep < 0)
-		notes = CodeEditor::RunNotes(simulation->SelectedTrace());
+	const GuidanceSimulation::Missile *missile = simulation->Followed();
+	if(missile)
+	{
+		notes = CodeEditor::RunNotes(simulation->TraceOf(missile->id));
+		const bool isSelected = (missile->id == simulation->Selected());
+		editor.SetCaption("values from missile #" + to_string(missile->id + 1)
+			+ (isSelected ? " (selected)" : " (newest)"), FOLLOWED);
+	}
+	else
+		editor.SetCaption("no missile in flight", DIM);
 	editor.SetRun(notes);
-	editor.SetGlitch(missile && missile->endStep < 0 && missile->projectile.IsConfused()
-		? "SEEKER CONFUSED: it is steering, not the script" : "");
+	// The code stays readable while the seeker has taken over, since it can
+	// still be edited.
+	editor.SetGlitch(missile && missile->projectile.IsConfused() ? "SEEKER CONFUSED by " + Blame(*missile)
+		+ ": it steers, not this code" : "", false);
 }
 
 
@@ -575,7 +616,7 @@ void SimulatorPanel::DrawTrails() const
 		const auto &trail = missile.trail;
 		if(trail.size() < 2)
 			continue;
-		const bool isSelected = (missile.id == simulation->Selected());
+		const bool isSelected = (&missile == simulation->Followed());
 		Color base = isSelected ? SELECTED : missile.hit ? HIT : missile.endStep >= 0 ? MISS : MISSILE;
 		// Fade out a trail once its projectile is gone.
 		float fade = missile.endStep < 0 ? 1.f : max(0.f, 1.f - (step - missile.endStep) / 120.f);
@@ -596,6 +637,47 @@ void SimulatorPanel::DrawTrails() const
 			RingShader::Draw(ToScreen(trail.back()), 9.f, 7.f, color);
 		}
 	}
+}
+
+
+
+void SimulatorPanel::DrawJamming() const
+{
+	// The target's jamming, for the kinds of seeker this weapon has: strongest
+	// at the target, and fading out evenly to nothing at its edge.
+	const Weapon &weapon = simulation->GetWeapon();
+	const Ship &target = simulation->Target();
+	double jamming = 0.;
+	string kind;
+	if(weapon.RadarTracking() && target.RadarJamming())
+	{
+		jamming = target.RadarJamming();
+		kind = "radar";
+	}
+	if(weapon.OpticalTracking() && target.OpticalJamming() > jamming)
+	{
+		jamming = target.OpticalJamming();
+		kind = "optical";
+	}
+	if(!jamming)
+		return;
+	const Point center = ToScreen(target.Position());
+	const double range = Projectile::JammingRange(jamming) * zoom;
+	const int BANDS = 12;
+	for(int i = 0; i < BANDS; ++i)
+	{
+		const double outer = range * (i + 1) / BANDS;
+		const double inner = range * i / BANDS;
+		const float alpha = .22f * (1.f - (i + .5f) / BANDS);
+		RingShader::Draw(center, outer, inner, Color(CONFUSED.Get()[0] * alpha, CONFUSED.Get()[1] * alpha,
+			CONFUSED.Get()[2] * alpha, alpha));
+	}
+	const Color edge(CONFUSED.Get()[0] * .5f, CONFUSED.Get()[1] * .5f, CONFUSED.Get()[2] * .5f, .5f);
+	RingShader::Draw(center, range, range - 1.5, edge);
+	char text[64];
+	snprintf(text, sizeof(text), "%s jamming %g", kind.c_str(), jamming);
+	const Font &font = FontSet::Get(14);
+	font.Draw(text, center + Point(-font.Width(text) / 2., -range - 20.), edge);
 }
 
 
@@ -650,28 +732,67 @@ void SimulatorPanel::DrawTimeline() const
 
 void SimulatorPanel::DrawSelection() const
 {
-	const GuidanceSimulation::Missile *missile = simulation->SelectedMissile();
-	if(!missile || missile->endStep >= 0)
+	// Number each missile in flight, so the editor's caption can say which
+	// one its values are from, colored by what its seeker is doing: locked on,
+	// lost, or confused.
+	const Font &font = FontSet::Get(14);
+	const GuidanceSimulation::Missile *followed = simulation->Followed();
+	vector<int> locked;
+	for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
+	{
+		if(missile.endStep >= 0)
+			continue;
+		const Projectile &projectile = missile.projectile;
+		if(projectile.HasLock())
+			locked.push_back(missile.id);
+		if(&missile == followed)
+			continue;
+		const Color &color = projectile.IsConfused() ? CONFUSED : projectile.HasLock() ? HIT : MISS;
+		const Point at = ToScreen(projectile.Position()) + Point(10., -16.);
+		font.Draw("#" + to_string(missile.id + 1), at, color);
+	}
+	// Lock-on brackets around the target, while any seeker sees it, saying
+	// which ones.
+	if(!locked.empty())
+	{
+		const Point center = ToScreen(simulation->Target().Position());
+		const double r = max(18., simulation->Target().Radius() * zoom + 6.);
+		const double arm = r * .35;
+		for(int sx : {-1, 1})
+			for(int sy : {-1, 1})
+			{
+				const Point corner = center + Point(sx * r, sy * r);
+				LineShader::Draw(corner, corner - Point(sx * arm, 0.), 1.5f, HIT, false);
+				LineShader::Draw(corner, corner - Point(0., sy * arm), 1.5f, HIT, false);
+			}
+		string label = "locked:";
+		for(int id : locked)
+			label += " #" + to_string(id + 1);
+		font.Draw(label, center + Point(-r, r + 6.), HIT);
+	}
+	if(!followed)
 		return;
-	const Point position = ToScreen(missile->projectile.Position());
-	if(missile->projectile.IsConfused())
+	const Point position = ToScreen(followed->projectile.Position());
+	const string label = "#" + to_string(followed->id + 1);
+	if(followed->projectile.IsConfused())
 	{
 		// The seeker has lost the target and is steering on its own.
 		const double wobble = (frameCount / 3 % 3) - 1.;
 		RingShader::Draw(position + Point(wobble, 0.), 16.f, 14.f, CONFUSED);
-		FontSet::Get(14).Draw("CONFUSED", position + Point(20., -8.), CONFUSED);
+		font.Draw(label + " CONFUSED", position + Point(20., -8.), CONFUSED);
 		return;
 	}
-	RingShader::Draw(position, 16.f, 14.f, SELECTED);
+	RingShader::Draw(position, 16.f, 14.f, FOLLOWED);
+	font.Draw(label, position + Point(20., -8.), FOLLOWED);
 	// Where the seeker thinks the target is, which with a noisy seeker is
 	// not quite where it really is.
-	const MissileGuidance::Input &input = missile->projectile.LastGuidanceInput();
+	const MissileGuidance::Input &input = followed->projectile.LastGuidanceInput();
 	if(input.hasLock)
 	{
 		const Point seen = ToScreen(input.targetPosition);
-		LineShader::DrawDashed(position, seen, (seen - position).Unit(), 1.f, SELECTED, 6., 6.);
-		LineShader::Draw(seen + Point(-8., 0.), seen + Point(8., 0.), 1.5f, SELECTED);
-		LineShader::Draw(seen + Point(0., -8.), seen + Point(0., 8.), 1.5f, SELECTED);
+		LineShader::DrawDashed(position, seen, (seen - position).Unit(), 1.f, FOLLOWED, 6., 6.);
+		LineShader::Draw(seen + Point(-8., 0.), seen + Point(8., 0.), 1.5f, FOLLOWED);
+		LineShader::Draw(seen + Point(0., -8.), seen + Point(0., 8.), 1.5f, FOLLOWED);
 	}
 }
 
@@ -689,33 +810,116 @@ void SimulatorPanel::DrawInspector() const
 	};
 	line("Drill " + to_string(simulation->Drill() + 1) + ": " + simulation->Drills()[simulation->Drill()].name, TEXT);
 	line("hits " + to_string(simulation->Hits()) + " of " + to_string(simulation->Launches()) + " fired", DIM);
-	y += 12.;
-	const GuidanceSimulation::Missile *missile = simulation->SelectedMissile();
+	y += 10.;
+	const GuidanceSimulation::Missile *missile = simulation->Followed();
 	if(!missile)
 	{
-		line("Click a missile to see, in the", DIM);
-		line("script, how it ran this step.", DIM);
+		line("No missile in flight.", DIM);
 		return;
 	}
-	line("Missile #" + to_string(missile->id + 1) + ", fired at step " + to_string(missile->launchStep), SELECTED);
-	if(missile->endStep >= 0)
+	const bool isSelected = (missile->id == simulation->Selected());
+	line("Missile #" + to_string(missile->id + 1) + (isSelected ? " (selected)" : " (newest)"), FOLLOWED);
+	line(isSelected ? "click empty space to follow the newest" : "click a missile to follow it", DIM);
+	y += 6.;
+	DrawCloseUp(*missile, Rectangle(Point(left + INSPECTOR_WIDTH / 2., y + CLOSE_UP_SIZE / 2.),
+		Point(CLOSE_UP_SIZE, CLOSE_UP_SIZE)));
+	y += CLOSE_UP_SIZE + 12.;
+
+	// Its state, as gauges and numbers.
+	const Projectile &projectile = missile->projectile;
+	const Weapon &weapon = simulation->GetWeapon();
+	const MissileGuidance::Input &input = projectile.LastGuidanceInput();
+	const bool confused = projectile.IsConfused();
+	if(confused)
+		line((frameCount / 15) % 2 ? "SEEKER CONFUSED" : "", CONFUSED);
+	else
+		line(string("lock: ") + (input.hasLock ? "target in sight" : "no target"), input.hasLock ? HIT : MISS);
+	if(confused)
 	{
-		line(string(missile->hit ? "Hit" : "Expired") + " at step " + to_string(missile->endStep) + ".", DIM);
-		return;
+		line("by " + Blame(*missile) + ";", CONFUSED);
+		line("it steers itself, and the code waits", CONFUSED);
 	}
-	if(missile->projectile.IsConfused())
+	else if(input.hasLock)
+		line("target " + to_string(lround((input.targetPosition - input.position).Length())) + " away", DIM);
+	// Its odds at its next lock check, which jamming near the target lowers.
+	if(!confused)
 	{
-		line("lock: no, and confused: the seeker", MISS);
-		line("is steering, not the script", MISS);
-		return;
+		char text[64];
+		snprintf(text, sizeof(text), "%s %.0f%% at the next check", projectile.HasLock() ? "keeps lock:" : "relocks:",
+			100. * projectile.LockChance());
+		line(text, projectile.LockChance() < .8 ? CONFUSED : DIM);
 	}
-	const MissileGuidance::Input &input = missile->projectile.LastGuidanceInput();
-	line(string("lock: ") + (input.hasLock ? "yes" : "no"), DIM);
-	line("age " + to_string(input.age) + ", " + to_string(input.lifetimeLeft) + " steps left", DIM);
-	if(input.hasLock)
+	const int total = max(1, input.age + input.lifetimeLeft);
+	auto gauge = [&](const string &label, double fraction, const string &value, const Color &color) {
+		font.Draw(label, Point(left + 12., y), DIM);
+		const double barLeft = left + 70.;
+		const double barWidth = INSPECTOR_WIDTH - 70. - 70.;
+		FillShader::Fill(Point(barLeft + barWidth / 2., y + 8.), Point(barWidth, 8.), GRID_MINOR);
+		fraction = max(0., min(1., fraction));
+		FillShader::Fill(Point(barLeft + barWidth * fraction / 2., y + 8.), Point(barWidth * fraction, 8.), color);
+		font.Draw(value, Point(left + INSPECTOR_WIDTH - 12. - font.Width(value), y), DIM);
+		y += 20.;
+	};
+	gauge("life", static_cast<double>(input.lifetimeLeft) / total, to_string(input.lifetimeLeft) + " left",
+		input.lifetimeLeft < 60 ? MISS : HIT);
+	const double topSpeed = weapon.Drag() ? weapon.Acceleration() / weapon.Drag() : 1.;
+	const double speed = projectile.Velocity().Length();
+	gauge("speed", speed / max(1., topSpeed), to_string(lround(speed * 60.)) + "/s", MISSILE);
+	if(const MissileGuidance::Record *record = simulation->LastRecord(missile->id))
 	{
-		const Point offset = input.targetPosition - input.position;
-		line("target " + to_string(lround(offset.Length())) + " away", DIM);
+		const double maxTurn = max(.001, weapon.Turn());
+		char text[32];
+		snprintf(text, sizeof(text), "%+.1f deg", confused ? 0. : record->output.turn);
+		gauge("turn", fabs(record->output.turn) / maxTurn, confused ? "seeker" : text, confused ? CONFUSED : TEXT);
+		snprintf(text, sizeof(text), "%.0f%%", 100. * record->output.thrust / max(1e-9, weapon.Acceleration()));
+		gauge("thrust", confused ? 1. : record->output.thrust / max(1e-9, weapon.Acceleration()),
+			confused ? "seeker" : text, confused ? CONFUSED : TEXT);
+	}
+}
+
+
+
+void SimulatorPanel::DrawCloseUp(const GuidanceSimulation::Missile &missile, const Rectangle &box) const
+{
+	// The missile itself, magnified, facing as it does, with where it is
+	// headed and where its seeker sees the target.
+	FillShader::Fill(box.Center(), box.Dimensions(), BACKGROUND);
+	const Projectile &projectile = missile.projectile;
+	const bool confused = projectile.IsConfused();
+	const Color &frame = confused ? CONFUSED : FOLLOWED;
+	const double wobble = confused ? (frameCount / 3 % 3) - 1. : 0.;
+	const Point corners[] = {box.TopLeft(), Point(box.Right(), box.Top()), box.BottomRight(),
+		Point(box.Left(), box.Bottom())};
+	for(int i = 0; i < 4; ++i)
+		LineShader::Draw(corners[i] + Point(wobble, 0.), corners[(i + 1) % 4] + Point(wobble, 0.), 1.f, frame, false);
+
+	// Scale the sprite up to fill a good part of the box.
+	const double size = max(1., max(projectile.Width(), projectile.Height()));
+	const double scale = min(6., box.Width() * .45 / size);
+	DrawList draw;
+	draw.Clear(simulation->CurrentStep(), scale);
+	draw.SetCenter(projectile.Position() - (box.Center() + Point(wobble, 0.)) / scale);
+	draw.AddUnblurred(projectile);
+	draw.Draw();
+
+	// Its velocity, and the direction to what its seeker sees.
+	const double reach = box.Width() * .45;
+	const Point velocity = projectile.Velocity();
+	if(velocity)
+		LineShader::Draw(box.Center(), box.Center() + velocity.Unit() * reach * .8, 1.f,
+			Color(MISSILE.Get()[0] * .6f, MISSILE.Get()[1] * .6f, MISSILE.Get()[2] * .6f, .6f), false);
+	const MissileGuidance::Input &input = projectile.LastGuidanceInput();
+	if(input.hasLock && !confused)
+	{
+		const Point toward = (input.targetPosition - input.position).Unit();
+		LineShader::DrawDashed(box.Center(), box.Center() + toward * reach, toward, 1.f, FOLLOWED, 5., 5.);
+	}
+	const Font &font = FontSet::Get(14);
+	font.Draw("#" + to_string(missile.id + 1), box.TopLeft() + Point(6., 4.), frame);
+	if(confused)
+	{
+		const string text = "CONFUSED";
+		font.Draw(text, Point(box.Center().X() - font.Width(text) / 2. + wobble, box.Bottom() - 20.), CONFUSED);
 	}
 }
 
@@ -738,7 +942,7 @@ void SimulatorPanel::DrawStatus() const
 	const string save = player ? "ctrl+s install   ctrl+d factory" : "ctrl+s save";
 	const string help = editor.HasFocus()
 		? "editing: esc stop editing   " + save + "   ctrl+space pause   ctrl+r restart   ctrl+z undo"
-		: "e edit   space pause   . step   - + speed   1-8 drill   t target   r restart   click a missile   "
+		: "e edit   space pause   . step   - + speed   1-9 drill   t target   r restart   [ ] or click: missile   "
 			+ save + "   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }

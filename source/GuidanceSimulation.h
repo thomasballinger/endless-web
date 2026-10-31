@@ -108,13 +108,17 @@ public:
 	// is simulated.)
 	Difference FirstDifference(const MissileGuidance &guidance) const;
 
-	// Choose which projectile to trace (-1 for none).
+	// Choose a projectile to follow (-1 for none).
 	void Select(int id);
 	int Selected() const;
-	// The selected projectile, if it is still in the simulation.
-	const Missile *SelectedMissile() const;
-	// How its guidance script ran on the last step, and what it was given.
-	const script::Trace &SelectedTrace() const;
+	// The projectile being followed: the selected one while it is in flight,
+	// or else the newest one in flight (or null, if none is).
+	const Missile *Followed() const;
+	// How a projectile's guidance script ran on the last step it ran.
+	const script::Trace &TraceOf(int id) const;
+	// What its script was given and decided the last time it ran (or null if
+	// it hasn't run yet).
+	const MissileGuidance::Record *LastRecord(int id) const;
 	// The projectile nearest the given position, within the given distance,
 	// or -1 if there is none.
 	int MissileAt(const Point &position, double distance) const;
@@ -140,6 +144,8 @@ private:
 	// How each projectile's guidance script ran, by projectile.
 	std::map<int, std::vector<MissileGuidance::Record>> records;
 
+	// How each projectile's script last ran, by projectile. (Each projectile
+	// keeps a pointer to its own, so these are kept in a map, not a vector.)
+	std::map<int, script::Trace> traces;
 	int selected = -1;
-	script::Trace selectedTrace;
 };

@@ -284,9 +284,18 @@ void CodeEditor::SetStyle(const CodeStyle *style)
 
 
 
-void CodeEditor::SetGlitch(const string &message)
+void CodeEditor::SetGlitch(const string &message, bool scramble)
 {
 	glitch = message;
+	this->scramble = scramble;
+}
+
+
+
+void CodeEditor::SetCaption(const string &caption, const Color &color)
+{
+	this->caption = caption;
+	captionColor.assign(color.Get(), color.Get() + 4);
 }
 
 
@@ -373,6 +382,15 @@ void CodeEditor::Draw() const
 			const double x = textLeft + columns[min(document.Caret().column, line.size())];
 			FillShader::Fill(Point(x, y + LINE_HEIGHT / 2.), Point(2., LINE_HEIGHT - 2.), CARET);
 		}
+	}
+	if(!caption.empty())
+	{
+		const Font &small = FontSet::Get(14);
+		const Color color(captionColor[0], captionColor[1], captionColor[2], captionColor[3]);
+		const Point corner(area.Right() - small.Width(caption) - 10., area.Top() + 6.);
+		FillShader::Fill(corner + Point(small.Width(caption) / 2., 8.), Point(small.Width(caption) + 12., 20.),
+			background ? *background : BACKGROUND);
+		small.Draw(caption, corner, color);
 	}
 	if(!glitch.empty())
 		DrawGlitchMessage();
@@ -612,7 +630,7 @@ void CodeEditor::DrawLine(const string &line, const Point &start, bool dim, int 
 		text = style->Encode(text);
 	Point position = start + Point(columns[indent], 0.);
 	// While typing, the line being typed on stays readable.
-	if(!glitch.empty() && !(hasFocus && static_cast<size_t>(lineIndex) == document.Caret().line))
+	if(!glitch.empty() && scramble && !(hasFocus && static_cast<size_t>(lineIndex) == document.Caret().line))
 	{
 		// Some lines jump sideways, and some letters turn into noise, in a
 		// pattern that changes every few frames.
@@ -637,9 +655,19 @@ void CodeEditor::DrawLine(const string &line, const Point &start, bool dim, int 
 
 void CodeEditor::DrawGlitchMessage() const
 {
-	// Bands of interference across the code.
+	// Bands of interference across the code (unless it should stay readable,
+	// in which case a border flickers around it instead).
 	const uint32_t phase = blink / GLITCH_FRAMES;
-	for(int i = 0; i < 4; ++i)
+	if(!scramble)
+	{
+		const float alpha = .55f + .35f * static_cast<float>(Hash(phase, 5, 5) % 3) / 2.f;
+		const Color border(GLITCH.Get()[0] * alpha, GLITCH.Get()[1] * alpha, GLITCH.Get()[2] * alpha, alpha);
+		LineShader::Draw(area.TopLeft(), Point(area.Right(), area.Top()), 2.f, border, false);
+		LineShader::Draw(Point(area.Left(), area.Bottom()), Point(area.Right(), area.Bottom()), 2.f, border, false);
+		LineShader::Draw(area.TopLeft(), Point(area.Left(), area.Bottom()), 2.f, border, false);
+		LineShader::Draw(Point(area.Right(), area.Top()), Point(area.Right(), area.Bottom()), 2.f, border, false);
+	}
+	for(int i = 0; scramble && i < 4; ++i)
 	{
 		const uint32_t h = Hash(phase, i, 99);
 		const double y = area.Top() + (h % 1000) / 1000. * area.Height();

@@ -94,6 +94,12 @@ private:
 	void DrawTimeline() const;
 	void DrawSelection() const;
 	void DrawInspector() const;
+	void DrawJamming() const;
+	void DrawCloseUp(const GuidanceSimulation::Missile &missile, const Rectangle &box) const;
+	// Follow the next (or previous) missile in flight.
+	void CycleMissile(int direction);
+	// What confused a missile's seeker, e.g. "the Carrier's radar jamming".
+	std::string Blame(const GuidanceSimulation::Missile &missile) const;
 	void DrawStatus() const;
 
 

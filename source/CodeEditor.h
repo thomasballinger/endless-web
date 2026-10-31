@@ -66,9 +66,13 @@ public:
 	// The notes for a traced run of a script whose first line is the given
 	// line of its data file, shown below the given number of other lines.
 	static std::map<size_t, LineNote> RunNotes(const script::Trace &trace, size_t firstLine = 1, size_t above = 0);
-	// Show the code breaking up, with this message over it, because the
-	// hardware has taken over from it (or an empty message to stop).
-	void SetGlitch(const std::string &message);
+	// Show a message over the code because the hardware has taken over from it
+	// (or an empty message to stop), with the code breaking up if "scramble"
+	// is set. Unscrambled, the code stays readable, and editable.
+	void SetGlitch(const std::string &message, bool scramble = true);
+	// A label in the editor's top right corner, e.g. saying whose run the
+	// notes are from (or an empty one for none).
+	void SetCaption(const std::string &caption, const Color &color);
 	// Show the code in a faction's style (or null for the usual one).
 	void SetStyle(const CodeStyle *style);
 
@@ -103,6 +107,9 @@ private:
 	std::map<size_t, std::string> errors;
 	std::map<size_t, LineNote> notes;
 	std::string glitch;
+	bool scramble = true;
+	std::string caption;
+	std::vector<float> captionColor;
 	const CodeStyle *style = nullptr;
 	// For blinking the caret, and changing how glitching code breaks up.
 	mutable int blink = 0;
