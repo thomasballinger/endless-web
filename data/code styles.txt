@@ -1,0 +1,130 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# How each faction's code looks when you watch it run (with a code scanner).
+# A style applies to the governments it names and their variants ("Hai" also
+# covers "Hai Merchant" and "Hai (Unfettered)"). It can set the colors of
+# each part of the code ("keyword", "name", "number", "comment", "string",
+# "paren", "background", and "lit" for lines that ran in the HUD's map), add
+# comment lines at the top ("header"), and with a "cipher" (the letters to
+# show for "a" through "z"), make the code unreadable while its numbers still
+# show.
+
+"code style" "Republic"
+	government "Republic" "Navy (Oathkeeper)" "Navy Intelligence"
+	header "# REPUBLIC NAVY FLIGHT CONTROL // REV 14.2 // CLEARED FOR FLEET USE"
+	header "# Tampering with naval flight software is a federal offense."
+	color keyword .55 .75 1
+	color name .9 .93 1
+	color number 1 .85 .5
+	color comment .45 .55 .7
+	color background .02 .03 .07
+	color lit .5 .75 1
+
+"code style" "Militia"
+	government "Militia"
+	header "# planetary militia: copied off a Navy cutter, mostly"
+	color keyword .6 .8 .6
+	color background .03 .04 .03
+
+"code style" "Syndicate"
+	government "Syndicate"
+	header "# (c) Syndicated Systems. This software is licensed, not sold."
+	header "# Unauthorized inspection voids your warranty and your ship."
+	color keyword 1 .78 .35
+	color name .95 .9 .8
+	color number .9 .6 .3
+	color comment .6 .5 .35
+	color background .06 .04 .01
+	color lit 1 .8 .35
+
+"code style" "Free Worlds"
+	government "Free Worlds"
+	header "# Free Worlds field build -- patched in a hangar on Bourne. Works fine."
+	color keyword .5 .95 .6
+	color comment .5 .7 .5
+	color background .02 .05 .02
+
+"code style" "Pirate"
+	government "Pirate" "Marauder" "Scar's Legion" "Bounty Hunter"
+	header "# ripped out of a dead merchant's flight computer. dont touch it"
+	header "# TODO: shoot first"
+	color keyword .95 .45 .3
+	color name .9 .8 .7
+	color number 1 .7 .3
+	color comment .65 .4 .3
+	color background .07 .02 .01
+	color lit 1 .5 .3
+
+"code style" "Merchant"
+	government "Merchant" "Independent"
+	header "# Southbound Shipyards factory autopilot, rev. 7 (do not modify)"
+	color background .02 .035 .03
+
+"code style" "Hai"
+	government "Hai"
+	cipher "ihlmanvrusywtholmnvresywth"
+	color keyword .8 .6 1
+	color name .85 .8 .95
+	color comment .55 .45 .7
+	color background .04 .02 .07
+	color lit .8 .6 1
+
+"code style" "Korath"
+	government "Korath" "Kor Efret" "Kor Mereti" "Kor Sestor"
+	cipher "akxzeqtrxgdkhzuxqtrkkdgzxk"
+	color keyword 1 .3 .25
+	color name .9 .6 .55
+	color comment .6 .3 .3
+	color background .06 .01 .01
+	color lit 1 .35 .3
+
+"code style" "Quarg"
+	government "Quarg"
+	cipher "oqrgumnhorgqmnuhqrgmanhqrg"
+	color keyword .85 .9 .95
+	color name .7 .75 .8
+	color comment .5 .55 .6
+	color background .04 .045 .05
+	color lit .9 .95 1
+
+"code style" "Wanderer"
+	government "Wanderer"
+	cipher "elthansrilthnserlthnasrlth"
+	color keyword .6 .9 .5
+	color name .9 .9 .6
+	color background .03 .05 .02
+	color lit .7 1 .5
+
+"code style" "Coalition"
+	government "Coalition" "Heliarch" "Lunarium"
+	cipher "aktciskretkcskotrcksatkcrt"
+	color keyword 1 .85 .45
+	color name .85 .8 .7
+	color background .05 .04 .02
+	color lit 1 .85 .45
+
+"code style" "Pug"
+	government "Pug"
+	cipher "zyxwvutsrqponmlkjihgfedcba"
+	color keyword .9 .9 .9
+	color background .05 .05 .05
+
+"code style" "Remnant"
+	government "Remnant"
+	header "# //"
+	color keyword .4 .9 .9
+	color name .8 .95 .95
+	color comment .3 .55 .55
+	color background .01 .05 .05
+	color lit .4 .9 .9

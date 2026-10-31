@@ -471,6 +471,8 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 				RecordScriptSource(scriptFiles, scriptSources, path, "guidance " + node.Token(i));
 			}
 		}
+		else if(key == "code style" && hasValue)
+			codeStyles.Get(node.Token(1))->Load(node);
 		else if(key == "maneuver" && hasValue)
 		{
 			maneuvers.Get(node.Token(1))->Load(node);

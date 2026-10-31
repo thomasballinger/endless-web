@@ -25,6 +25,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+class CodeStyle;
 class Color;
 namespace script {
 	class Trace;
@@ -63,11 +64,13 @@ public:
 	// Which lines ran, and a note to show beside each, or none to show none.
 	void SetRun(const std::map<size_t, LineNote> &notes);
 	// The notes for a traced run of a script whose first line is the given
-	// line of its data file.
-	static std::map<size_t, LineNote> RunNotes(const script::Trace &trace, size_t firstLine = 1);
+	// line of its data file, shown below the given number of other lines.
+	static std::map<size_t, LineNote> RunNotes(const script::Trace &trace, size_t firstLine = 1, size_t above = 0);
 	// Show the code breaking up, with this message over it, because the
 	// hardware has taken over from it (or an empty message to stop).
 	void SetGlitch(const std::string &message);
+	// Show the code in a faction's style (or null for the usual one).
+	void SetStyle(const CodeStyle *style);
 
 	void Draw() const;
 
@@ -100,6 +103,7 @@ private:
 	std::map<size_t, std::string> errors;
 	std::map<size_t, LineNote> notes;
 	std::string glitch;
+	const CodeStyle *style = nullptr;
 	// For blinking the caret, and changing how glitching code breaks up.
 	mutable int blink = 0;
 };

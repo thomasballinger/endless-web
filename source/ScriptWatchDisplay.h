@@ -25,6 +25,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+class CodeStyle;
 class Point;
 
 
@@ -57,6 +58,8 @@ public:
 		std::string unreadable;
 		// Jamming that garbles its code, if any.
 		std::string interference;
+		// How its faction's code looks, or null for the usual way.
+		const CodeStyle *style = nullptr;
 		script::Activity activity;
 	};
 

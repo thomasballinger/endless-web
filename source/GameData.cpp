@@ -709,6 +709,13 @@ const Set<MissileGuidance> &GameData::Guidance()
 
 
 
+const Set<CodeStyle> &GameData::CodeStyles()
+{
+	return objects.codeStyles;
+}
+
+
+
 const Set<ShipManeuver> &GameData::Maneuvers()
 {
 	return objects.maneuvers;

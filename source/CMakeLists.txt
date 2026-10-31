@@ -57,6 +57,8 @@ target_sources(EndlessSkyLib PRIVATE
 	CodeDocument.h
 	CodeEditor.cpp
 	CodeEditor.h
+	CodeStyle.cpp
+	CodeStyle.h
 	Collision.cpp
 	Collision.h
 	CollisionSet.cpp

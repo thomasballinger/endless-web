@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "CodeEditor.h"
 
+#include "CodeStyle.h"
 #include "Color.h"
 #include "shader/FillShader.h"
 #include "text/Font.h"
@@ -109,29 +110,37 @@ namespace {
 		return tokens;
 	}
 
-	Color TokenColor(TokenKind kind, bool dim)
+	Color TokenColor(TokenKind kind, bool dim, const CodeStyle *style)
 	{
+		static const map<TokenKind, string> PARTS = {{TokenKind::KEYWORD, "keyword"},
+			{TokenKind::NUMBER, "number"}, {TokenKind::COMMENT, "comment"}, {TokenKind::STRING, "string"},
+			{TokenKind::PAREN, "paren"}, {TokenKind::NAME, "name"}};
 		Color color;
-		switch(kind)
-		{
-			case TokenKind::KEYWORD:
-				color = Color(.55f, .80f, 1.f, 1.f);
-				break;
-			case TokenKind::NUMBER:
-				color = Color(.95f, .72f, .45f, 1.f);
-				break;
-			case TokenKind::COMMENT:
-				color = Color(.42f, .55f, .48f, 1.f);
-				break;
-			case TokenKind::STRING:
-				color = Color(.70f, .95f, .60f, 1.f);
-				break;
-			case TokenKind::PAREN:
-				color = Color(.55f, .68f, .60f, 1.f);
-				break;
-			default:
-				color = Color(.86f, .93f, .88f, 1.f);
-		}
+		auto part = PARTS.find(kind);
+		const Color *styled = (style && part != PARTS.end()) ? style->GetColor(part->second) : nullptr;
+		if(styled)
+			color = *styled;
+		else
+			switch(kind)
+			{
+				case TokenKind::KEYWORD:
+					color = Color(.55f, .80f, 1.f, 1.f);
+					break;
+				case TokenKind::NUMBER:
+					color = Color(.95f, .72f, .45f, 1.f);
+					break;
+				case TokenKind::COMMENT:
+					color = Color(.42f, .55f, .48f, 1.f);
+					break;
+				case TokenKind::STRING:
+					color = Color(.70f, .95f, .60f, 1.f);
+					break;
+				case TokenKind::PAREN:
+					color = Color(.55f, .68f, .60f, 1.f);
+					break;
+				default:
+					color = Color(.86f, .93f, .88f, 1.f);
+			}
 		if(dim)
 			color = Color(color.Get()[0] * .55f, color.Get()[1] * .55f, color.Get()[2] * .55f, .55f);
 		return color;
@@ -228,10 +237,10 @@ void CodeEditor::SetRun(const map<size_t, LineNote> &notes)
 
 
 
-map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trace, size_t firstLine)
+map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trace, size_t firstLine, size_t above)
 {
 	map<size_t, LineNote> notes;
-	auto line = [firstLine](size_t fileLine) { return fileLine + 1 - firstLine; };
+	auto line = [firstLine, above](size_t fileLine) { return fileLine + 1 - firstLine + above; };
 	using Kind = script::Trace::Step::Kind;
 	for(const script::Trace::Step &step : trace.steps)
 	{
@@ -268,6 +277,13 @@ map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trac
 
 
 
+void CodeEditor::SetStyle(const CodeStyle *style)
+{
+	this->style = style;
+}
+
+
+
 void CodeEditor::SetGlitch(const string &message)
 {
 	glitch = message;
@@ -278,8 +294,11 @@ void CodeEditor::SetGlitch(const string &message)
 void CodeEditor::Draw() const
 {
 	const Font &font = FontSet::Get(14);
-	FillShader::Fill(area.Center(), area.Dimensions(), BACKGROUND);
-	FillShader::Fill(Point(area.Left() + GUTTER / 2., area.Center().Y()), Point(GUTTER, area.Height()), GUTTER_COLOR);
+	const Color *background = style ? style->GetColor("background") : nullptr;
+	FillShader::Fill(area.Center(), area.Dimensions(), background ? *background : BACKGROUND);
+	const Color gutter = background ? Color(background->Get()[0] * .6f, background->Get()[1] * .6f,
+		background->Get()[2] * .6f, 1.f) : GUTTER_COLOR;
+	FillShader::Fill(Point(area.Left() + GUTTER / 2., area.Center().Y()), Point(GUTTER, area.Height()), gutter);
 
 	const vector<string> &lines = document.Lines();
 	const auto [selectionStart, selectionEnd] = document.Selection();
@@ -344,7 +363,7 @@ void CodeEditor::Draw() const
 				columns = ColumnX(line);
 			const double x = max(textLeft + columns.back() + 18., textLeft + 150.);
 			if(x < area.Right() - 20.)
-				font.DrawCode(comment, Point(x, y + 1.), {commentColor});
+				font.DrawCode(style ? style->Encode(comment) : comment, Point(x, y + 1.), {commentColor});
 		}
 
 		if(isCaretLine && hasFocus && (blink / 30) % 2 == 0)
@@ -580,7 +599,7 @@ void CodeEditor::DrawLine(const string &line, const Point &start, bool dim, int 
 	vector<Color> colors;
 	colors.reserve(line.size());
 	for(const Token &token : Tokenize(line))
-		colors.insert(colors.end(), token.text.size(), TokenColor(token.kind, dim));
+		colors.insert(colors.end(), token.text.size(), TokenColor(token.kind, dim, style));
 	colors.erase(colors.begin(), colors.begin() + indent);
 
 	// Leave off whatever runs past the right edge.
@@ -589,6 +608,8 @@ void CodeEditor::DrawLine(const string &line, const Point &start, bool dim, int 
 	while(end > indent && start.X() + columns[end] > area.Right() - 6.)
 		--end;
 	string text = Displayed(line.substr(indent, end - indent));
+	if(style)
+		text = style->Encode(text);
 	Point position = start + Point(columns[indent], 0.);
 	// While typing, the line being typed on stays readable.
 	if(!glitch.empty() && !(hasFocus && static_cast<size_t>(lineIndex) == document.Caret().line))

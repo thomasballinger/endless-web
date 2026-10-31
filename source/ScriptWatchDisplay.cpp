@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "ScriptWatchDisplay.h"
 
+#include "CodeStyle.h"
 #include "Color.h"
 #include "shader/FillShader.h"
 #include "text/Font.h"
@@ -335,6 +336,18 @@ void ScriptWatchDisplay::ShowSelected()
 		text = selectedName.empty() ? "# No scripts are running." : source.text.empty()
 			? "# The code of " + selectedKind + " \"" + selectedName + "\" isn't available." : source.text;
 	}
+	// Each faction's programmers sign their code.
+	const CodeStyle *style = entry ? entry->style : nullptr;
+	const size_t headerLines = style ? style->Header().size() : 0;
+	if(headerLines)
+	{
+		string header;
+		for(const string &line : style->Header())
+			header += line + "\n";
+		text = header + text;
+		key = style->Name() + " " + key;
+	}
+	editor.SetStyle(style);
 	if(key != loadedKey)
 	{
 		loadedKey = key;
@@ -345,7 +358,8 @@ void ScriptWatchDisplay::ShowSelected()
 	// what it did last.
 	if(entry && entry->unreadable.empty())
 		if(const script::Activity::Run *run = SelectedRun())
-			editor.SetRun(CodeEditor::RunNotes(run->trace, GetSource(selectedKind, selectedName).firstLine));
+			editor.SetRun(CodeEditor::RunNotes(run->trace, GetSource(selectedKind, selectedName).firstLine,
+				headerLines));
 	editor.SetGlitch(entry ? Interference(*entry) : string());
 }
 
@@ -458,7 +472,8 @@ void ScriptWatchDisplay::DrawMap(const Rectangle &box, const Entry *entry) const
 		if(end <= start)
 			continue;
 		const double offset = (i + .5) * step;
-		Color color = ran[i] ? LIT_LINE : DARK_LINE;
+		const Color *lit = entry->style ? entry->style->GetColor("lit") : nullptr;
+		Color color = ran[i] ? (lit ? *lit : LIT_LINE) : DARK_LINE;
 		if(glitching && Hash(phase, i) % 3 == 0)
 		{
 			start += static_cast<int>(Hash(phase, i + 99) % 9) - 4;

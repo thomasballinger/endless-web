@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "audio/Audio.h"
 #include "CategoryList.h"
 #include "CategoryType.h"
+#include "CodeStyle.h"
 #include "Collision.h"
 #include "CollisionType.h"
 #include "CoreStartData.h"
@@ -2127,6 +2128,10 @@ void Engine::WatchScripts(WatchedScripts &watched)
 			else if(jamming > 0.)
 				entry.interference = "JAMMING: its code is being garbled";
 		}
+		// Other factions' code looks like theirs.
+		if(!isOwn)
+			entry.style = CodeStyle::ForGovernment(ship ? ship->GetGovernment()
+				: projectile ? projectile->GetGovernment() : nullptr);
 		watched.entries.push_back(std::move(entry));
 		watchedObjects.emplace_back(ship, projectile);
 	};
