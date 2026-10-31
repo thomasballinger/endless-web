@@ -238,6 +238,8 @@
       </div>
     </div>
     <script>
+      // The commit this was built from, filled in by the Makefile.
+      console.log("Endless Sky (scriptable fork) build __BUILD_SHA__");
       if (window.location.hostname === 'play-endless-sky.com') {
         const loud = document.createElement('div');
         loud.innerHTML = `<h1>play-endless-sky.com is deprecated, please use play-endless-web.com (<a href="https://play-endless-web.com/">play-endless-web.com</a>) instead<h1>
