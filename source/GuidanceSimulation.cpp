@@ -164,8 +164,12 @@ void GuidanceSimulation::Step()
 			continue;
 		}
 		missile.trail.push_back(projectile.Position());
+		missile.confused.push_back(projectile.IsConfused());
 		if(missile.trail.size() > TRAIL_LENGTH)
+		{
 			missile.trail.pop_front();
+			missile.confused.pop_front();
+		}
 		// Projectiles check for collisions along their next movement.
 		Point offset = projectile.Position() - target->Position();
 		if(target->GetMask(step).Collide(offset, projectile.Velocity(), target->Facing()) < 1.)

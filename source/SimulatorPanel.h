@@ -125,6 +125,8 @@ private:
 	// Steps per frame: 1/4, 1/2, 1, 2, 4 or 8.
 	int speedIndex = 2;
 	int frame = 0;
+	// Frames drawn, for things that flicker.
+	int frameCount = 0;
 
 	// The part of the screen showing the range.
 	Rectangle view;

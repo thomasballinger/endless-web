@@ -65,6 +65,7 @@ namespace {
 	const Color MISS(.95f, .35f, .30f, 1.f);
 	const Color SELECTED(1.f, .95f, .40f, 1.f);
 	const Color MATTERED(.55f, .80f, 1.f, 1.f);
+	const Color CONFUSED(.95f, .40f, .95f, 1.f);
 	const Color PANEL(0.f, .03f, .015f, .85f);
 
 	const string NOT_RUNNING = "The script has mistakes, so the last version without any is running.";
@@ -176,6 +177,7 @@ void SimulatorPanel::Step()
 
 void SimulatorPanel::Draw()
 {
+	++frameCount;
 	Layout();
 	// Frame the launcher and the target.
 	const Point launcher = simulation->Launcher().Position();
@@ -471,6 +473,8 @@ void SimulatorPanel::UpdateRunNotes()
 			notes[trace.errorLine] = {"error: " + trace.error, true};
 	}
 	editor.SetRun(notes);
+	editor.SetGlitch(missile && missile->endStep < 0 && missile->projectile.IsConfused()
+		? "SEEKER CONFUSED: it is steering, not the script" : "");
 }
 
 
@@ -565,7 +569,9 @@ void SimulatorPanel::DrawTrails() const
 		{
 			const float age = static_cast<float>(i) / trail.size();
 			const float alpha = fade * (.15f + .85f * age);
-			const Color color(base.Get()[0] * alpha, base.Get()[1] * alpha, base.Get()[2] * alpha, alpha);
+			// Where the seeker was confused and steering, the trail shows it.
+			const Color &segment = missile.confused[i] ? CONFUSED : base;
+			const Color color(segment.Get()[0] * alpha, segment.Get()[1] * alpha, segment.Get()[2] * alpha, alpha);
 			LineShader::Draw(ToScreen(trail[i - 1]), ToScreen(trail[i]), isSelected ? 2.5f : 1.5f, color, false);
 		}
 		if(missile.endStep >= 0 && fade > 0.f)
@@ -632,6 +638,14 @@ void SimulatorPanel::DrawSelection() const
 	if(!missile || missile->endStep >= 0)
 		return;
 	const Point position = ToScreen(missile->projectile.Position());
+	if(missile->projectile.IsConfused())
+	{
+		// The seeker has lost the target and is steering on its own.
+		const double wobble = (frameCount / 3 % 3) - 1.;
+		RingShader::Draw(position + Point(wobble, 0.), 16.f, 14.f, CONFUSED);
+		FontSet::Get(14).Draw("CONFUSED", position + Point(20., -8.), CONFUSED);
+		return;
+	}
 	RingShader::Draw(position, 16.f, 14.f, SELECTED);
 	// Where the seeker thinks the target is, which with a noisy seeker is
 	// not quite where it really is.

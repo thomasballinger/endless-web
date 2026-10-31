@@ -22,6 +22,9 @@
 #   3. Saving writes the script into a plugin.
 #   4. One undo takes back the whole edit, which makes a difference at that
 #      same step: the runs were the same until then.
+#   5. Fired at a Carrier, whose radar jammers confuse the missiles' seekers,
+#      a confused missile's trail is marked, and selecting it makes the code
+#      glitch, saying that the seeker is steering instead of the script.
 #
 # Usage: simulator-ui.sh BINARY
 #
@@ -52,16 +55,25 @@ GAME=
 trap 'kill $GAME $XVFB 2> /dev/null' EXIT
 sleep 1
 
-ES_SIMULATOR_LOG=1 "$BINARY" --config "$OUT/config" --resources "$ROOT" --simulator "Sidewinder Missile Launcher" \
-	> "$OUT/game.log" 2>&1 &
-GAME=$!
-for i in $(seq 100); do
-	WINDOW=$(xdotool search --name "Endless Sky" 2> /dev/null | head -1)
-	[ -n "$WINDOW" ] && break
-	sleep 0.2
-done
-# With no window manager, the game thinks its window fills the screen.
-xdotool windowmove "$WINDOW" 0 0 windowsize "$WINDOW" 1600 1000
+# Open the simulator, with the given configuration, firing at the given ship.
+start() {
+	ES_SIMULATOR_LOG=1 "$BINARY" --config "$1" --resources "$ROOT" \
+		--simulator "Sidewinder Missile Launcher" --simulator-target "$2" >> "$OUT/game.log" 2>&1 &
+	GAME=$!
+	WINDOW=
+	for i in $(seq 100); do
+		WINDOW=$(xdotool search --name "Endless Sky" 2> /dev/null | head -1)
+		[ -n "$WINDOW" ] && break
+		sleep 0.2
+	done
+	# With no window manager, the game thinks its window fills the screen.
+	xdotool windowmove "$WINDOW" 0 0 windowsize "$WINDOW" 1600 1000
+	for i in $(seq 120); do
+		shot start
+		"$LOOK" ready "$OUT/start.png" && break
+		sleep 0.5
+	done
+}
 
 shot() { import -window root "$OUT/$1.png"; }
 FAILED=0
@@ -84,11 +96,7 @@ check_not() {
 # The center of a line of the script.
 line() { echo $((59 + ($1 - 1) * 18)); }
 
-for i in $(seq 120); do
-	shot start
-	"$LOOK" ready "$OUT/start.png" && break
-	sleep 0.5
-done
+start "$OUT/config" Argosy
 check "the simulator starts" ready "$OUT/start.png" || exit 1
 
 # The jinking drill, at 2x speed for a few seconds (not long enough for the
@@ -154,6 +162,34 @@ if [ "$(edits)" -eq $((EDITS + 1)) ] && echo "$UNDO" | grep -q "first difference
 	echo "ok: one undo takes the edit back, with a difference at the same step"
 else
 	echo "FAILED: one undo takes the edit back, with a difference at the same step"
+	FAILED=1
+fi
+
+kill $GAME
+wait $GAME 2> /dev/null
+
+# The jinking drill again, but against jammers. Wait for a confused missile,
+# pause, and select it. (A new configuration leaves out the script saved above.)
+cp -r "$ROOT/tests/integration/config" "$OUT/config-jammed"
+start "$OUT/config-jammed" Carrier
+xdotool key 5 equal equal
+WHERE=
+for i in $(seq 60); do
+	shot jammed
+	WHERE=$("$LOOK" confused "$OUT/jammed.png") && break
+	sleep 0.3
+done
+xdotool key space
+sleep 0.5
+shot jammed
+if WHERE=$("$LOOK" confused "$OUT/jammed.png"); then
+	echo "ok: a confused missile's trail is marked"
+	xdotool mousemove $WHERE click 1
+	sleep 0.5
+	shot glitch
+	check "selecting a confused missile makes the code glitch" glitch "$OUT/glitch.png"
+else
+	echo "FAILED: a confused missile's trail is marked"
 	FAILED=1
 fi
 

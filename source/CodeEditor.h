@@ -59,6 +59,9 @@ public:
 	void SetErrors(const std::map<size_t, std::string> &errors);
 	// Which lines ran, and a note to show beside each, or none to show none.
 	void SetRun(const std::map<size_t, LineNote> &notes);
+	// Show the code breaking up, with this message over it, because the
+	// hardware has taken over from it (or an empty message to stop).
+	void SetGlitch(const std::string &message);
 
 	void Draw() const;
 
@@ -78,7 +81,8 @@ private:
 	// Keep the caret on screen.
 	void ScrollToCaret();
 	int VisibleLines() const;
-	void DrawLine(const std::string &line, const Point &start, bool dim) const;
+	void DrawLine(const std::string &line, const Point &start, bool dim, int lineIndex) const;
+	void DrawGlitchMessage() const;
 
 
 private:
@@ -89,6 +93,7 @@ private:
 	int scroll = 0;
 	std::map<size_t, std::string> errors;
 	std::map<size_t, LineNote> notes;
-	// For blinking the caret.
+	std::string glitch;
+	// For blinking the caret, and changing how glitching code breaks up.
 	mutable int blink = 0;
 };

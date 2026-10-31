@@ -46,6 +46,11 @@ namespace {
 	const Color RAN(.30f, .85f, .45f, 1.f);
 	const Color ERROR_COLOR(.95f, .35f, .30f, 1.f);
 	const Color NOTE(.95f, .82f, .40f, 1.f);
+	const Color GLITCH(.95f, .40f, .95f, 1.f);
+	// What glitching code turns into.
+	const string NOISE = "#%&@$*=+<>/\\|?!~^01";
+	// How many frames a glitch pattern lasts.
+	const int GLITCH_FRAMES = 4;
 
 	const set<string> KEYWORDS = {"let", "set", "if", "elif", "else", "memory", "stop", "function", "return",
 		"for", "in"};
@@ -140,6 +145,18 @@ namespace {
 
 
 
+	// A number that looks random but depends only on its arguments, so that
+	// glitching never takes numbers from the game's random sequences.
+	uint32_t Hash(uint32_t a, uint32_t b, uint32_t c)
+	{
+		uint32_t h = a * 0x9e3779b1u ^ (b + 0x7f4a7c15u) * 0x85ebca6bu ^ (c + 0x165667b1u) * 0xc2b2ae35u;
+		h ^= h >> 15;
+		h *= 0x2c1b3c6du;
+		h ^= h >> 12;
+		h *= 0x297a2d39u;
+		return h ^ (h >> 15);
+	}
+
 	bool IsWordChar(char c)
 	{
 		return isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.';
@@ -210,6 +227,13 @@ void CodeEditor::SetRun(const map<size_t, LineNote> &notes)
 
 
 
+void CodeEditor::SetGlitch(const string &message)
+{
+	glitch = message;
+}
+
+
+
 void CodeEditor::Draw() const
 {
 	const Font &font = FontSet::Get(14);
@@ -257,7 +281,7 @@ void CodeEditor::Draw() const
 
 		// While showing a run, dim the lines that didn't run.
 		const bool dim = !notes.empty() && note == notes.end();
-		DrawLine(line, Point(textLeft, y + 1.), dim);
+		DrawLine(line, Point(textLeft, y + 1.), dim, i);
 
 		// What the line did, or what is wrong with it.
 		string comment;
@@ -290,6 +314,8 @@ void CodeEditor::Draw() const
 			FillShader::Fill(Point(x, y + LINE_HEIGHT / 2.), Point(2., LINE_HEIGHT - 2.), CARET);
 		}
 	}
+	if(!glitch.empty())
+		DrawGlitchMessage();
 	++blink;
 	// A border shows which editor has the keyboard.
 	if(hasFocus)
@@ -502,7 +528,7 @@ int CodeEditor::VisibleLines() const
 
 
 
-void CodeEditor::DrawLine(const string &line, const Point &start, bool dim) const
+void CodeEditor::DrawLine(const string &line, const Point &start, bool dim, int lineIndex) const
 {
 	size_t indent = 0;
 	while(indent < line.size() && (line[indent] == '\t' || line[indent] == ' '))
@@ -521,6 +547,50 @@ void CodeEditor::DrawLine(const string &line, const Point &start, bool dim) cons
 	size_t end = line.size();
 	while(end > indent && start.X() + columns[end] > area.Right() - 6.)
 		--end;
-	FontSet::Get(14).DrawCode(Displayed(line.substr(indent, end - indent)), start + Point(columns[indent], 0.),
-		colors);
+	string text = Displayed(line.substr(indent, end - indent));
+	Point position = start + Point(columns[indent], 0.);
+	// While typing, the line being typed on stays readable.
+	if(!glitch.empty() && !(hasFocus && static_cast<size_t>(lineIndex) == document.Caret().line))
+	{
+		// Some lines jump sideways, and some letters turn into noise, in a
+		// pattern that changes every few frames.
+		const uint32_t phase = blink / GLITCH_FRAMES;
+		const uint32_t jump = Hash(lineIndex, phase, 1);
+		if(jump % 4 == 0)
+			position += Point(static_cast<int>(jump / 4 % 15) - 7, 0.);
+		for(size_t i = 0; i < text.size(); ++i)
+		{
+			const uint32_t h = Hash(lineIndex, phase, i + 2);
+			if(text[i] != ' ' && h % 9 == 0)
+			{
+				text[i] = NOISE[h / 9 % NOISE.size()];
+				colors[i] = GLITCH;
+			}
+		}
+	}
+	FontSet::Get(14).DrawCode(text, position, colors);
+}
+
+
+
+void CodeEditor::DrawGlitchMessage() const
+{
+	// Bands of interference across the code.
+	const uint32_t phase = blink / GLITCH_FRAMES;
+	for(int i = 0; i < 4; ++i)
+	{
+		const uint32_t h = Hash(phase, i, 99);
+		const double y = area.Top() + (h % 1000) / 1000. * area.Height();
+		const double height = 1. + h / 1000 % 4;
+		FillShader::Fill(Point(area.Center().X(), y), Point(area.Width(), height),
+			Color(GLITCH.Get()[0] * .25f, GLITCH.Get()[1] * .25f, GLITCH.Get()[2] * .25f, .25f));
+	}
+
+	// The message, in a bar across the bottom.
+	const Font &font = FontSet::Get(14);
+	const double height = 30.;
+	const Point center(area.Center().X(), area.Bottom() - height / 2. - 4.);
+	FillShader::Fill(center, Point(area.Width() - 8., height), Color(.12f, .02f, .12f, .95f));
+	const double jitter = Hash(phase, 7, 7) % 3 == 0 ? static_cast<double>(Hash(phase, 8, 8) % 5) - 2. : 0.;
+	font.Draw(glitch, Point(center.X() - font.Width(glitch) / 2. + jitter, center.Y() - 8.), GLITCH);
 }

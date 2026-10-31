@@ -49,8 +49,10 @@ public:
 		int id = 0;
 		int launchStep = 0;
 		Projectile projectile;
-		// Where it has been, oldest first.
+		// Where it has been, oldest first, and whether its seeker was confused
+		// (and steering instead of the script) at each of those points.
 		std::deque<Point> trail;
+		std::deque<bool> confused;
 		bool hit = false;
 		// The step it hit or expired on, or -1 while it is in flight.
 		int endStep = -1;
