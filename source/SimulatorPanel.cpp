@@ -147,6 +147,7 @@ void SimulatorPanel::Step()
 	}
 	else if(!paused && !isScrubbing)
 	{
+		FlyLauncher();
 		// Fractional speeds step every few frames.
 		const double speed = SPEEDS[speedIndex];
 		++frame;
@@ -219,7 +220,10 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 		statusTime = 300;
 	}
 	else if(control && key == SDLK_r)
+	{
+		simulation->ClearLauncherControls();
 		Restart();
+	}
 	else if(editor.HasFocus())
 	{
 		if(key == SDLK_ESCAPE)
@@ -252,7 +256,22 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 		simulation->ReplayTo(max(0, simulation->CurrentStep() - 1));
 	}
 	else if(key == SDLK_r)
+	{
+		// Start over, with the launcher back where it started.
+		simulation->ClearLauncherControls();
 		Restart();
+	}
+	else if(key == SDLK_UP || key == SDLK_LEFT || key == SDLK_RIGHT || key == SDLK_DOWN)
+	{
+		// Flying the launcher: see FlyLauncher().
+	}
+	else if(key == SDLK_d)
+	{
+		const int count = simulation->Drills().size();
+		const int next = (simulation->Drill() + ((mod & KMOD_SHIFT) ? count - 1 : 1)) % count;
+		Restart();
+		simulation->SetDrill(next);
+	}
 	else if(key == SDLK_t)
 		NextTarget();
 	else if(key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET)
@@ -394,6 +413,26 @@ string SimulatorPanel::Blame(const GuidanceSimulation::Missile &missile) const
 	if(cause == "poor tracking")
 		return "its own poor tracking";
 	return "the " + simulation->Target().DisplayModelName() + "'s " + cause;
+}
+
+
+
+void SimulatorPanel::FlyLauncher()
+{
+	// The arrow keys fly the launcher, unless the editor has the keyboard.
+	// While they are up, the launcher flies as it was recorded flying, if it
+	// was, so going back and playing again repeats it.
+	GuidanceDrill::Control control;
+	if(!editor.HasFocus())
+	{
+		const Uint8 *keys = SDL_GetKeyboardState(nullptr);
+		control.turn = keys[SDL_SCANCODE_RIGHT] - keys[SDL_SCANCODE_LEFT];
+		control.thrust = keys[SDL_SCANCODE_UP];
+	}
+	const bool flying = control.turn || control.thrust;
+	if(flying || wasFlying)
+		simulation->SetLauncherControl(control);
+	wasFlying = flying;
 }
 
 
@@ -1111,7 +1150,7 @@ void SimulatorPanel::DrawStatus() const
 	const string save = player ? "ctrl+s install   ctrl+d factory" : "ctrl+s save";
 	const string help = editor.HasFocus()
 		? "editing: esc stop editing   " + save + "   ctrl+space pause   ctrl+r restart   ctrl+z undo"
-		: "e edit   space pause   , . step   - + speed   1-9 drill   t target   r restart   [ ] or click: missile   "
+		: "e edit   arrows fly   space pause   , . step   - + speed   d drill   t target   r restart   [ ] missile   "
 			+ save + "   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }

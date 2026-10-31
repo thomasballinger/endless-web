@@ -69,7 +69,10 @@ GuidanceSimulation::GuidanceSimulation(const Outfit &outfit, const Ship &targetM
 {
 	auto model = make_shared<Ship>(targetModel);
 	const double distance = min(1500., .5 * weapon.Range());
-	drills = GuidanceDrill::MakeDrills(distance, model->MaxVelocity());
+	// Drills with a pilot flying the target come first.
+	drills = GuidanceDrill::MakeFlownDrills(distance);
+	for(GuidanceDrill &drill : GuidanceDrill::MakeDrills(distance, model->MaxVelocity()))
+		drills.push_back(std::move(drill));
 	Reset();
 }
 
@@ -129,8 +132,11 @@ void GuidanceSimulation::Reset()
 	launcher = Ship(*targetModel);
 	launcher.SetGovernment(GameData::Governments().Get("Republic"));
 	launcher.SetTargetShip(target);
-	const GuidanceDrill::Motion motion = drills[drill].motion(0);
-	target->SetKinematics(motion.position, motion.velocity, motion.facing);
+	launcherMotion = GuidanceDrill::Motion{Point(), Point(), Angle()};
+	launcher.SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
+	const GuidanceDrill &current = drills[drill];
+	targetMotion = current.pilot ? current.start : current.motion(0);
+	target->SetKinematics(targetMotion.position, targetMotion.velocity, targetMotion.facing);
 }
 
 
@@ -139,8 +145,33 @@ void GuidanceSimulation::Step()
 {
 	++step;
 	// As in the game, ships move before projectiles do.
-	const GuidanceDrill::Motion motion = drills[drill].motion(step);
-	target->SetKinematics(motion.position, motion.velocity, motion.facing);
+	const GuidanceDrill &current = drills[drill];
+	if(current.pilot)
+	{
+		GuidanceDrill::Situation situation;
+		situation.step = step;
+		situation.ship = targetMotion;
+		situation.turnRate = target->TurnRate();
+		situation.acceleration = target->Acceleration();
+		situation.launcher = launcherMotion.position;
+		for(const Missile &missile : missiles)
+			if(missile.endStep < 0)
+				situation.missiles.push_back({missile.projectile.Position(), missile.projectile.Velocity(),
+					missile.projectile.Facing()});
+		GuidanceDrill::Fly(targetMotion, current.pilot(situation), situation.turnRate, situation.acceleration,
+			target->MaxVelocity());
+	}
+	else
+		targetMotion = current.motion(step);
+	target->SetKinematics(targetMotion.position, targetMotion.velocity, targetMotion.facing);
+	// The launcher, as it was flown on this step (if it ever was).
+	if(!launcherControls.empty())
+	{
+		const size_t index = min(static_cast<size_t>(step - 1), launcherControls.size() - 1);
+		GuidanceDrill::Fly(launcherMotion, launcherControls[index], launcher.TurnRate(), launcher.Acceleration(),
+			launcher.MaxVelocity());
+		launcher.SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
+	}
 	if((step - 1) % LAUNCH_INTERVAL == 0)
 		Fire();
 
@@ -185,6 +216,29 @@ void GuidanceSimulation::Step()
 		if(forget)
 			traces.erase(missile.id);
 		return forget; }), missiles.end());
+}
+
+
+
+void GuidanceSimulation::SetLauncherControl(const GuidanceDrill::Control &control)
+{
+	// What happens from the next step on is no longer what was recorded.
+	launcherControls.resize(step, launcherControls.empty() ? GuidanceDrill::Control() : launcherControls.back());
+	launcherControls.push_back(control);
+}
+
+
+
+void GuidanceSimulation::ClearLauncherControls()
+{
+	launcherControls.clear();
+}
+
+
+
+bool GuidanceSimulation::HasLauncherControls() const
+{
+	return !launcherControls.empty();
 }
 
 
@@ -345,7 +399,7 @@ int GuidanceSimulation::MissileAt(const Point &position, double distance) const
 
 void GuidanceSimulation::Fire()
 {
-	missiles.emplace_back(nextId, step, Projectile(launcher, Point(), Angle(), &weapon));
+	missiles.emplace_back(nextId, step, Projectile(launcher, launcher.Position(), launcher.Facing(), &weapon));
 	missiles.back().projectile.SetGuidanceRecords(&records[nextId]);
 	missiles.back().projectile.SetGuidanceTrace(&traces[nextId]);
 	++nextId;

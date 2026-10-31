@@ -107,6 +107,8 @@ private:
 	void DrawCloseUp(const GuidanceSimulation::Missile &missile, const Rectangle &box) const;
 	// Follow the next (or previous) missile in flight.
 	void CycleMissile(int direction);
+	// Fly the launcher with the arrow keys.
+	void FlyLauncher();
 	// What confused a missile's seeker, e.g. "the Carrier's radar jamming".
 	std::string Blame(const GuidanceSimulation::Missile &missile) const;
 	void DrawStatus() const;
@@ -150,6 +152,8 @@ private:
 	int playFrames = 0;
 	// Whether the timeline is being dragged.
 	bool isScrubbing = false;
+	// Whether the arrow keys were flying the launcher on the last step.
+	bool wasFlying = false;
 
 	// Whether a key gave the editor the keyboard on this frame, so that the
 	// text of that same key press isn't typed into it.

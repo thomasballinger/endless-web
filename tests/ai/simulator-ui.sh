@@ -101,7 +101,7 @@ check "the simulator starts" ready "$OUT/start.png" || exit 1
 
 # The jinking drill, at 2x speed for a few seconds (not long enough for the
 # drill to start over), then paused.
-xdotool key 5 equal
+xdotool key 8 equal
 sleep 5
 xdotool key space
 # Let the camera settle.
@@ -172,7 +172,7 @@ wait $GAME 2> /dev/null
 # pause, and select it. (A new configuration leaves out the script saved above.)
 cp -r "$ROOT/tests/integration/config" "$OUT/config-jammed"
 start "$OUT/config-jammed" Carrier
-xdotool key 5 equal equal
+xdotool key 8 equal equal
 WHERE=
 for i in $(seq 60); do
 	shot jammed

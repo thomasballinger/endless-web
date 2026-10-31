@@ -93,6 +93,15 @@ public:
 	void Step();
 	// Start over and run to the given step.
 	void ReplayTo(int step);
+
+	// Fly the launcher with this control from the current step on, until
+	// told otherwise. Each step's control is recorded, so replaying (to a
+	// step after an edit, or to go back) flies it the same way; stepping on
+	// past what was recorded repeats the last control given. Clear() forgets
+	// the recording, leaving the launcher where it starts.
+	void SetLauncherControl(const GuidanceDrill::Control &control);
+	void ClearLauncherControls();
+	bool HasLauncherControls() const;
 	int CurrentStep() const;
 
 	const Ship &Launcher() const;
@@ -136,6 +145,11 @@ private:
 
 	Ship launcher;
 	std::shared_ptr<Ship> target;
+	// How the launcher was flown, by step.
+	std::vector<GuidanceDrill::Control> launcherControls;
+	// How the target and launcher are moving, when they are flown.
+	GuidanceDrill::Motion targetMotion;
+	GuidanceDrill::Motion launcherMotion;
 	std::vector<Missile> missiles;
 	int step = 0;
 	int nextId = 0;
