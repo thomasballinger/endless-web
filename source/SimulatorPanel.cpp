@@ -53,7 +53,7 @@ namespace {
 	const double INSPECTOR_WIDTH = 270.;
 	const double STATUS_HEIGHT = 36.;
 	// The size of the close-up of the followed missile.
-	const double CLOSE_UP_SIZE = 246.;
+	const double CLOSE_UP_SIZE = 200.;
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often, so replaying after an edit is quick.
 	const int LOOP_STEPS = 1200;
@@ -94,6 +94,13 @@ namespace {
 			printf("SIMULATOR edit at step %d: first difference at step %d, missile %d\n", now, difference.step,
 				difference.missile + 1);
 		fflush(stdout);
+	}
+
+	// What a missile's script was given on its last step, or if it didn't run
+	// (e.g. its seeker is confused), the missile's state now.
+	MissileGuidance::Input Shown(const Projectile &projectile)
+	{
+		return projectile.RanGuidance() ? projectile.LastGuidanceInput() : projectile.CurrentGuidanceInput();
 	}
 
 	string FormatSpeed(double speed)
@@ -841,10 +848,38 @@ void SimulatorPanel::DrawTrails() const
 		{
 			const float age = static_cast<float>(i) / trail.size();
 			const float alpha = fade * (.15f + .85f * age);
-			// Where the seeker was confused and steering, the trail shows it.
+			// Where the seeker was confused and steering, the trail shows it, and
+			// it is fainter where the seeker had no lock.
 			const Color &segment = missile.confused[i] ? CONFUSED : base;
-			const Color color(segment.Get()[0] * alpha, segment.Get()[1] * alpha, segment.Get()[2] * alpha, alpha);
-			LineShader::Draw(ToScreen(trail[i - 1]), ToScreen(trail[i]), isSelected ? 2.5f : 1.5f, color, false);
+			const bool locked = missile.confused[i] || missile.locked[i];
+			const float shade = locked ? alpha : alpha * .4f;
+			const Color color(segment.Get()[0] * shade, segment.Get()[1] * shade, segment.Get()[2] * shade, shade);
+			LineShader::Draw(ToScreen(trail[i - 1]), ToScreen(trail[i]), (isSelected ? 2.5f : 1.5f) * (locked ? 1.f : .6f),
+				color, false);
+		}
+		// Where its seeker lost its lock (an x), got it back (a ring), or got
+		// confused (a diamond), along the part of its course still drawn.
+		using Kind = GuidanceSimulation::Missile::LockEvent::Kind;
+		const int drawnFrom = (missile.endStep >= 0 ? missile.endStep : step) - static_cast<int>(trail.size());
+		for(const GuidanceSimulation::Missile::LockEvent &event : missile.lockEvents)
+		{
+			if(event.step < drawnFrom || fade <= 0.f)
+				continue;
+			const Point at = ToScreen(event.position);
+			if(event.kind == Kind::LOST)
+			{
+				LineShader::Draw(at + Point(-5., -5.), at + Point(5., 5.), 2.f, MISS, false);
+				LineShader::Draw(at + Point(-5., 5.), at + Point(5., -5.), 2.f, MISS, false);
+			}
+			else if(event.kind == Kind::REGAINED)
+				RingShader::Draw(at, 5.f, 3.5f, HIT);
+			else if(event.kind == Kind::CONFUSED)
+				for(int k = 0; k < 4; ++k)
+				{
+					const Point a = Angle(90. * k).Unit() * 6.;
+					const Point b = Angle(90. * (k + 1)).Unit() * 6.;
+					LineShader::Draw(at + a, at + b, 1.5f, CONFUSED, false);
+				}
 		}
 		if(missile.endStep >= 0 && fade > 0.f)
 		{
@@ -1090,7 +1125,7 @@ void SimulatorPanel::DrawSelection() const
 	font.Draw(label, position + Point(20., -8.), FOLLOWED);
 	// Where the seeker thinks the target is, which with a noisy seeker is
 	// not quite where it really is.
-	const MissileGuidance::Input &input = followed->projectile.LastGuidanceInput();
+	const MissileGuidance::Input input = Shown(followed->projectile);
 	if(input.hasLock && followed->endStep < 0)
 	{
 		const Point seen = ToScreen(input.targetPosition);
@@ -1135,7 +1170,7 @@ void SimulatorPanel::DrawInspector() const
 	// Its state, as gauges and numbers.
 	const Projectile &projectile = missile->projectile;
 	const Weapon &weapon = simulation->GetWeapon();
-	const MissileGuidance::Input &input = projectile.LastGuidanceInput();
+	const MissileGuidance::Input input = Shown(projectile);
 	const bool confused = missile->endStep < 0 && projectile.IsConfused();
 	if(confused)
 		line((frameCount / 15) % 2 ? "SEEKER CONFUSED" : "", CONFUSED);
@@ -1155,6 +1190,34 @@ void SimulatorPanel::DrawInspector() const
 		snprintf(text, sizeof(text), "%s %.0f%% at the next check", projectile.HasLock() ? "keeps lock:" : "relocks:",
 			100. * projectile.LockChance());
 		line(text, projectile.LockChance() < .8 ? CONFUSED : DIM);
+		// Why: each way it tracks, what affects it, and its own odds (any one
+		// of them seeing the target is enough).
+		for(const Projectile::LockMethod &method : projectile.LockBreakdown())
+		{
+			char odds[16];
+			snprintf(odds, sizeof(odds), "%.0f%%", 100. * method.chance);
+			snprintf(text, sizeof(text), "  %s %g: ", method.name.c_str(), method.tracking);
+			string description = text + method.reason;
+			while(font.Width(description) > INSPECTOR_WIDTH - 60. && description.size() > 4)
+				description = description.substr(0, description.size() - 4) + "...";
+			font.Draw(description, Point(left + 12., y), DIM);
+			font.Draw(odds, Point(left + INSPECTOR_WIDTH - 12. - font.Width(odds), y), method.chance < .8 ? CONFUSED : DIM);
+			y += 18.;
+		}
+	}
+	// What its lock checks have done (about every half second), lately.
+	using Kind = GuidanceSimulation::Missile::LockEvent::Kind;
+	int shown = 0;
+	for(auto it = missile->lockEvents.rbegin(); it != missile->lockEvents.rend() && shown < 3; ++it)
+	{
+		if(it->kind == Kind::KEPT)
+			continue;
+		static const char *WHAT[] = {"kept", "lost lock", "got lock back", "no lock", "confused"};
+		char text[64];
+		snprintf(text, sizeof(text), "step %d: %s (%.0f%% odds)", it->step, WHAT[static_cast<int>(it->kind)],
+			100. * it->chance);
+		line(text, it->kind == Kind::LOST || it->kind == Kind::CONFUSED ? MISS : it->kind == Kind::REGAINED ? HIT : DIM);
+		++shown;
 	}
 	const int total = max(1, input.age + input.lifetimeLeft);
 	auto gauge = [&](const string &label, double fraction, const string &value, const Color &color) {
@@ -1203,7 +1266,7 @@ void SimulatorPanel::DrawReference(const GuidanceSimulation::Missile &missile, d
 	const Weapon &weapon = simulation->GetWeapon();
 	const script::Interface &interface = MissileGuidance::GetInterface();
 	vector<script::Value> values;
-	const MissileGuidance::Input &input = missile.projectile.LastGuidanceInput();
+	const MissileGuidance::Input input = Shown(missile.projectile);
 	MissileGuidance::Variables(input, values);
 	for(int i = 0; i < interface.VariableCount() && y < Screen::Bottom() - FOOTER_HEIGHT - LINE; ++i)
 	{
@@ -1366,7 +1429,7 @@ void SimulatorPanel::DrawCloseUp(const GuidanceSimulation::Missile &missile, con
 		for(int i = 0; i < segments && used; ++i)
 			LineShader::Draw(at(used * i / segments), at(used * (i + 1) / segments), 3.f, TEXT, false);
 	}
-	const MissileGuidance::Input &input = projectile.LastGuidanceInput();
+	const MissileGuidance::Input input = Shown(projectile);
 	if(input.hasLock && !confused)
 	{
 		const Point toward = (input.targetPosition - input.position).Unit();

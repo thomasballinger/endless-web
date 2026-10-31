@@ -212,9 +212,37 @@ void GuidanceSimulation::Step()
 		vector<MissileGuidance::Record> &runs = records[missile.id];
 		const size_t runCount = runs.size();
 		const bool hadLock = projectile.HasLock();
+		const bool wasConfused = projectile.IsConfused();
+		const int checks = projectile.LockChecks();
+		// The odds as they stand before the projectile moves, which is when it
+		// checks its lock, if it does this step.
+		const vector<Projectile::LockMethod> methods = projectile.LockBreakdown();
+		const Point before = projectile.Position();
 		projectile.Move(visuals, spawned);
 		if(hadLock && !projectile.HasLock())
 			missile.lostLockStep = step;
+		if(projectile.LockChecks() != checks || (!wasConfused && projectile.IsConfused()))
+		{
+			using Kind = Missile::LockEvent::Kind;
+			Missile::LockEvent event;
+			event.step = step;
+			event.position = before;
+			const bool hasLock = projectile.HasLock();
+			event.kind = (!wasConfused && projectile.IsConfused()) ? Kind::CONFUSED : hadLock
+				? (hasLock ? Kind::KEPT : Kind::LOST) : (hasLock ? Kind::REGAINED : Kind::MISSED);
+			double miss = 1.;
+			for(const Projectile::LockMethod &method : methods)
+			{
+				miss *= 1. - method.chance;
+				char text[160];
+				snprintf(text, sizeof(text), "%s%s %g: %s%s%.0f%%", event.reason.empty() ? "" : "; ",
+					method.name.c_str(), method.tracking, method.reason.c_str(), method.reason.empty() ? "" : ", ",
+					100. * method.chance);
+				event.reason += text;
+			}
+			event.chance = 1. - miss;
+			missile.lockEvents.push_back(std::move(event));
+		}
 		for(size_t i = runCount; i < runs.size(); ++i)
 			runs[i].step = step;
 		visuals.clear();
@@ -226,10 +254,12 @@ void GuidanceSimulation::Step()
 		}
 		missile.trail.push_back(projectile.Position());
 		missile.confused.push_back(projectile.IsConfused());
+		missile.locked.push_back(projectile.HasLock());
 		if(missile.trail.size() > TRAIL_LENGTH)
 		{
 			missile.trail.pop_front();
 			missile.confused.pop_front();
+			missile.locked.pop_front();
 		}
 		// Projectiles check for collisions along their next movement.
 		Point offset = projectile.Position() - target->Position();

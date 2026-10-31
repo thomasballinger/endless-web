@@ -281,6 +281,7 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 	bool homing = weapon->Homing();
 	if(currentTarget && homing && !Random::Int(30))
 	{
+		++lockChecks;
 		CheckLock(*currentTarget);
 		CheckConfused(*currentTarget);
 	}
@@ -330,6 +331,7 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 // and how much to accelerate.
 void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 {
+	ranGuidance = false;
 	// The seeker itself steers in two cases, and then the guidance script
 	// does not run that step (and a trace of it shows nothing):
 	// A seeker with a blind spot can't see a target behind the projectile, so
@@ -408,6 +410,7 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	input.lifetimeLeft = lifetime;
 
 	MissileGuidance::Output output;
+	ranGuidance = true;
 	if(guidanceTrace)
 		lastGuidanceInput = input;
 	MissileGuidance::Record *record = nullptr;
@@ -711,6 +714,96 @@ double Projectile::LockChanceAt(double distance, bool locked) const
 	for(double probability : LockProbabilities(*target, distance))
 		miss *= 1. - min(1., base * probability);
 	return 1. - miss;
+}
+
+
+
+MissileGuidance::Input Projectile::CurrentGuidanceInput() const
+{
+	MissileGuidance::Input input;
+	input.position = position;
+	input.velocity = velocity;
+	input.facing = angle.Unit();
+	const shared_ptr<Entity> target = TargetPtr();
+	input.hasLock = HasLock();
+	if(input.hasLock && target)
+	{
+		input.targetPosition = target->Position();
+		input.targetVelocity = target->Velocity();
+		input.targetFacing = target->Facing().Unit();
+	}
+	input.maxTurn = weapon->Turn();
+	input.acceleration = weapon->Acceleration();
+	input.drag = weapon->Drag();
+	input.age = age;
+	input.lifetimeLeft = lifetime;
+	return input;
+}
+
+
+
+bool Projectile::RanGuidance() const
+{
+	return ranGuidance;
+}
+
+
+
+int Projectile::LockChecks() const
+{
+	return lockChecks;
+}
+
+
+
+vector<Projectile::LockMethod> Projectile::LockBreakdown() const
+{
+	vector<LockMethod> methods;
+	const shared_ptr<Entity> target = TargetPtr();
+	if(!target || !weapon->Homing())
+		return methods;
+	const double distance = position.Distance(target->Position());
+	const double base = hasLock ? 1. : RELOCK_RATE;
+	char text[96];
+	// In the order LockProbabilities() gives them.
+	if(weapon->Tracking())
+		methods.push_back({"tracking", weapon->Tracking(), "", 0.});
+	if(weapon->OpticalTracking())
+	{
+		const double jamming = target->IsDisabled() ? 0. : target->OpticalJamming();
+		if(jamming && distance < JammingRange(jamming))
+			snprintf(text, sizeof(text), "size %.0f, made smaller by jamming %.1f", target->OpticalSize(),
+				jamming * RangeFraction(distance, jamming));
+		else
+			snprintf(text, sizeof(text), "target size %.0f", target->OpticalSize());
+		methods.push_back({"optical", weapon->OpticalTracking(), text, 0.});
+	}
+	if(weapon->InfraredTracking())
+	{
+		const double shortRange = weapon->Range() * 0.33;
+		if(distance <= shortRange)
+			snprintf(text, sizeof(text), "target heat %.0f%%, x%.1f up close", 100. * target->HeatFraction(),
+				2. - distance / shortRange);
+		else
+			snprintf(text, sizeof(text), "target heat %.0f%%", 100. * target->HeatFraction());
+		methods.push_back({"infrared", weapon->InfraredTracking(), text, 0.});
+	}
+	if(weapon->RadarTracking())
+	{
+		const double jamming = target->IsDisabled() ? 0. : target->RadarJamming();
+		if(jamming && distance < JammingRange(jamming))
+			snprintf(text, sizeof(text), "jammed %.1f (of %g, up close)", jamming * RangeFraction(distance, jamming),
+				jamming);
+		else if(jamming)
+			snprintf(text, sizeof(text), "out of its jamming's reach");
+		else
+			snprintf(text, sizeof(text), "no jamming");
+		methods.push_back({"radar", weapon->RadarTracking(), text, 0.});
+	}
+	const vector<double> probabilities = LockProbabilities(*target, distance);
+	for(size_t i = 0; i < methods.size() && i < probabilities.size(); ++i)
+		methods[i].chance = min(1., base * probabilities[i]);
+	return methods;
 }
 
 

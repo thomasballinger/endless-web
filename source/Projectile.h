@@ -75,6 +75,12 @@ public:
 	void SetGuidanceTrace(script::Trace *trace);
 	// What the guidance script was given on the last step it was traced.
 	const MissileGuidance::Input &LastGuidanceInput() const;
+	// What its guidance script would be given now (without the noise of an
+	// imperfect seeker, which takes random numbers), for showing its state
+	// when the script hasn't run.
+	MissileGuidance::Input CurrentGuidanceInput() const;
+	// Whether its guidance script ran on its last step.
+	bool RanGuidance() const;
 	// Whether the seeker has lost its lock and is confused, so that it steers
 	// the projectile instead of the guidance script.
 	bool IsConfused() const;
@@ -86,6 +92,18 @@ public:
 	// The same, if it were the given distance from its target, and had a lock
 	// or not.
 	double LockChanceAt(double distance, bool locked) const;
+	// How many times its seeker has checked its lock.
+	int LockChecks() const;
+	// Each way its seeker tracks, what affects it now, and its chance of
+	// seeing the target at the next check (it needs only one to).
+	class LockMethod {
+	public:
+		std::string name;
+		double tracking = 0.;
+		std::string reason;
+		double chance = 0.;
+	};
+	std::vector<LockMethod> LockBreakdown() const;
 	// How far from a ship its jamming reaches. (Jamming is strongest at the
 	// ship, and fades out evenly to nothing at this distance.)
 	static double JammingRange(double jamming);
@@ -192,6 +210,8 @@ private:
 	// Which of its target's jamming was confusing it when it got confused:
 	// 1 for radar, 2 for optical.
 	int confusingJamming = 0;
+	int lockChecks = 0;
+	bool ranGuidance = false;
 	// What this projectile's guidance script remembers between steps.
 	script::Memory guidanceMemory;
 	// Where to record how the guidance script ran, if anywhere, and what it

@@ -54,6 +54,20 @@ public:
 		// (and steering instead of the script) at each of those points.
 		std::deque<Point> trail;
 		std::deque<bool> confused;
+		// And whether its seeker had a lock.
+		std::deque<bool> locked;
+		// Each time its seeker checked its lock (and what came of it), or got
+		// confused: where, with what odds, and why.
+		class LockEvent {
+		public:
+			enum class Kind { KEPT, LOST, REGAINED, MISSED, CONFUSED };
+			int step = 0;
+			Point position;
+			Kind kind = Kind::KEPT;
+			double chance = 0.;
+			std::string reason;
+		};
+		std::vector<LockEvent> lockEvents;
 		bool hit = false;
 		// The step it hit or expired on, or -1 while it is in flight.
 		int endStep = -1;
