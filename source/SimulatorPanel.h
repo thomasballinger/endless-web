@@ -63,6 +63,7 @@ protected:
 	virtual bool TextInput(const std::string &text) override;
 	virtual bool Click(int x, int y, MouseButton button, int clicks) override;
 	virtual bool Drag(double dx, double dy) override;
+	virtual bool Release(int x, int y, MouseButton button) override;
 	virtual bool Scroll(double dx, double dy) override;
 
 
@@ -95,6 +96,14 @@ private:
 	void DrawSelection() const;
 	void DrawInspector() const;
 	void DrawJamming() const;
+	// Rewind and play symbols over the range, like a tape deck's.
+	void DrawTapeDeck() const;
+	// The timeline's ends, and its height on the screen.
+	double TimelineLeft() const;
+	double TimelineRight() const;
+	double TimelineY() const;
+	// Replay to the step under the given point of the timeline.
+	void ScrubTo(double x);
 	void DrawCloseUp(const GuidanceSimulation::Missile &missile, const Rectangle &box) const;
 	// Follow the next (or previous) missile in flight.
 	void CycleMissile(int direction);
@@ -135,6 +144,12 @@ private:
 	int rewindTo = 0;
 	int rewindFrame = 0;
 	int rewindFrames = 0;
+	// After a rewind, how many more frames to hold at the step it went back
+	// to, and then how many to show that the new run is playing.
+	int holdFrames = 0;
+	int playFrames = 0;
+	// Whether the timeline is being dragged.
+	bool isScrubbing = false;
 
 	// Whether a key gave the editor the keyboard on this frame, so that the
 	// text of that same key press isn't typed into it.

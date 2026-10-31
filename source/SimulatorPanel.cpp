@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "SimulatorPanel.h"
 
+#include "Angle.h"
 #include "Color.h"
 #include "Command.h"
 #include "DataFile.h"
@@ -29,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "MouseButton.h"
 #include "Outfit.h"
 #include "PlayerInfo.h"
+#include "shader/PointerShader.h"
 #include "shader/RingShader.h"
 #include "Screen.h"
 #include "Ship.h"
@@ -51,7 +53,7 @@ namespace {
 	const double INSPECTOR_WIDTH = 270.;
 	const double STATUS_HEIGHT = 36.;
 	// The size of the close-up of the followed missile.
-	const double CLOSE_UP_SIZE = 200.;
+	const double CLOSE_UP_SIZE = 246.;
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often, so replaying after an edit is quick.
 	const int LOOP_STEPS = 1200;
@@ -133,9 +135,17 @@ void SimulatorPanel::Step()
 		Recompile();
 	if(statusTime)
 		--statusTime;
+	if(playFrames)
+		--playFrames;
 	if(rewindFrames)
 		StepRewind();
-	else if(!paused)
+	else if(holdFrames)
+	{
+		// Hold at the step the change first matters, and then play on.
+		if(!--holdFrames)
+			playFrames = 40;
+	}
+	else if(!paused && !isScrubbing)
 	{
 		// Fractional speeds step every few frames.
 		const double speed = SPEEDS[speedIndex];
@@ -183,6 +193,7 @@ void SimulatorPanel::Draw()
 	draw.Draw();
 
 	DrawSelection();
+	DrawTapeDeck();
 	DrawTimeline();
 	editor.Draw();
 	DrawInspector();
@@ -228,8 +239,17 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	else if(key == SDLK_PERIOD)
 	{
 		FinishRewind();
+		holdFrames = 0;
 		paused = true;
 		simulation->Step();
+	}
+	else if(key == SDLK_COMMA)
+	{
+		// Replaying is exact, so stepping back is replaying to one step less.
+		FinishRewind();
+		holdFrames = 0;
+		paused = true;
+		simulation->ReplayTo(max(0, simulation->CurrentStep() - 1));
 	}
 	else if(key == SDLK_r)
 		Restart();
@@ -280,6 +300,17 @@ bool SimulatorPanel::Click(int x, int y, MouseButton button, int clicks)
 		return true;
 	}
 	editor.SetFocus(false);
+	// Clicking or dragging on the timeline goes to that step.
+	if(fabs(y - TimelineY()) <= 12. && x >= TimelineLeft() - 8. && x <= TimelineRight() + 8.)
+	{
+		FinishRewind();
+		holdFrames = 0;
+		isScrubbing = true;
+		paused = true;
+		dragPoint = point;
+		ScrubTo(x);
+		return true;
+	}
 	// Clicking a missile follows it; clicking anywhere else goes back to
 	// following the newest one.
 	if(view.Contains(point))
@@ -291,10 +322,56 @@ bool SimulatorPanel::Click(int x, int y, MouseButton button, int clicks)
 
 bool SimulatorPanel::Drag(double dx, double dy)
 {
+	if(isScrubbing)
+	{
+		dragPoint += Point(dx, dy);
+		ScrubTo(dragPoint.X());
+		return true;
+	}
 	if(!isDragging)
 		return false;
 	dragPoint += Point(dx, dy);
 	return editor.Drag(dragPoint);
+}
+
+
+
+bool SimulatorPanel::Release(int x, int y, MouseButton button)
+{
+	isScrubbing = false;
+	isDragging = false;
+	return true;
+}
+
+
+
+void SimulatorPanel::ScrubTo(double x)
+{
+	const double fraction = (x - TimelineLeft()) / (TimelineRight() - TimelineLeft());
+	const int step = static_cast<int>(lround(max(0., min(1., fraction)) * (LOOP_STEPS - 1)));
+	if(step != simulation->CurrentStep())
+		simulation->ReplayTo(step);
+}
+
+
+
+double SimulatorPanel::TimelineLeft() const
+{
+	return view.Left() + 20.;
+}
+
+
+
+double SimulatorPanel::TimelineRight() const
+{
+	return view.Right() - 20.;
+}
+
+
+
+double SimulatorPanel::TimelineY() const
+{
+	return view.Bottom() - 18.;
 }
 
 
@@ -406,7 +483,7 @@ void SimulatorPanel::Recompile()
 	rewindFrom = now;
 	rewindTo = difference.step;
 	rewindFrame = 0;
-	rewindFrames = static_cast<int>(round(6. + 14. * log10(now - difference.step + 1.)));
+	rewindFrames = static_cast<int>(round(10. + 20. * log10(now - difference.step + 1.)));
 	status = "This first makes a difference at step " + to_string(difference.step) + ", for missile #"
 		+ to_string(difference.missile + 1) + ".";
 	statusTime = 300;
@@ -419,11 +496,13 @@ void SimulatorPanel::StepRewind()
 	if(++rewindFrame >= rewindFrames)
 	{
 		FinishRewind();
+		// Hold there for a moment, before the new run plays on.
+		holdFrames = 45;
 		return;
 	}
-	// Speed up and then slow down, like winding back a tape.
+	// Wind back quickly at first, then slow down coming up to the step.
 	const double t = static_cast<double>(rewindFrame) / rewindFrames;
-	const double eased = t * t * (3. - 2. * t);
+	const double eased = 1. - (1. - t) * (1. - t) * (1. - t);
 	simulation->ReplayTo(rewindFrom - static_cast<int>(lround((rewindFrom - rewindTo) * eased)));
 }
 
@@ -641,6 +720,40 @@ void SimulatorPanel::DrawTrails() const
 
 
 
+void SimulatorPanel::DrawTapeDeck() const
+{
+	// Rewinding: two triangles pointing back, a little shaky, with a few
+	// faint bands of tracking noise rolling across the range.
+	const Point corner = view.TopLeft() + Point(36., 34.);
+	const Font &font = FontSet::Get(18);
+	if(rewindFrames)
+	{
+		const int jitter = (frameCount * 7 % 5 == 0) ? (frameCount % 3) - 1 : 0;
+		const Point at = corner + Point(jitter, 0.);
+		PointerShader::Draw(at, Point(-1., 0.), 22.f, 18.f, 0.f, MATTERED);
+		PointerShader::Draw(at + Point(16., 0.), Point(-1., 0.), 22.f, 18.f, 0.f, MATTERED);
+		font.Draw("REWIND", at + Point(34., -10.), MATTERED);
+		for(int i = 0; i < 3; ++i)
+		{
+			const double y = view.Top() + fmod(frameCount * 9. + i * 197., view.Height());
+			FillShader::Fill(Point(view.Center().X(), y), Point(view.Width(), 2. + i),
+				Color(MATTERED.Get()[0] * .08f, MATTERED.Get()[1] * .08f, MATTERED.Get()[2] * .08f, .08f));
+		}
+	}
+	else if(holdFrames || playFrames)
+	{
+		// Then one triangle pointing ahead: steady while holding at the step
+		// where the change first matters, fading once it plays on.
+		const float alpha = holdFrames ? 1.f : playFrames / 40.f;
+		const Color color(MATTERED.Get()[0] * alpha, MATTERED.Get()[1] * alpha, MATTERED.Get()[2] * alpha, alpha);
+		PointerShader::Draw(corner, Point(1., 0.), 22.f, 18.f, 0.f, color);
+		font.Draw(holdFrames ? "step " + to_string(simulation->CurrentStep()) : "PLAY", corner + Point(16., -10.),
+			color);
+	}
+}
+
+
+
 void SimulatorPanel::DrawJamming() const
 {
 	// The target's jamming, for the kinds of seeker this weapon has: strongest
@@ -708,10 +821,12 @@ void SimulatorPanel::DrawGhosts() const
 void SimulatorPanel::DrawTimeline() const
 {
 	// A bar under the range, from the start of the drill to where it loops.
-	const double left = view.Left() + 20.;
-	const double right = view.Right() - 20.;
-	const double y = view.Bottom() - 18.;
-	auto x = [left, right](int step) { return left + (right - left) * min(1., step / static_cast<double>(LOOP_STEPS)); };
+	const double left = TimelineLeft();
+	const double right = TimelineRight();
+	const double y = TimelineY();
+	auto x = [left, right](int step) {
+		return left + (right - left) * min(1., step / static_cast<double>(LOOP_STEPS - 1));
+	};
 	LineShader::Draw(Point(left, y), Point(right, y), 2.f, GRID_MAJOR, false);
 	const int step = simulation->CurrentStep();
 	LineShader::Draw(Point(left, y), Point(x(step), y), 2.f, rewindFrames ? MATTERED : DIM, false);
@@ -902,24 +1017,78 @@ void SimulatorPanel::DrawCloseUp(const GuidanceSimulation::Missile &missile, con
 	draw.AddUnblurred(projectile);
 	draw.Draw();
 
-	// Its velocity, and the direction to what its seeker sees.
+	// The forces on it: thrust pushing it along the way it faces, drag pulling
+	// back against its velocity (the two balance at its top speed), and how far
+	// it is turning this step, out of the most it can.
+	const Weapon &weapon = simulation->GetWeapon();
+	const Point center = box.Center() + Point(wobble, 0.);
 	const double reach = box.Width() * .45;
+	const Point facing = projectile.Facing().Unit();
 	const Point velocity = projectile.Velocity();
+	const double acceleration = max(1e-9, weapon.Acceleration());
+	const double topSpeed = weapon.Drag() ? acceleration / weapon.Drag() : max(1., velocity.Length());
+	const MissileGuidance::Record *record = simulation->LastRecord(missile.id);
+	// A confused seeker steers at full turn, and keeps on thrusting.
+	const double thrust = confused || !record ? acceleration : record->output.thrust;
+	const double turn = (confused || !record) ? 0. : record->output.turn;
+	const Font &font = FontSet::Get(14);
+	auto arrow = [&](const Point &from, const Point &vector, const Color &color, const string &label) {
+		if(vector.Length() < 2.)
+			return;
+		const Point tip = from + vector;
+		LineShader::Draw(from, tip, 2.f, color, false);
+		PointerShader::Draw(tip, vector.Unit(), 8.f, 8.f, 0.f, color);
+		const Point at = tip + vector.Unit() * 10. + Point(-font.Width(label) / 2., -7.);
+		font.Draw(label, Point(max(box.Left() + 4., min(box.Right() - 4. - font.Width(label), at.X())),
+			max(box.Top() + 4., min(box.Bottom() - 18., at.Y()))), color);
+	};
+	// The exhaust: a flame out of its tail, as long as its thrust is strong.
+	const double tail = size * scale * .5;
+	if(thrust > 0.)
+	{
+		const Point start = center - facing * tail;
+		const double length = reach * .5 * thrust / acceleration;
+		LineShader::Draw(start, start - facing * length, 5.f, Color(.9f, .55f, .15f, .7f), false);
+		LineShader::Draw(start, start - facing * length * .6, 2.f, Color(1.f, .9f, .5f, .9f), false);
+	}
 	if(velocity)
-		LineShader::Draw(box.Center(), box.Center() + velocity.Unit() * reach * .8, 1.f,
-			Color(MISSILE.Get()[0] * .6f, MISSILE.Get()[1] * .6f, MISSILE.Get()[2] * .6f, .6f), false);
+	{
+		const double speed = velocity.Length();
+		arrow(center, velocity.Unit() * reach * .85 * min(1., speed / topSpeed), MISSILE, "velocity");
+		// Drag, off to one side so that it doesn't hide the exhaust.
+		const Point side = Point(-velocity.Unit().Y(), velocity.Unit().X()) * 14.;
+		if(weapon.Drag())
+			arrow(center + side, -velocity.Unit() * reach * .55 * min(1., weapon.Drag() * speed / acceleration), MISS,
+				"drag");
+	}
+	// The turn: an arc from the way it faces, out to where the most it can
+	// turn would take it, filled as far as it is turning.
+	const double maxTurn = weapon.Turn();
+	if(maxTurn > 0.)
+	{
+		const double arcRadius = reach * .7;
+		const double base = projectile.Facing().Degrees();
+		const double span = 50.;
+		auto at = [&](double degrees) { return center + Angle(base + degrees).Unit() * arcRadius; };
+		for(int sign : {-1, 1})
+			for(int i = 0; i < 10; ++i)
+				LineShader::Draw(at(sign * span * i / 10.), at(sign * span * (i + 1) / 10.), 1.f, GRID_MAJOR, false);
+		const double used = confused ? 0. : max(-1., min(1., turn / maxTurn)) * span;
+		const int segments = max(1, static_cast<int>(fabs(used) / 5.));
+		for(int i = 0; i < segments && used; ++i)
+			LineShader::Draw(at(used * i / segments), at(used * (i + 1) / segments), 3.f, TEXT, false);
+	}
 	const MissileGuidance::Input &input = projectile.LastGuidanceInput();
 	if(input.hasLock && !confused)
 	{
 		const Point toward = (input.targetPosition - input.position).Unit();
-		LineShader::DrawDashed(box.Center(), box.Center() + toward * reach, toward, 1.f, FOLLOWED, 5., 5.);
+		LineShader::DrawDashed(center, center + toward * reach, toward, 1.f, FOLLOWED, 5., 5.);
 	}
-	const Font &font = FontSet::Get(14);
 	font.Draw("#" + to_string(missile.id + 1), box.TopLeft() + Point(6., 4.), frame);
 	if(confused)
 	{
 		const string text = "CONFUSED";
-		font.Draw(text, Point(box.Center().X() - font.Width(text) / 2. + wobble, box.Bottom() - 20.), CONFUSED);
+		font.Draw(text, Point(box.Center().X() - font.Width(text) / 2. + wobble, box.Top() + 4.), CONFUSED);
 	}
 }
 
@@ -942,7 +1111,7 @@ void SimulatorPanel::DrawStatus() const
 	const string save = player ? "ctrl+s install   ctrl+d factory" : "ctrl+s save";
 	const string help = editor.HasFocus()
 		? "editing: esc stop editing   " + save + "   ctrl+space pause   ctrl+r restart   ctrl+z undo"
-		: "e edit   space pause   . step   - + speed   1-9 drill   t target   r restart   [ ] or click: missile   "
+		: "e edit   space pause   , . step   - + speed   1-9 drill   t target   r restart   [ ] or click: missile   "
 			+ save + "   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }
