@@ -2115,14 +2115,24 @@ void Engine::WatchScripts(WatchedScripts &watched)
 		if(!isOwn)
 		{
 			if(!isHere)
+			{
 				entry.unreadable = "It is in another system.";
+				entry.unreadableLabel = "elsewhere";
+			}
 			else if(!scanPower)
-				entry.unreadable = "Reading its code needs a code scanner.";
+			{
+				entry.unreadable = "Reading its code needs a code scanner (sold at outfitters).";
+				entry.unreadableLabel = "no code scanner";
+			}
 			else if(position.Distance(flagship->Position()) > scanRange)
+			{
 				entry.unreadable = "It is out of your code scanner's range.";
+				entry.unreadableLabel = "out of scanner range";
+			}
 			else if(jamming >= scanPower)
 			{
 				entry.unreadable = "Its code is jammed.";
+				entry.unreadableLabel = "JAMMED";
 				entry.interference = "CODE JAMMED: there is too much interference to read it";
 			}
 			else if(jamming > 0.)

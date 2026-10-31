@@ -63,6 +63,14 @@ WorkshopPanel::WorkshopPanel(PlayerInfo &player)
 
 
 
+void WorkshopPanel::Step()
+{
+	// Explain the workshop the first time it opens.
+	DoHelp("workshop");
+}
+
+
+
 void WorkshopPanel::Draw()
 {
 	DrawBackdrop();

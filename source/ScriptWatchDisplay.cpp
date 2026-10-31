@@ -418,7 +418,7 @@ void ScriptWatchDisplay::DrawMap(const Rectangle &box, const Entry *entry) const
 	const bool glitching = !Interference(*entry).empty();
 	// Without a script, say why: which of the AI's built-in rules it followed,
 	// or why its code can't be read.
-	string title = !entry->unreadable.empty() ? entry->unreadable : run ? run->name
+	string title = !entry->unreadable.empty() ? entry->unreadableLabel : run ? run->name
 		: !activity.overriddenBy.empty() ? activity.overriddenBy.substr(0, activity.overriddenBy.find(':'))
 		: !activity.notes.empty() ? activity.notes.back() : "idle";
 	font.Draw(Fit(font, title, box.Width()), box.TopLeft(), glitching ? GLITCH : LABEL);

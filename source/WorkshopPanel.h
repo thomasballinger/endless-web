@@ -36,6 +36,7 @@ class WorkshopPanel : public Panel {
 public:
 	explicit WorkshopPanel(PlayerInfo &player);
 
+	virtual void Step() override;
 	virtual void Draw() override;
 
 

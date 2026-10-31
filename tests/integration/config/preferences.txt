@@ -7,6 +7,7 @@
 "help: basics 2" 1
 "help: basics 3" 1
 "help: cargo management" 1
+"help: code" 1
 "help: control ship with mouse" 1
 "help: dead" 1
 "help: disabled" 1
@@ -42,3 +43,4 @@
 "help: trading" 1
 "help: try out fighters transfer cargo" 1
 "help: uninstalling and storage" 1
+"help: workshop" 1

@@ -523,6 +523,13 @@ bool MainPanel::ShowHelp(bool force)
 		else if(DoHelp("navigation"))
 			return true;
 	}
+	if(flagship->IsTargetable())
+	{
+		if(force)
+			forced.push_back("code");
+		else if(DoHelp("code"))
+			return true;
+	}
 	if(flagship->IsDestroyed())
 	{
 		if(force)

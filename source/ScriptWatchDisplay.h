@@ -54,8 +54,10 @@ public:
 		// Whether it is the player's own (so its code can always be read, and
 		// it can't be hacked).
 		bool isOwn = false;
-		// Why its code can't be read, or empty if it can.
+		// Why its code can't be read, or empty if it can, and a shorter way
+		// of saying so, for the HUD.
 		std::string unreadable;
+		std::string unreadableLabel;
 		// Jamming that garbles its code, if any.
 		std::string interference;
 		// How its faction's code looks, or null for the usual way.

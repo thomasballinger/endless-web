@@ -210,3 +210,11 @@ help "control ship with mouse"
 	`Right mouse click will fire primary weapons.`
 	`<Mouse turning (hold)> will toggle mouse turning while it is held.`
 	`The "go to and hold" command is remapped from the right mouse button to the middle one.`
+
+help "code"
+	`Every ship's flight computer, and every guided missile, runs code that decides what it does next. The little lines under your target's name, and beside your own ship's status, are a map of the code each is running right now: the lit ones ran a moment ago. Click a map, or press <Show scripts>, to read the code itself, with what each line worked out.`
+	`You can always read your own ships' and missiles' code. Reading anyone else's needs a code scanner, sold at outfitters, and some ships carry code jammers that garble it. With a code injector too, you can hack the code you read (<Hack selected ship's scripts>): a hacked ship drifts for a few seconds without firing, and a hacked missile spins away.`
+
+help "workshop"
+	`In the missile workshop you can program your guided missiles. Choose a weapon to open its program in the simulator, where missiles fly at a target ship over and over. Press E to edit the code; every change you make replays the battle from the moment it first made a difference, so you can see at once what it does.`
+	`The weapon's hardware decides what its program can know and do: only "leading" seekers can measure a target's velocity, and only weapons with "throttle control" can change their thrust. When you like how your missiles fly, press Ctrl+S to install the program on all your ships' weapons of that kind, or Ctrl+D to go back to the factory's.`
