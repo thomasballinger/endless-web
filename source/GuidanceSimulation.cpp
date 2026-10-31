@@ -211,7 +211,10 @@ void GuidanceSimulation::Step()
 		Projectile &projectile = missile.projectile;
 		vector<MissileGuidance::Record> &runs = records[missile.id];
 		const size_t runCount = runs.size();
+		const bool hadLock = projectile.HasLock();
 		projectile.Move(visuals, spawned);
+		if(hadLock && !projectile.HasLock())
+			missile.lostLockStep = step;
 		for(size_t i = runCount; i < runs.size(); ++i)
 			runs[i].step = step;
 		visuals.clear();

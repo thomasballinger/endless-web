@@ -83,6 +83,9 @@ public:
 	// The chance that its seeker will see its target after its next check
 	// (which happens, on average, every 30 steps).
 	double LockChance() const;
+	// The same, if it were the given distance from its target, and had a lock
+	// or not.
+	double LockChanceAt(double distance, bool locked) const;
 	// How far from a ship its jamming reaches. (Jamming is strongest at the
 	// ship, and fades out evenly to nothing at this distance.)
 	static double JammingRange(double jamming);
@@ -157,7 +160,7 @@ public:
 
 private:
 	void CheckLock(const Entity &target);
-	std::vector<double> LockProbabilities(const Entity &target) const;
+	std::vector<double> LockProbabilities(const Entity &target, double distance) const;
 	void CheckConfused(const Entity &target);
 	// Run the guidance script to set this step's turn and acceleration.
 	void Steer(const Entity *currentTarget, double &turn, double &accel);

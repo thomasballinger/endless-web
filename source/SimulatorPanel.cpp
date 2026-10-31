@@ -858,41 +858,66 @@ void SimulatorPanel::DrawTapeDeck() const
 
 void SimulatorPanel::DrawJamming() const
 {
-	// The target's jamming, for the kinds of seeker this weapon has: strongest
-	// at the target, and fading out evenly to nothing at its edge.
+	// Where the target's jamming reaches, for the kinds of seeker this weapon
+	// has: it is strongest at the target, fading out evenly to nothing.
 	const Weapon &weapon = simulation->GetWeapon();
 	const Ship &target = simulation->Target();
 	double jamming = 0.;
-	string kind;
-	if(weapon.RadarTracking() && target.RadarJamming())
-	{
+	if(weapon.RadarTracking())
 		jamming = target.RadarJamming();
-		kind = "radar";
-	}
-	if(weapon.OpticalTracking() && target.OpticalJamming() > jamming)
-	{
-		jamming = target.OpticalJamming();
-		kind = "optical";
-	}
-	if(!jamming)
-		return;
+	if(weapon.OpticalTracking())
+		jamming = max(jamming, target.OpticalJamming());
+	const double jammingRange = jamming ? Projectile::JammingRange(jamming) : 0.;
+	// Infrared seekers see better up close.
+	const double infraredRange = weapon.InfraredTracking() ? weapon.Range() * .33 : 0.;
+	const double range = max(jammingRange, infraredRange);
 	const Point center = ToScreen(target.Position());
-	const double range = Projectile::JammingRange(jamming) * zoom;
-	const int BANDS = 12;
+	const int step = simulation->CurrentStep();
+
+	// A line from each missile its target is jamming, stronger closer in, and
+	// bright for a moment after it loses its lock.
+	if(jammingRange)
+		for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
+		{
+			if(missile.endStep >= 0)
+				continue;
+			const double distance = missile.projectile.Position().Distance(target.Position());
+			if(distance >= jammingRange)
+				continue;
+			const bool justLost = missile.lostLockStep >= 0 && step - missile.lostLockStep < 30;
+			const float alpha = justLost ? .9f : .12f + .4f * static_cast<float>(1. - distance / jammingRange);
+			const Color color(CONFUSED.Get()[0] * alpha, CONFUSED.Get()[1] * alpha, CONFUSED.Get()[2] * alpha, alpha);
+			LineShader::Draw(ToScreen(missile.projectile.Position()), center, justLost ? 2.5f : 1.f, color, false);
+		}
+
+	// The followed missile's odds of keeping its lock, at each distance from
+	// the target, as rings from green (sure to) to red (likely to lose it),
+	// where distance makes a difference.
+	const GuidanceSimulation::Missile *followed = simulation->Followed();
+	if(!range || !followed || followed->endStep >= 0)
+		return;
+	const int BANDS = 16;
 	for(int i = 0; i < BANDS; ++i)
 	{
-		const double outer = range * (i + 1) / BANDS;
 		const double inner = range * i / BANDS;
-		const float alpha = .22f * (1.f - (i + .5f) / BANDS);
-		RingShader::Draw(center, outer, inner, Color(CONFUSED.Get()[0] * alpha, CONFUSED.Get()[1] * alpha,
-			CONFUSED.Get()[2] * alpha, alpha));
+		const double outer = range * (i + 1) / BANDS;
+		const double chance = followed->projectile.LockChanceAt((inner + outer) / 2., true);
+		// Red below 1/2, through yellow, to green near 1.
+		const float t = static_cast<float>(max(0., min(1., (chance - .5) / .5)));
+		const float alpha = .16f;
+		const Color color((1.f - t * .7f) * alpha, (.35f + .6f * t) * alpha, .25f * alpha, alpha);
+		RingShader::Draw(center, outer * zoom, inner * zoom, color);
 	}
-	const Color edge(CONFUSED.Get()[0] * .5f, CONFUSED.Get()[1] * .5f, CONFUSED.Get()[2] * .5f, .5f);
-	RingShader::Draw(center, range, range - 1.5, edge);
-	char text[64];
-	snprintf(text, sizeof(text), "%s jamming %g", kind.c_str(), jamming);
+	const Color edge(DIM.Get()[0] * .6f, DIM.Get()[1] * .6f, DIM.Get()[2] * .6f, .6f);
+	RingShader::Draw(center, range * zoom, range * zoom - 1.5, edge);
+	char text[96];
+	const double near = followed->projectile.LockChanceAt(range * .1, true);
+	const double far = followed->projectile.LockChanceAt(range, true);
+	snprintf(text, sizeof(text), "keeps lock: %.0f%% out here, %.0f%% close in%s", 100. * far, 100. * near,
+		jamming ? " (jamming)" : "");
 	const Font &font = FontSet::Get(14);
-	font.Draw(text, center + Point(-font.Width(text) / 2., -range - 20.), edge);
+	// Under the target, where it is sure to be on screen.
+	font.Draw(text, center + Point(-font.Width(text) / 2., max(30., target.Radius() * zoom + 34.)), DIM);
 }
 
 

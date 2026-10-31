@@ -629,7 +629,7 @@ void Projectile::CheckLock(const Entity &target)
 	hasLock = false;
 	// Each tracking method this weapon has gets a try (drawing a random number
 	// whether or not an earlier one succeeded).
-	for(double probability : LockProbabilities(target))
+	for(double probability : LockProbabilities(target, position.Distance(target.Position())))
 		hasLock |= Check(probability, base);
 }
 
@@ -638,7 +638,7 @@ void Projectile::CheckLock(const Entity &target)
 // For each tracking type, the probability twice every second that a lock will be
 // lost, for the tracking types this projectile's weapon has, in the order they
 // are checked.
-vector<double> Projectile::LockProbabilities(const Entity &target) const
+vector<double> Projectile::LockProbabilities(const Entity &target, double distance) const
 {
 	vector<double> probabilities;
 	auto add = [&probabilities](double lockChance) {
@@ -655,7 +655,7 @@ vector<double> Projectile::LockProbabilities(const Entity &target) const
 	{
 		double opticalJamming = target.IsDisabled() ? 0. : target.OpticalJamming();
 		if(opticalJamming)
-			opticalJamming *= RangeFraction(position.Distance(target.Position()), opticalJamming);
+			opticalJamming *= RangeFraction(distance, opticalJamming);
 		double opticalSize = target.OpticalSize() / (1. + opticalJamming);
 		double weight = opticalSize * opticalSize * opticalSize / 1e9;
 		add(weapon->OpticalTracking() * weight / (1. + weight));
@@ -667,7 +667,6 @@ vector<double> Projectile::LockProbabilities(const Entity &target) const
 	// wavelengths of IR radiation are easier to distinguish at closer distances.
 	if(weapon->InfraredTracking())
 	{
-		double distance = position.Distance(target.Position());
 		double shortRange = weapon->Range() * 0.33;
 		double multiplier = 1.;
 		if(distance <= shortRange)
@@ -684,7 +683,7 @@ vector<double> Projectile::LockProbabilities(const Entity &target) const
 	{
 		double radarJamming = target.IsDisabled() ? 0. : target.RadarJamming();
 		if(radarJamming)
-			radarJamming *= RangeFraction(position.Distance(target.Position()), radarJamming);
+			radarJamming *= RangeFraction(distance, radarJamming);
 		add(weapon->RadarTracking() / (1. + radarJamming));
 	}
 	return probabilities;
@@ -695,11 +694,21 @@ vector<double> Projectile::LockProbabilities(const Entity &target) const
 double Projectile::LockChance() const
 {
 	const shared_ptr<Entity> target = TargetPtr();
+	if(!target)
+		return 0.;
+	return LockChanceAt(position.Distance(target->Position()), hasLock);
+}
+
+
+
+double Projectile::LockChanceAt(double distance, bool locked) const
+{
+	const shared_ptr<Entity> target = TargetPtr();
 	if(!target || !weapon->Homing())
 		return 0.;
-	const double base = hasLock ? 1. : RELOCK_RATE;
+	const double base = locked ? 1. : RELOCK_RATE;
 	double miss = 1.;
-	for(double probability : LockProbabilities(*target))
+	for(double probability : LockProbabilities(*target, distance))
 		miss *= 1. - min(1., base * probability);
 	return 1. - miss;
 }

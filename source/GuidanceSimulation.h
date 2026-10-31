@@ -57,6 +57,8 @@ public:
 		bool hit = false;
 		// The step it hit or expired on, or -1 while it is in flight.
 		int endStep = -1;
+		// The last step its seeker lost its lock on, or -1.
+		int lostLockStep = -1;
 	};
 
 
