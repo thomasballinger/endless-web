@@ -65,14 +65,27 @@
 # are: "let d (- target-position position)".)
 #
 # Inputs (read only):
-#   position velocity facing                 this projectile (facing is a unit vector)
-#   max_turn acceleration drag               the weapon's attributes
-#   age lifetime_left                        steps since it was fired, and until
-#                                            it expires
-#   target                                   whether the seeker sees a target;
-#                                            only inside "if target" can it read:
-#   target.position target.velocity          where the target is, and how it moves
-#   target.facing                            the unit vector the target faces
+#   position velocity facing          this projectile (facing is a unit vector)
+#   max_turn acceleration drag        the weapon's attributes
+#   top_speed                         how fast it can go
+#   age lifetime_left                 steps since it was fired, and until it
+#                                     expires
+#   target                            whether the seeker sees a target; only
+#                                     inside "if target" can it read:
+#   target.position target.velocity   where the target is, and how it moves
+#   target.facing                     the unit vector the target faces
+#   target.offset                     target.position - position
+#   target.distance                   how far away it is
+#   target.direction                  the unit vector toward it
+#   target.bearing                    the degrees to turn to face it (from -90
+#                                     to 90: a target right behind is 0)
+#   target.steps_away                 steps to get there at top speed
+#   target.intercept                  the unit vector toward where to meet it,
+#                                     leading it (needs "leading")
+#   target.intercept_steps            steps to get to where to meet it
+# Functions:
+#   bearing(direction)                the degrees to turn to face a direction
+#   turn_toward(direction)            the same, but no more than max_turn
 # Outputs (start at the weapon's turn rate and acceleration, and are limited to
 # those after the script runs):
 #   turn thrust
@@ -85,12 +98,7 @@
 # Turn towards the target.
 guidance "basic"
 	if target
-		let direction = unit(target.position - position)
-		let desired_turn = to_deg * asin(cross(facing, direction))
-		if abs(desired_turn) > turn
-			turn = copysign(turn, desired_turn)
-		else
-			turn = desired_turn
+		turn = turn_toward(target.direction)
 	# If a weapon is homing but has no target, do not turn it.
 	else
 		turn = 0
@@ -98,20 +106,11 @@ guidance "basic"
 # Turn towards the target, and stop accelerating when facing away from it.
 guidance "throttle control"
 	if target
-		let d = target.position - position
-		let direction = unit(d)
-		let true_velocity = drag != 0 ? acceleration / drag : length(velocity)
-		let steps_to_reach = length(d) / true_velocity
-		let desired_turn = to_deg * asin(cross(facing, direction))
-		if abs(desired_turn) > turn
-			turn = copysign(turn, desired_turn)
-		else
-			turn = desired_turn
-
-		# This is measured with the turn just chosen, so it is 1 unless the
-		# projectile is turning as fast as it can.
-		let steps_to_face = desired_turn / turn
-		if steps_to_face * 1.5 > steps_to_reach
+		turn = turn_toward(target.direction)
+		# Coast while it would take longer to turn to face the target than to
+		# get to it. (Dividing by the turn just chosen gives the steps to face
+		# it, if it is turning as fast as it can.)
+		if target.bearing / turn * 1.5 > target.steps_away
 			thrust = 0
 	else
 		turn = 0
@@ -119,28 +118,7 @@ guidance "throttle control"
 # Turn towards where the target will be.
 guidance "leading"
 	if target
-		let d = target.position - position
-		let direction = unit(d)
-		let true_velocity = drag != 0 ? acceleration / drag : length(velocity)
-		if dot(direction, target.velocity) < 0
-			# If the target is moving toward this projectile, the intercept
-			# course is where the target and the projectile have the same
-			# velocity normal to the distance between them.
-			let normal = vec(direction.y, -direction.x)
-			let normal_speed = dot(normal, target.velocity)
-			let closing_speed = sqrt(max(0, true_velocity * true_velocity - normal_speed * normal_speed))
-			d = closing_speed * direction + normal_speed * normal
-		else
-			# Aim where the target will be when this projectile reaches it.
-			let steps_to_reach = length(d) / true_velocity
-			d = d + steps_to_reach * target.velocity
-		direction = unit(d)
-
-		let desired_turn = to_deg * asin(cross(facing, direction))
-		if abs(desired_turn) > turn
-			turn = copysign(turn, desired_turn)
-		else
-			turn = desired_turn
+		turn = turn_toward(target.intercept)
 	else
 		turn = 0
 
@@ -148,28 +126,8 @@ guidance "leading"
 # away from it.
 guidance "leading and throttle control"
 	if target
-		let d = target.position - position
-		let direction = unit(d)
-		let true_velocity = drag != 0 ? acceleration / drag : length(velocity)
-		let steps_to_reach = length(d) / true_velocity
-		if dot(direction, target.velocity) < 0
-			let normal = vec(direction.y, -direction.x)
-			let normal_speed = dot(normal, target.velocity)
-			let closing_speed = sqrt(max(0, true_velocity * true_velocity - normal_speed * normal_speed))
-			d = closing_speed * direction + normal_speed * normal
-		else
-			d = d + steps_to_reach * target.velocity
-			steps_to_reach = length(d) / true_velocity
-		direction = unit(d)
-
-		let desired_turn = to_deg * asin(cross(facing, direction))
-		if abs(desired_turn) > turn
-			turn = copysign(turn, desired_turn)
-		else
-			turn = desired_turn
-
-		let steps_to_face = desired_turn / turn
-		if steps_to_face * 1.5 > steps_to_reach
+		turn = turn_toward(target.intercept)
+		if bearing(target.intercept) / turn * 1.5 > target.intercept_steps
 			thrust = 0
 	else
 		turn = 0

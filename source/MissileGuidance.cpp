@@ -18,8 +18,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataFile.h"
 #include "DataNode.h"
 #include "GameData.h"
+#include "pi.h"
 #include "Weapon.h"
 
+#include <algorithm>
+#include <cmath>
 #include <map>
 #include <sstream>
 #include <vector>
@@ -40,6 +43,25 @@ namespace {
 		return texts;
 	}
 
+	// The input of the script running on this thread, for its functions.
+	const MissileGuidance::Input *&CurrentInput()
+	{
+		thread_local const MissileGuidance::Input *input = nullptr;
+		return input;
+	}
+
+	// These do exactly what the default scripts did, in the same order, so
+	// that scripts using them steer exactly as those did.
+	double Bearing(const Point &facing, const Point &direction)
+	{
+		return TO_DEG * asin(facing.Cross(direction));
+	}
+
+	double LimitTurn(double turn, double maxTurn)
+	{
+		return fabs(turn) > maxTurn ? copysign(maxTurn, turn) : turn;
+	}
+
 	script::Interface MakeInterface()
 	{
 		script::Interface interface;
@@ -56,6 +78,14 @@ namespace {
 		interface.AddInput("age");
 		interface.AddInput("lifetime-left");
 		interface.AddInput("target-facing");
+		interface.AddInput("top-speed");
+		interface.AddInput("target-offset");
+		interface.AddInput("target-distance");
+		interface.AddInput("target-direction");
+		interface.AddInput("target-bearing");
+		interface.AddInput("target-steps-away");
+		interface.AddInput("target-intercept");
+		interface.AddInput("target-intercept-steps");
 		interface.AddOutput("turn");
 		interface.AddOutput("thrust");
 		interface.AddEffect("drop-target");
@@ -64,8 +94,38 @@ namespace {
 		// "if target" (that is, while it has a lock).
 		const int hasLock = interface.Find("has-lock");
 		interface.AddAlias("target", hasLock);
-		for(const char *input : {"target-position", "target-velocity", "target-facing"})
+		for(const char *input : {"target-position", "target-velocity", "target-facing", "target-offset",
+				"target-distance", "target-direction", "target-bearing", "target-steps-away", "target-intercept",
+				"target-intercept-steps"})
 			interface.SetGuard(interface.Find(input), hasLock);
+
+		// "bearing(direction)": the degrees to turn to face the given direction.
+		// "turn_toward(direction)": the same, limited to the most it can turn.
+		auto direction = [](const script::Value *arguments, Point &result, string &error) {
+			if(arguments[0].GetType() != script::Value::Type::VECTOR || !CurrentInput())
+			{
+				error = "wrong type of argument: it takes a direction (a vector)";
+				return false;
+			}
+			result = arguments[0].Vector();
+			return true;
+		};
+		interface.AddFunction("bearing", 1, [direction](const script::Value *arguments, script::Value &result,
+				string &error) {
+			Point toward;
+			if(!direction(arguments, toward, error))
+				return false;
+			result = script::Value(Bearing(CurrentInput()->facing, toward));
+			return true;
+		});
+		interface.AddFunction("turn-toward", 1, [direction](const script::Value *arguments, script::Value &result,
+				string &error) {
+			Point toward;
+			if(!direction(arguments, toward, error))
+				return false;
+			result = script::Value(LimitTurn(Bearing(CurrentInput()->facing, toward), CurrentInput()->maxTurn));
+			return true;
+		});
 		return interface;
 	}
 }
@@ -197,9 +257,11 @@ string MissileGuidance::MissingCapability(const Weapon &weapon) const
 string MissileGuidance::MissingCapability(bool leading, bool throttleControl, bool optical) const
 {
 	if(!leading && program.Reads(TARGET_VELOCITY))
-		return "it reads \"target-velocity\", which requires \"leading\"";
+		return "it reads \"target.velocity\", which requires \"leading\"";
+	if(!leading && (program.Reads(TARGET_INTERCEPT) || program.Reads(TARGET_INTERCEPT_STEPS)))
+		return "it reads \"target.intercept\", which requires \"leading\"";
 	if(!optical && program.Reads(TARGET_FACING))
-		return "it reads \"target-facing\", which requires \"optical tracking\"";
+		return "it reads \"target.facing\", which requires \"optical tracking\"";
 	if(!throttleControl && program.Writes(THRUST))
 		return "it sets \"thrust\", which requires \"throttle control\"";
 	return "";
@@ -225,6 +287,51 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	variables[AGE] = script::Value(static_cast<double>(input.age));
 	variables[LIFETIME_LEFT] = script::Value(static_cast<double>(input.lifetimeLeft));
 	variables[TARGET_FACING] = script::Value(locked ? input.targetFacing : Point());
+	// What scripts would otherwise work out for themselves.
+	const double topSpeed = (input.drag != 0.) ? input.acceleration / input.drag : input.velocity.Length();
+	variables[TOP_SPEED] = script::Value(topSpeed);
+	Point offset;
+	double distance = 0.;
+	Point direction;
+	double bearing = 0.;
+	double steps = 0.;
+	Point intercept;
+	double interceptSteps = 0.;
+	if(locked)
+	{
+		offset = input.targetPosition - input.position;
+		distance = offset.Length();
+		direction = offset.Unit();
+		bearing = Bearing(input.facing, direction);
+		steps = distance / topSpeed;
+		// Where to meet the target. If it is coming toward the projectile, that
+		// is where the two have the same velocity normal to the distance
+		// between them; otherwise, where the target will be when the
+		// projectile gets to where it is now.
+		Point meet = offset;
+		interceptSteps = steps;
+		if(direction.Dot(input.targetVelocity) < 0.)
+		{
+			const Point normal(direction.Y(), -direction.X());
+			const double normalSpeed = normal.Dot(input.targetVelocity);
+			const double closingSpeed = sqrt(max(0., topSpeed * topSpeed - normalSpeed * normalSpeed));
+			meet = closingSpeed * direction + normalSpeed * normal;
+		}
+		else
+		{
+			meet = meet + steps * input.targetVelocity;
+			interceptSteps = meet.Length() / topSpeed;
+		}
+		intercept = meet.Unit();
+	}
+	variables[TARGET_OFFSET] = script::Value(offset);
+	variables[TARGET_DISTANCE] = script::Value(distance);
+	variables[TARGET_DIRECTION] = script::Value(direction);
+	variables[TARGET_BEARING] = script::Value(bearing);
+	variables[TARGET_STEPS_AWAY] = script::Value(steps);
+	variables[TARGET_INTERCEPT] = script::Value(intercept);
+	variables[TARGET_INTERCEPT_STEPS] = script::Value(interceptSteps);
+	CurrentInput() = &input;
 	variables[TURN] = script::Value(input.maxTurn);
 	variables[THRUST] = script::Value(input.acceleration);
 

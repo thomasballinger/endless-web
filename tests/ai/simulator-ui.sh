@@ -108,25 +108,25 @@ xdotool key space
 sleep 2
 shot before
 
-# Line 21 is "turn = desired_turn"; add a word to the end of it.
-xdotool mousemove 600 "$(line 21)" click 1
+# Line 3 is "turn = turn_toward(target.intercept)"; add a word to the end of it.
+xdotool mousemove 600 "$(line 3)" click 1
 xdotool type --delay 20 " oops"
 sleep 0.5
 shot mistake
-check "a mistake is marked" error "$OUT/mistake.png" 21
+check "a mistake is marked" error "$OUT/mistake.png" 3
 xdotool key ctrl+z
 sleep 0.5
 shot undone
-check_not "undo clears the mark" error "$OUT/undone.png" 21
+check_not "undo clears the mark" error "$OUT/undone.png" 3
 check_not "the mistake doesn't change the battle" differ "$OUT/before.png" "$OUT/undone.png"
 # What the edits that compiled did, as the game reports them.
 edits() { grep -c '^SIMULATOR edit' "$OUT/game.log"; }
 EDITS=$(edits)
 
-# Line 24 is "if steps_to_face * 1.5 > steps_to_reach"; coast sooner.
-xdotool mousemove 600 "$(line 24)" click 1
+# Line 4 is "if bearing(target.intercept) / turn * 1.5 > target.intercept_steps"; coast sooner.
+xdotool mousemove 600 "$(line 4)" click 1
 xdotool key End shift+Home
-xdotool type --delay 20 "if steps_to_face * 3 > steps_to_reach"
+xdotool type --delay 20 "if bearing(target.intercept) / turn * 3 > target.intercept_steps"
 # Let the rewind finish.
 sleep 2
 shot after
@@ -146,7 +146,7 @@ fi
 xdotool key ctrl+s
 sleep 0.5
 SAVED="$OUT/config/plugins/simulator scripts/data/guidance leading and throttle control.txt"
-if grep -q "if steps_to_face \* 3 > steps_to_reach" "$SAVED" 2> /dev/null; then
+if grep -q "if bearing(target.intercept) / turn \* 3 > target.intercept_steps" "$SAVED" 2> /dev/null; then
 	echo "ok: saving writes the edited script"
 else
 	echo "FAILED: saving writes the edited script"

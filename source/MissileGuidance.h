@@ -70,6 +70,23 @@ public:
 		// The unit vector the target faces. Seeing it takes an optical seeker,
 		// which sees the target's shape. Zero without a lock.
 		TARGET_FACING,
+		// Worked out from the others, so that scripts can be about what to do
+		// rather than arithmetic (each exactly as the default scripts used to
+		// work it out). The projectile's top speed:
+		TOP_SPEED,
+		// While it has a lock: the offset from it to the target, the distance,
+		// and the unit vector toward it; the degrees to turn to face it (from
+		// -90 to 90: a target behind is 0); and how many steps it would take to
+		// get there at top speed.
+		TARGET_OFFSET,
+		TARGET_DISTANCE,
+		TARGET_DIRECTION,
+		TARGET_BEARING,
+		TARGET_STEPS_AWAY,
+		// With "leading": the unit vector toward where to meet the target, and
+		// the steps it would take to get there.
+		TARGET_INTERCEPT,
+		TARGET_INTERCEPT_STEPS,
 		// Outputs: degrees to turn this step, and acceleration to apply. They
 		// start at the weapon's maximum turn rate and acceleration, and are
 		// limited to those after the script runs.

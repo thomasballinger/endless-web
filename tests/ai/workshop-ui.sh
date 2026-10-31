@@ -139,7 +139,7 @@ else
 fi
 
 # In flight, the flagship's missiles fly the program: fire one, and open the
-# flagship's code, where line 12 (the line added above, which runs while the
+# flagship's code, where line 7 (the line added above, which runs while the
 # missile has no target) is marked as having run.
 hold() {
 	xdotool keydown "$1"
@@ -154,7 +154,7 @@ hold q 0.6
 hold k 0.15
 sleep 0.5
 shot flying
-check "the flagship's missiles fly the program" lit "$OUT/flying.png" 300 368 312 386
+check "the flagship's missiles fly the program" lit "$OUT/flying.png" 300 278 312 296
 
 echo "Screenshots in $OUT"
 exit $FAILED

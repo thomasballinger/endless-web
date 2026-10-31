@@ -42,16 +42,30 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   press **W** ("Workshop"). It lists your fleet's guided weapons (Meteor
   Missile Launchers are the cheapest; they're sold with the Common
   Outfits). Choose one to open it in the simulator:
-  - **E** edits the program; every change replays the battle from the
-    first moment it made a difference, so you see what it does at once.
+  - **E** edits the program; once you pause typing, the battle replays
+    from the first moment the change made a difference, so you see what it
+    does at once.
+  - Programs are C-like: `turn = turn_toward(target.intercept)`,
+    `if target.bearing / turn * 1.5 > target.steps_away`. What the seeker
+    sees of its target (`target.position`, `target.direction`...) can only
+    be used inside `if target`. `data/guidance.txt` lists every input and
+    function.
   - **Ctrl+S** installs it on all your ships' weapons of that kind,
     **Ctrl+D** goes back to the factory's. Your programs are saved with your
     game.
-  - **T** changes the target ship (one has radar jammers that confuse
-    seekers), **1**-**8** the drill it flies, **Space** pauses, and clicking
-    a missile shows how its code ran.
+  - The editor follows one missile from launch to impact, then the next;
+    **[** and **]** (or clicking) follow another. Beside the range, a
+    close-up shows its thrust, drag, turn, life, lock and the odds of
+    keeping it. Hover over a vector's value to see it drawn from the
+    missile.
+  - **Arrow keys** fly your own ship (your flying is recorded, so replays
+    repeat it); **D** changes the drill (the first three are flown by a
+    pilot: evading, cruising, breaking away), **T** the target ship (one has
+    radar jammers that confuse seekers), **Space** pauses, **,** and **.**
+    step back and forward, and dragging on the timeline goes to any step.
   - The weapon's hardware limits its program: only "leading" seekers can
-    read `target-velocity`, only "throttle control" can set `thrust`.
+    read `target.velocity` or `target.intercept`, only "throttle control"
+    can set `thrust`.
 
 Things worth trying: make your Meteors lead their targets (they can't, on
 basic hardware: the workshop will tell you why), make them coast instead of
@@ -101,4 +115,13 @@ Things that would build on what's here, roughly from smallest to largest:
 - **Live debugging in flight.** Slow time and step through a missile's
   program while it chases its target.
 - **Different editors for different factions.** A block-based editor for some
-  factions' hardware, text for others.
+  factions' hardware, text for others. Guidance programs are mostly a tree of
+  tests on the inputs ending in a turn and a thrust, so an alien faction
+  could see them as a decision tree, with the branch that ran lit up; another
+  faction's code could stay in prefix form (which scripts can still use).
+- **Linear scripts.** A faction whose programs run once, start to finish, over
+  a missile's flight ("burn for 2 seconds, then turn toward the target until
+  it is close, then..."), rather than once per step.
+- **Code modules for sale.** The ready-made inputs and functions
+  (`target.intercept`, `turn_toward`) could be things a missile's hardware or
+  firmware provides, bought separately.
