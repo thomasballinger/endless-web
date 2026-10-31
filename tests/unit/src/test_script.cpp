@@ -578,8 +578,9 @@ SCENARIO( "Infix scripts", "[Script]" ) {
 			CHECK( Run(chain, 11.).out.Number() == 1. );
 			CHECK( Run(chain, 6.).out.Number() == 2. );
 			CHECK( Run(chain, 1.).out.Number() == 3. );
-			CHECK( Run("program test\n\tfunction twice(x, y)\n\t\treturn x * 2 + y\n\tout = twice(a, 1)\n", 5.)
-				.out.Number() == 11. );
+			const std::string twice = "program test\n\tfunction twice(x, y)\n\t\treturn x * 2 + y\n"
+				"\tout = twice(a, 1)\n";
+			CHECK( Run(twice, 5.).out.Number() == 11. );
 			CHECK( Run("program test\n\tif a > 1\n\t\tping\n", 5.).effects == 1 );
 		}
 		THEN( "mistakes are rejected" ) {
@@ -609,8 +610,9 @@ SCENARIO( "Infix scripts", "[Script]" ) {
 			CHECK( valid("program test\n\tif target\n\t\tout = target.position.x\n") );
 			CHECK( valid("program test\n\tif target && out > 1\n\t\tout = target_position.y\n") );
 			CHECK( valid("program test\n\tif !target\n\t\tstop\n\tout = target.position.x\n") );
-			CHECK_FALSE( valid("program test\n\tfunction f(z)\n\t\treturn target.position.x\n\tif target\n"
-				"\t\tout = f(1)\n") );
+			const std::string inFunction = "program test\n\tfunction f(z)\n\t\treturn target.position.x\n"
+				"\tif target\n\t\tout = f(1)\n";
+			CHECK_FALSE( valid(inFunction) );
 		}
 		THEN( "prefix scripts are not held to it" ) {
 			CHECK( valid("program test\n\tset out (x target-position)\n") );
