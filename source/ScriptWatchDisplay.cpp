@@ -86,7 +86,13 @@ void ScriptWatchDisplay::Update(const script::Activity &flagship, const script::
 	this->flagship = flagship;
 	hasTarget = target;
 	this->target = target ? *target : script::Activity();
+	if(targetName != this->targetName)
+		lastTargetRun = script::Activity::Run();
 	this->targetName = targetName;
+	if(const script::Activity::Run *run = MainRun(this->flagship))
+		lastFlagshipRun = *run;
+	if(const script::Activity::Run *run = MainRun(this->target))
+		lastTargetRun = *run;
 	if(shown == Shown::TARGET && !hasTarget)
 		shown = Shown::NONE;
 	if(shown == Shown::NONE)
@@ -154,7 +160,14 @@ bool ScriptWatchDisplay::Click(const Point &point)
 	shown = clicked;
 	selectedKind.clear();
 	selectedName.clear();
-	if(const script::Activity::Run *run = MainRun(ShownActivity()))
+	const script::Activity::Run *run = MainRun(ShownActivity());
+	if(!run)
+	{
+		const script::Activity::Run &last = (shown == Shown::TARGET ? lastTargetRun : lastFlagshipRun);
+		if(!last.name.empty())
+			run = &last;
+	}
+	if(run)
 	{
 		selectedKind = run->kind;
 		selectedName = run->name;
@@ -219,12 +232,17 @@ const script::Activity &ScriptWatchDisplay::ShownActivity() const
 
 
 
-const script::Activity::Run *ScriptWatchDisplay::SelectedRun() const
+const script::Activity::Run *ScriptWatchDisplay::SelectedRun(bool *isRunning) const
 {
+	if(isRunning)
+		*isRunning = true;
 	for(const script::Activity::Run &run : ShownActivity().runs)
 		if(run.kind == selectedKind && run.name == selectedName)
 			return &run;
-	return nullptr;
+	if(isRunning)
+		*isRunning = false;
+	const script::Activity::Run &last = (shown == Shown::TARGET ? lastTargetRun : lastFlagshipRun);
+	return (last.kind == selectedKind && last.name == selectedName) ? &last : nullptr;
 }
 
 
@@ -238,9 +256,12 @@ void ScriptWatchDisplay::ShowSelected()
 		loadedKey = key;
 		document.SetText(selectedName.empty() ? "# No scripts are running." : source.text.empty()
 			? "# The code of " + selectedKind + " \"" + selectedName + "\" isn't available." : source.text);
+		editor.SetRun({});
 	}
-	const script::Activity::Run *run = SelectedRun();
-	editor.SetRun(run ? CodeEditor::RunNotes(run->trace, source.firstLine) : map<size_t, CodeEditor::LineNote>());
+	// Once a script stops running (e.g. its missile is gone), keep showing
+	// what it did last.
+	if(const script::Activity::Run *run = SelectedRun())
+		editor.SetRun(CodeEditor::RunNotes(run->trace, source.firstLine));
 	editor.SetGlitch(ShownActivity().overriddenBy);
 }
 
@@ -358,7 +379,11 @@ void ScriptWatchDisplay::DrawPane() const
 	const string who = shown == Shown::TARGET ? targetName : "Your ship";
 	string title = who;
 	if(!selectedName.empty())
-		title += ": " + selectedKind + " \"" + selectedName + "\"" + (SelectedRun() ? "" : " (not running)");
+	{
+		bool isRunning = false;
+		SelectedRun(&isRunning);
+		title += ": " + selectedKind + " \"" + selectedName + "\"" + (isRunning ? "" : " (stopped)");
+	}
 	font.Draw(Fit(font, title, pane.Width() - 40.), pane.TopLeft() + Point(10., 6.), TITLE);
 	font.Draw("x", closeBox.Center() - Point(font.Width("x") / 2., 8.), LABEL);
 

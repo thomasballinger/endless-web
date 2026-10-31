@@ -71,7 +71,9 @@ private:
 	// its missile steers.
 	static const script::Activity::Run *MainRun(const script::Activity &activity);
 	const script::Activity &ShownActivity() const;
-	const script::Activity::Run *SelectedRun() const;
+	// The selected script's run on the latest step, or if it didn't run, its
+	// last run (if it was the one that mattered most), or null.
+	const script::Activity::Run *SelectedRun(bool *isRunning = nullptr) const;
 	// Put the selected script in the editor, and what it did beside its lines.
 	void ShowSelected();
 	void Layout();
@@ -83,6 +85,10 @@ private:
 private:
 	script::Activity flagship;
 	script::Activity target;
+	// The last run of each one's most important script, kept so the pane can
+	// show it after it stops (e.g. when a missile is gone).
+	script::Activity::Run lastFlagshipRun;
+	script::Activity::Run lastTargetRun;
 	bool hasTarget = false;
 	std::string targetName;
 
