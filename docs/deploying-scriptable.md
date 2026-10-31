@@ -8,8 +8,9 @@ How the vanilla web port is hosted (account 700134640850, all looked up
   `/editor`); E2TZUW922XPLEF serves play-endless-sky.com from `/live`.
 - DNS for both domains is in Route 53; play-endless-web.com is zone
   `Z0956029IY6ZW2VC4C1K`.
-- A wildcard certificate for `*.play-endless-web.com` already exists:
-  `arn:aws:acm:us-east-1:700134640850:certificate/1e94e90d-cca4-4683-9e32-79208e617c60`.
+- The wildcard certificate for `*.play-endless-web.com` (`1e94e90d-…`) expired
+  in 2022, so code.play-endless-web.com has its own:
+  `arn:aws:acm:us-east-1:700134640850:certificate/7ffb5cbf-203d-446a-af3e-82d9ad1eb68e`.
 - CI (the endless-web repo's `aws-deploy` environment) deploys as the IAM
   user `endless-web-github-deployer`, whose policy `endless-sky-upload-live`
   allows only `live/` and the two distributions above.
@@ -18,13 +19,17 @@ The scriptable fork goes in the same bucket's `code/` folder, served by its
 own distribution on code.play-endless-web.com. Being its own domain also
 keeps its saves apart from vanilla's (browsers keep IndexedDB per origin).
 
+Steps 1-3 were done on 2026-10-31: the distribution is `E2CB5CIFY6ZNI0`
+(d3157hey3f3osz.cloudfront.net), and `SCRIPTABLE_DISTRIBUTION_ID` is set in
+the `aws-deploy` environment. They're kept here as a record.
+
 ## 1. Distribution
 
 A copy of play-endless-sky.com's distribution, serving `/code` under the new
 name with the wildcard certificate:
 
 ```sh
-CERT=arn:aws:acm:us-east-1:700134640850:certificate/1e94e90d-cca4-4683-9e32-79208e617c60
+CERT=arn:aws:acm:us-east-1:700134640850:certificate/7ffb5cbf-203d-446a-af3e-82d9ad1eb68e
 aws cloudfront get-distribution-config --id E2TZUW922XPLEF --query DistributionConfig > base.json
 jq --arg cert "$CERT" '
   .CallerReference = "scriptable-2026-10-31"
