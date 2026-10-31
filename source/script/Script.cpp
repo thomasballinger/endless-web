@@ -1460,8 +1460,11 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 						return CompileExpression(vector, node, expression.arguments.front());
 					}
 				}
-				Report(node, "\"" + source.Name().substr(0, source.Name().find('.'))
-					+ "\" has no fields; only a \"for\" loop's variable does:");
+				if(infix)
+					Report(node, "Unknown name \"" + source.Name() + "\":");
+				else
+					Report(node, "\"" + source.Name().substr(0, source.Name().find('.'))
+						+ "\" has no fields; only a \"for\" loop's variable does:");
 				return false;
 			}
 			expression.kind = Expression::Kind::FIELD;

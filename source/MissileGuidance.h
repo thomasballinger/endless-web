@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Point.h"
 #include "script/Script.h"
 
+#include <map>
 #include <string>
 
 class DataNode;
@@ -136,6 +137,14 @@ public:
 	};
 
 	static const script::Interface &GetInterface();
+	// What each input, output and function a guidance script can use is, and
+	// how it is worked out (in the script language), by its infix name.
+	class Doc {
+	public:
+		std::string text;
+		std::string source;
+	};
+	static const std::map<std::string, Doc> &Documentation();
 	// What a script is given for the given input: a value for each of the
 	// interface's variables (inputs, then outputs at their starting values).
 	static void Variables(const Input &input, std::vector<script::Value> &variables);

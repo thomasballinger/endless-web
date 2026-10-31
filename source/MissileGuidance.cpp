@@ -132,6 +132,54 @@ namespace {
 
 
 
+const map<string, MissileGuidance::Doc> &MissileGuidance::Documentation()
+{
+	static const map<string, Doc> DOCS = {
+		{"position", {"Where this projectile is.", ""}},
+		{"velocity", {"How far it moves each step, and which way.", ""}},
+		{"facing", {"The unit vector it faces (which way it thrusts).", ""}},
+		{"target", {"Whether its seeker sees a target. Only inside \"if target\" can a script use what the seeker"
+			" sees of it (target.position and the rest).", "the seeker has a lock"}},
+		{"target.position", {"Where the target is.", ""}},
+		{"target.velocity", {"How the target is moving. Needs a \"leading\" seeker.", ""}},
+		{"target.facing", {"The unit vector the target faces. Needs \"optical tracking\".", ""}},
+		{"max_turn", {"The most degrees it can turn in one step.", "the weapon's \"turn\""}},
+		{"acceleration", {"How much it speeds up each step at full thrust.", "the weapon's \"acceleration\""}},
+		{"drag", {"The fraction of its speed it loses each step.", "the weapon's \"drag\""}},
+		{"top_speed", {"How fast it can go, when thrust and drag balance.",
+			"drag != 0 ? acceleration / drag : length(velocity)"}},
+		{"age", {"Steps since it was fired.", ""}},
+		{"lifetime_left", {"Steps until it expires.", ""}},
+		{"target.offset", {"From this projectile to the target.", "target.position - position"}},
+		{"target.distance", {"How far away the target is.", "length(target.offset)"}},
+		{"target.direction", {"The unit vector toward the target.", "unit(target.offset)"}},
+		{"target.bearing", {"The degrees to turn to face the target: positive is clockwise. From -90 to 90, so a"
+			" target right behind is 0.", "bearing(target.direction)"}},
+		{"target.steps_away", {"How many steps it would take to get to where the target is, at top speed.",
+			"target.distance / top_speed"}},
+		{"target.intercept", {"The unit vector toward where to meet the target: if it is coming closer, where the"
+			" two have the same speed across the line between them; otherwise where it will be by the time this"
+			" gets to where it is now. Needs \"leading\".",
+			"unit(target.offset + target.steps_away * target.velocity), or head on, closing_speed * direction"
+			" + normal_speed * normal"}},
+		{"target.intercept_steps", {"How many steps it would take to get to where to meet the target.",
+			"length(where to meet) / top_speed"}},
+		{"turn", {"Output: degrees to turn this step (positive is clockwise). Starts at max_turn; no more than"
+			" max_turn either way is used.", ""}},
+		{"thrust", {"Output: how much to speed up this step. Starts at acceleration; from 0 up to acceleration"
+			" is used. Setting it needs \"throttle control\".", ""}},
+		{"bearing", {"bearing(direction): the degrees to turn to face a direction (positive is clockwise, from"
+			" -90 to 90).", "to_deg * asin(cross(facing, direction))"}},
+		{"turn_toward", {"turn_toward(direction): the degrees to turn this step toward a direction, no more than"
+			" max_turn.", "abs(bearing(d)) > max_turn ? copysign(max_turn, bearing(d)) : bearing(d)"}},
+		{"drop_target", {"Forget the target (the seeker may pick it up again).", ""}},
+		{"stop", {"End the script for this step.", ""}},
+	};
+	return DOCS;
+}
+
+
+
 const script::Interface &MissileGuidance::GetInterface()
 {
 	static const script::Interface interface = MakeInterface();

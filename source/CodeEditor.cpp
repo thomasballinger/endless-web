@@ -30,6 +30,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstring>
 #include <memory>
 #include <set>
+#include <sstream>
+#include <string>
+#include <vector>
 
 using namespace std;
 
@@ -313,6 +316,176 @@ void CodeEditor::SetGlitch(const string &message, bool scramble)
 
 
 
+void CodeEditor::SetCompletions(const vector<string> &names)
+{
+	completions = names;
+}
+
+
+
+string CodeEditor::WordBeforeCaret() const
+{
+	const CodeDocument::Position &caret = document.Caret();
+	if(document.HasSelection() || caret.line >= document.Lines().size())
+		return "";
+	const string &line = document.Lines()[caret.line];
+	size_t start = min(caret.column, line.size());
+	while(start > 0 && (isalnum(static_cast<unsigned char>(line[start - 1])) || line[start - 1] == '_'
+			|| line[start - 1] == '.'))
+		--start;
+	// Not in a comment, and not a number.
+	if(line.find('#') < start)
+		return "";
+	const string word = line.substr(start, caret.column - start);
+	if(word.empty() || isdigit(static_cast<unsigned char>(word[0])))
+		return "";
+	return word;
+}
+
+
+
+vector<string> CodeEditor::Suggestions() const
+{
+	const string word = WordBeforeCaret();
+	if(word.empty())
+		return {};
+	// The names given, and the ones the code defines.
+	vector<string> names = completions;
+	for(const string &line : document.Lines())
+	{
+		istringstream in(line);
+		string keyword;
+		string name;
+		in >> keyword >> name;
+		if(keyword == "let" || keyword == "memory" || keyword == "function")
+			names.push_back(name.substr(0, name.find('(')));
+	}
+	vector<string> matches;
+	for(const string &name : names)
+		if(name.size() > word.size() && !name.compare(0, word.size(), word)
+				&& find(matches.begin(), matches.end(), name) == matches.end())
+			matches.push_back(name);
+	// The shortest first, as the likeliest to be meant.
+	stable_sort(matches.begin(), matches.end(), [](const string &a, const string &b) { return a.size() < b.size(); });
+	if(word != completionWord)
+	{
+		completionWord = word;
+		completionIndex = 0;
+	}
+	if(completionIndex >= matches.size())
+		completionIndex = 0;
+	return matches;
+}
+
+
+
+void CodeEditor::DrawSuggestions() const
+{
+	const vector<string> matches = Suggestions();
+	if(matches.empty())
+		return;
+	const Font &font = FontSet::Get(14);
+	const CodeDocument::Position &caret = document.Caret();
+	const int row = static_cast<int>(caret.line) - scroll;
+	if(row < 0 || row >= VisibleLines())
+		return;
+	const vector<double> columns = ColumnX(document.Lines()[caret.line]);
+	const double x = area.Left() + GUTTER + PADDING + columns[min(caret.column, columns.size() - 1)]
+		- font.Width(completionWord);
+	double y = area.Top() + PADDING + (row + 1) * LINE_HEIGHT + 2.;
+	const size_t shown = min<size_t>(6, matches.size());
+	double width = 0.;
+	for(size_t i = 0; i < shown; ++i)
+		width = max<double>(width, font.Width(matches[i]));
+	const Rectangle box = Rectangle::WithCorners(Point(x - 4., y - 2.),
+		Point(x + width + 8., y + shown * LINE_HEIGHT + 2.));
+	FillShader::Fill(box.Center(), box.Dimensions(), Color(.02f, .10f, .06f, .97f));
+	for(size_t i = 0; i < shown; ++i)
+	{
+		if(i == completionIndex)
+			FillShader::Fill(Point(box.Center().X(), y + LINE_HEIGHT / 2.), Point(box.Width(), LINE_HEIGHT), SELECTION);
+		font.DrawCode(matches[i], Point(x, y + 1.), {i == completionIndex ? CARET : LINE_NUMBER});
+		y += LINE_HEIGHT;
+	}
+}
+
+
+
+void CodeEditor::SetDocumentation(const map<string, pair<string, string>> &docs)
+{
+	this->docs = docs;
+}
+
+
+
+string CodeEditor::WordAtCaret() const
+{
+	const CodeDocument::Position &caret = document.Caret();
+	if(caret.line >= document.Lines().size())
+		return "";
+	const string &line = document.Lines()[caret.line];
+	auto isName = [&line](size_t i) {
+		return isalnum(static_cast<unsigned char>(line[i])) || line[i] == '_' || line[i] == '.';
+	};
+	size_t start = min(caret.column, line.size());
+	size_t end = start;
+	while(start > 0 && isName(start - 1))
+		--start;
+	while(end < line.size() && isName(end))
+		++end;
+	if(line.find('#') < start)
+		return "";
+	return line.substr(start, end - start);
+}
+
+
+
+void CodeEditor::DrawDocumentation() const
+{
+	const auto it = docs.find(WordAtCaret());
+	if(it == docs.end())
+		return;
+	// A box across the bottom of the editor: the name, what it is, and how
+	// it is worked out, wrapped to fit.
+	const Font &font = FontSet::Get(14);
+	const double width = area.Width() - 24.;
+	auto wrap = [&font, width](const string &text) {
+		vector<string> lines(1);
+		istringstream in(text);
+		string word;
+		while(in >> word)
+		{
+			const string candidate = lines.back().empty() ? word : lines.back() + " " + word;
+			if(!lines.back().empty() && font.Width(candidate) > width)
+				lines.push_back(word);
+			else
+				lines.back() = candidate;
+		}
+		return lines;
+	};
+	// (A function's description already starts with how to call it.)
+	const bool named = !it->second.first.compare(0, it->first.size() + 1, it->first + "(");
+	const vector<string> text = wrap(named ? it->second.first : it->first + ": " + it->second.first);
+	const vector<string> source = it->second.second.empty() ? vector<string>() : wrap("is " + it->second.second);
+	const double height = (text.size() + source.size()) * LINE_HEIGHT + 12.;
+	const double top = area.Bottom() - height - 4.;
+	FillShader::Fill(Point(area.Center().X(), top + height / 2.), Point(area.Width() - 8., height),
+		Color(.02f, .08f, .05f, .97f));
+	double y = top + 6.;
+	for(const string &line : text)
+	{
+		font.DrawCode(line, Point(area.Left() + 12., y), {NOTE});
+		y += LINE_HEIGHT;
+	}
+	for(const string &line : source)
+	{
+		font.DrawCode(line, Point(area.Left() + 12., y), {LINE_NUMBER});
+		y += LINE_HEIGHT;
+	}
+}
+
+
+
 void CodeEditor::SetCaption(const string &caption, const Color &color)
 {
 	this->caption = caption;
@@ -442,6 +615,11 @@ void CodeEditor::Draw() const
 	}
 	if(!glitch.empty())
 		DrawGlitchMessage();
+	if(hasFocus)
+	{
+		DrawDocumentation();
+		DrawSuggestions();
+	}
 	++blink;
 	// A border shows which editor has the keyboard.
 	if(hasFocus)
@@ -464,6 +642,20 @@ bool CodeEditor::KeyDown(SDL_Keycode key, Uint16 mod)
 	const bool shift = mod & KMOD_SHIFT;
 	const bool control = mod & (KMOD_CTRL | KMOD_GUI);
 	using Move = CodeDocument::Move;
+	// While there are suggestions, tab takes one, and up and down choose.
+	if(!control && !shift && (key == SDLK_TAB || key == SDLK_UP || key == SDLK_DOWN))
+	{
+		const vector<string> matches = Suggestions();
+		if(!matches.empty())
+		{
+			if(key == SDLK_TAB)
+				document.Insert(matches[completionIndex].substr(completionWord.size()));
+			else
+				completionIndex = (completionIndex + (key == SDLK_DOWN ? 1 : matches.size() - 1)) % matches.size();
+			ScrollToCaret();
+			return true;
+		}
+	}
 	switch(key)
 	{
 		case SDLK_LEFT:

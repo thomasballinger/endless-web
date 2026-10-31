@@ -23,6 +23,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 class CodeStyle;
@@ -76,6 +77,12 @@ public:
 	// A label in the editor's top right corner, e.g. saying whose run the
 	// notes are from (or an empty one for none).
 	void SetCaption(const std::string &caption, const Color &color);
+	// Names to suggest while typing (along with the names the code itself
+	// defines). Tab takes the suggestion; up and down choose another.
+	void SetCompletions(const std::vector<std::string> &names);
+	// What names mean: while the caret is in one, its description, and how it
+	// is worked out, show at the bottom of the editor.
+	void SetDocumentation(const std::map<std::string, std::pair<std::string, std::string>> &docs);
 	// Show the code in a faction's style (or null for the usual one).
 	void SetStyle(const CodeStyle *style);
 
@@ -101,6 +108,13 @@ private:
 	int VisibleLines() const;
 	void DrawLine(const std::string &line, const Point &start, bool dim, int lineIndex) const;
 	void DrawGlitchMessage() const;
+	// The partly typed name before the caret, and the names it could be.
+	std::string WordBeforeCaret() const;
+	std::vector<std::string> Suggestions() const;
+	void DrawSuggestions() const;
+	// The name the caret is in, and what it means.
+	std::string WordAtCaret() const;
+	void DrawDocumentation() const;
 
 
 private:
@@ -114,6 +128,11 @@ private:
 	std::string glitch;
 	bool scramble = true;
 	std::string caption;
+	std::vector<std::string> completions;
+	std::map<std::string, std::pair<std::string, std::string>> docs;
+	// Which suggestion is chosen, for which partly typed word.
+	mutable size_t completionIndex = 0;
+	mutable std::string completionWord;
 	std::vector<float> captionColor;
 	const CodeStyle *style = nullptr;
 	// For blinking the caret, and changing how glitching code breaks up.

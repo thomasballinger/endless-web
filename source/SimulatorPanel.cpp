@@ -128,6 +128,40 @@ SimulatorPanel::SimulatorPanel(const Outfit &outfit, const Ship &target, PlayerI
 	document.SetText(text);
 	Recompile();
 	Layout();
+
+	// Suggest, and explain, what a guidance program can use.
+	map<string, pair<string, string>> docs;
+	for(const auto &[name, doc] : MissileGuidance::Documentation())
+		docs[name] = {doc.text, doc.source};
+	static const map<string, string> BUILTINS = {
+		{"abs", "abs(x): x without its sign"}, {"sqrt", "sqrt(x): the square root"},
+		{"asin", "asin(x): the angle (in radians) whose sine is x"},
+		{"acos", "acos(x): the angle (in radians) whose cosine is x"}, {"sin", "sin(x), of an angle in radians"},
+		{"cos", "cos(x), of an angle in radians"}, {"atan2", "atan2(y, x): the angle (in radians) of (x, y)"},
+		{"min", "min(a, b, ...): the smallest"}, {"max", "max(a, b, ...): the largest"},
+		{"copysign", "copysign(x, s): x, with the sign of s"},
+		{"clamp", "clamp(x, low, high): x, but no lower than low and no higher than high"},
+		{"vec", "vec(x, y): a vector"}, {"dot", "dot(a, b): how much of a is along b, times b's length"},
+		{"cross", "cross(a, b): how much of b is across a (positive if clockwise), times a's length"},
+		{"unit", "unit(v): v, made 1 long"}, {"length", "length(v): how long v is"},
+		{"random", "random(): a random number from 0 up to 1"},
+		{"random_int", "random_int(n): a random whole number from 0 up to n - 1"},
+		{"to_deg", "radians times this are degrees"}, {"to_rad", "degrees times this are radians"},
+		{"pi", "3.14159..."}, {"let", "let name = value: a new variable, to the end of its block"},
+		{"memory", "memory name = value: a variable each projectile keeps from one step to the next; value is"
+			" only where it starts"},
+		{"if", "if condition: run the lines below only if it is true; \"else if\" and \"else\" may follow"},
+		{"function", "function name(parameter, ...): a function, with its lines below; \"return value\" ends"
+			" it"}};
+	for(const auto &[name, text] : BUILTINS)
+		docs[name] = {text, ""};
+	vector<string> names;
+	for(const auto &it : docs)
+		names.push_back(it.first);
+	for(const char *word : {"else", "return", "true", "false"})
+		names.push_back(word);
+	editor.SetCompletions(names);
+	editor.SetDocumentation(docs);
 }
 
 
