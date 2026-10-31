@@ -928,6 +928,23 @@ void SimulatorPanel::DrawSelection() const
 		return;
 	const Point position = ToScreen(followed->projectile.Position());
 	const string label = "#" + to_string(followed->id + 1);
+
+	// A vector in the editor that the mouse is over, drawn from the missile:
+	// to scale if it is long enough to see (like an offset to the target),
+	// or else stretched, saying by how much (like a direction, or a velocity).
+	if(const CodeEditor::LineNote *note = editor.NoteAt(UI::GetMouse()))
+		if(note->isVector && note->vector)
+		{
+			const double length = note->vector.Length() * zoom;
+			const double stretch = length < 60. ? 60. / length : 1.;
+			const Point tip = position + note->vector * zoom * stretch;
+			LineShader::Draw(position, tip, 2.f, TEXT, false);
+			PointerShader::Draw(tip, note->vector.Unit(), 10.f, 10.f, 0.f, TEXT);
+			string text = note->text.substr(0, note->text.find(" = "));
+			if(stretch > 1.)
+				text += " (not to scale)";
+			font.Draw(text, tip + note->vector.Unit() * 12. + Point(-font.Width(text) / 2., -7.), TEXT);
+		}
 	if(followed->projectile.IsConfused())
 	{
 		// The seeker has lost the target and is steering on its own.

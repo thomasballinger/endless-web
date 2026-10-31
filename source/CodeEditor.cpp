@@ -21,6 +21,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "text/Font.h"
 #include "text/FontSet.h"
 #include "shader/LineShader.h"
+#include "shader/PointerShader.h"
 #include "script/Script.h"
 
 #include <algorithm>
@@ -239,6 +240,20 @@ void CodeEditor::SetRun(const map<size_t, LineNote> &notes)
 
 map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trace, size_t firstLine, size_t above)
 {
+	// Numbers, with fewer digits than a script would print, and vectors as
+	// arrows (with their length) rather than as numbers.
+	auto number = [](double value) {
+		char buffer[32];
+		snprintf(buffer, sizeof(buffer), fabs(value) >= 1000. ? "%.0f" : "%.3g", value);
+		return string(buffer);
+	};
+	auto show = [&number](const script::Value &value) {
+		if(value.GetType() == script::Value::Type::NUMBER)
+			return number(value.Number());
+		if(value.GetType() == script::Value::Type::VECTOR)
+			return number(value.Vector().Length());
+		return value.ToString();
+	};
 	map<size_t, LineNote> notes;
 	auto line = [firstLine, above](size_t fileLine) { return fileLine + 1 - firstLine + above; };
 	using Kind = script::Trace::Step::Kind;
@@ -250,10 +265,10 @@ map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trac
 		switch(step.kind)
 		{
 			case Kind::ASSIGN:
-				text = step.name + " = " + step.value.ToString();
+				text = step.name + " = " + show(step.value);
 				break;
 			case Kind::CONDITION:
-				text = step.value.ToString();
+				text = show(step.value);
 				break;
 			case Kind::EFFECT:
 				text = step.name;
@@ -262,13 +277,19 @@ map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trac
 				text = "stopped";
 				break;
 			case Kind::RETURN:
-				text = "returned " + step.value.ToString();
+				text = "returned " + show(step.value);
 				break;
 			case Kind::LOOP:
 				text = "#" + step.value.ToString();
 				break;
 		}
-		notes[line(step.line)] = {text, false};
+		LineNote &note = notes[line(step.line)];
+		note = {text, false};
+		if(step.kind != Kind::LOOP && step.value.GetType() == script::Value::Type::VECTOR)
+		{
+			note.isVector = true;
+			note.vector = step.value.Vector();
+		}
 	}
 	if(!trace.error.empty() && trace.errorLine >= firstLine)
 		notes[line(trace.errorLine)] = {"error: " + trace.error, true};
@@ -372,7 +393,34 @@ void CodeEditor::Draw() const
 				columns = ColumnX(line);
 			const double x = max(textLeft + columns.back() + 18., textLeft + 150.);
 			if(x < area.Right() - 20.)
-				font.DrawCode(style ? style->Encode(comment) : comment, Point(x, y + 1.), {commentColor});
+			{
+				const bool arrow = (error == errors.end() && note != notes.end() && note->second.isVector
+					&& !style);
+				// A vector's arrow goes after the "=", before its length.
+				string before = comment;
+				string after;
+				const size_t equals = comment.find(" = ");
+				if(arrow)
+				{
+					before = (equals == string::npos) ? string() : comment.substr(0, equals + 3);
+					after = (equals == string::npos) ? comment : comment.substr(equals + 3);
+				}
+				font.DrawCode(style ? style->Encode(before) : before, Point(x, y + 1.), {commentColor});
+				if(arrow)
+				{
+					const Point center(x + font.Width(before) + 9., y + LINE_HEIGHT / 2.);
+					const Point vector = note->second.vector;
+					if(vector)
+					{
+						const Point unit = vector.Unit();
+						LineShader::Draw(center - unit * 7., center + unit * 4., 1.5f, commentColor, false);
+						PointerShader::Draw(center + unit * 4., unit, 7.f, 6.f, 0.f, commentColor);
+					}
+					else
+						FillShader::Fill(center, Point(3., 3.), commentColor);
+					font.DrawCode(after, Point(center.X() + 12., y + 1.), {commentColor});
+				}
+			}
 		}
 
 		if(isCaretLine && hasFocus && (blink / 30) % 2 == 0)
@@ -568,6 +616,17 @@ vector<double> CodeEditor::ColumnX(const string &line) const
 	for(size_t k = 0; k <= rest.size(); ++k)
 		columns.push_back(x + (k ? font.CodeWidth(rest.substr(0, k), k < rest.size() ? rest[k] : ' ') : 0.));
 	return columns;
+}
+
+
+
+const CodeEditor::LineNote *CodeEditor::NoteAt(const Point &point) const
+{
+	if(!area.Contains(point) || point.X() < area.Left() + GUTTER)
+		return nullptr;
+	const int line = scroll + static_cast<int>(floor((point.Y() - area.Top() - PADDING) / LINE_HEIGHT));
+	const auto it = notes.find(line + 1);
+	return it == notes.end() ? nullptr : &it->second;
 }
 
 

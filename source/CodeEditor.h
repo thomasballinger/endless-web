@@ -47,6 +47,9 @@ public:
 	public:
 		std::string text;
 		bool isError = false;
+		// A note giving a vector's value shows it as an arrow after the text.
+		bool isVector = false;
+		Point vector;
 	};
 
 
@@ -77,6 +80,8 @@ public:
 	void SetStyle(const CodeStyle *style);
 
 	void Draw() const;
+	// The note on the line under the given point, if there is one.
+	const LineNote *NoteAt(const Point &point) const;
 
 	// Handle input. Each returns false if the editor did not use it.
 	bool KeyDown(SDL_Keycode key, Uint16 mod);
