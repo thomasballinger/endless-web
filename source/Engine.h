@@ -107,6 +107,10 @@ public:
 	// watching. Each returns false if the point isn't on it.
 	bool ScriptClick(const Point &point);
 	bool ScriptScroll(const Point &point, double dy);
+	// Open or close the display of scripts ("Show scripts"), and hack the
+	// scripts it shows, or the target's ("Hack selected ship's scripts").
+	void ToggleScripts();
+	void HackScripts();
 	void SelectGroup(int group, bool hasShift, bool hasControl);
 
 	// Break targeting on all projectiles between the player and the given
@@ -233,6 +237,12 @@ private:
 
 	void DoGrudge(const std::shared_ptr<Ship> &target, const Government *attacker);
 
+	// Choose what the player watches the scripts of on this step, and carry
+	// out any hack the player asked for.
+	class WatchedScripts;
+	void WatchScripts(WatchedScripts &watched);
+	void CarryOutHack(WatchedScripts &watched);
+
 	void CreateStatusOverlays();
 	void EmplaceStatusOverlay(const std::shared_ptr<Ship> &ship, Preferences::OverlayState overlaySetting,
 		Status::Type type, double cloak);
@@ -293,20 +303,30 @@ private:
 	int lastTargetType = 0;
 	EscortDisplay escorts;
 	AmmoDisplay ammoDisplay;
-	// The scripts that ran for the player's flagship (and its newest homing
-	// missile) and for its target on the latest step, double buffered like the
-	// draw lists, and the display of them.
+	// The scripts that ran on the latest step for what the player is watching:
+	// the flagship, its target, the selected escorts (with each one's newest
+	// homing missile), and the missile closest to hitting the flagship. They
+	// are double buffered, like the draw lists.
 	class WatchedScripts {
 	public:
 		// Whether these are from a step that ran (not one while paused).
 		bool isFresh = false;
-		bool hasTarget = false;
-		std::string targetName;
-		script::Activity flagship;
-		script::Activity target;
+		std::vector<ScriptWatchDisplay::Entry> entries;
+		ScriptWatchDisplay::Injector injector;
 	};
 	WatchedScripts watchedScripts[2];
 	ScriptWatchDisplay scriptDisplay;
+	// Used only by the calculation thread: where to note the scripts of each
+	// watched ship and the incoming missile, and what each entry is.
+	std::map<const Ship *, script::Activity *> watchedShips;
+	Projectile *incomingMissile = nullptr;
+	script::Activity *incomingActivity = nullptr;
+	std::vector<std::pair<Ship *, Projectile *>> watchedObjects;
+	// Which entry to hack: asked for by the player, and then on the next step.
+	std::string scriptHackNextStep;
+	std::string scriptHack;
+	// Steps until the code injector can hack again.
+	int scriptHackCooldown = 0;
 	std::vector<Outline> outlines;
 	std::vector<Status> statuses;
 	std::vector<PlanetLabel> labels;

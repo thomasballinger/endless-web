@@ -1026,6 +1026,18 @@ void AI::Step(Command &activeCommands)
 		Random::Scope randomScope(it->RandomStream());
 		auto watch = watched.find(it.get());
 		script::Activity::Watch activityWatch(watch == watched.end() ? nullptr : watch->second);
+		// A ship whose scripts have been hacked does nothing until they recover.
+		if(it.get() != flagship && it->AreScriptsHacked())
+		{
+			it->StepScriptHack();
+			if(script::Activity *activity = script::Activity::Current())
+				activity->overriddenBy = "HACKED: its scripts aren't running";
+			it->SetCommands(Command());
+			FireCommand holdFire;
+			holdFire.SetHardpoints(it->Weapons().size(), it->Decorations().size());
+			it->SetCommands(holdFire);
+			continue;
+		}
 		if(it.get() == flagship)
 		{
 			// Player cannot do anything if the flagship is landing.

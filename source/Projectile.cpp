@@ -210,6 +210,8 @@ void Projectile::Move(vector<Visual> &visuals, vector<Projectile> &projectiles)
 {
 	Random::Scope randomScope(RandomStream());
 	++age;
+	if(hackedSteps)
+		--hackedSteps;
 	if(--lifetime <= 0)
 	{
 		if(death == DeathType::NATURAL || death == DeathType::ANTI_MISSILE)
@@ -335,13 +337,14 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 		return;
 	}
 	// A seeker that has lost its lock and is confused turns the projectile as
-	// fast as it can, one way or the other.
-	if(isConfused && !(currentTarget && hasLock))
+	// fast as it can, one way or the other, and so does a hacked one.
+	if(hackedSteps || (isConfused && !(currentTarget && hasLock)))
 	{
 		if(guidanceTrace)
 			guidanceTrace->Clear();
 		if(script::Activity *activity = script::Activity::Current())
-			activity->overriddenBy = "SEEKER CONFUSED: it is steering, not the script";
+			activity->overriddenBy = hackedSteps ? "HACKED: its seeker is steering, not the script"
+				: "SEEKER CONFUSED: it is steering, not the script";
 		turn *= confusionDirection;
 		return;
 	}
@@ -444,16 +447,23 @@ const MissileGuidance::Input &Projectile::LastGuidanceInput() const
 
 
 
-void Projectile::SetWatched(bool watched)
+void Projectile::SetWatchedBy(const Ship *ship)
 {
-	isWatched = watched;
+	watchedBy = ship;
 }
 
 
 
-bool Projectile::IsWatched() const
+const Ship *Projectile::WatchedBy() const
 {
-	return isWatched;
+	return watchedBy;
+}
+
+
+
+void Projectile::Hack(int steps)
+{
+	hackedSteps = max(hackedSteps, steps);
 }
 
 

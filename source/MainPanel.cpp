@@ -214,6 +214,10 @@ bool MainPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command, boo
 
 	if(command.Has(Command::MAP | Command::INFO | Command::MESSAGE_LOG | Command::HAIL | Command::HELP))
 		show = command;
+	else if(command.Has(Command::SCRIPTS))
+		engine.ToggleScripts();
+	else if(command.Has(Command::HACK))
+		engine.HackScripts();
 	else if(command.Has(Command::TURRET_TRACKING))
 	{
 		bool newValue = !Preferences::Has("Turrets focus fire");

@@ -26,6 +26,8 @@ Usage:
   simulator-ui.py lit IMAGE L T R B    exit 0 if code that ran is lit up in that
                                        part of the screen
   simulator-ui.py pane IMAGE           exit 0 if the game shows a script's code
+  simulator-ui.py hacked IMAGE         exit 0 if the game's pane of code shows
+                                       it breaking up
 
 Screenshots are of a 1600x1000 screen.
 """
@@ -123,6 +125,17 @@ def pane(image):
     return dark_green and lit(image, PANE_GUTTER)
 
 
+# The bar across the bottom of the pane that says why its code is breaking up.
+PANE_GLITCH_BAR = (274, 796, 906, 826)
+
+
+def hacked(image):
+    left, top, right, bottom = PANE_GLITCH_BAR
+    count = sum(1 for y in range(top, bottom) for x in range(left, right)
+                if is_confused_color(*image.getpixel((x, y))))
+    return count > 30
+
+
 def main(args):
     if len(args) == 2 and args[0] == 'ready':
         return ready(load(args[1]))
@@ -138,6 +151,8 @@ def main(args):
         return lit(load(args[1]), tuple(int(a) for a in args[2:]))
     if len(args) == 2 and args[0] == 'pane':
         return pane(load(args[1]))
+    if len(args) == 2 and args[0] == 'hacked':
+        return hacked(load(args[1]))
     print(__doc__)
     sys.exit(2)
 

@@ -29,31 +29,67 @@ class Point;
 
 
 
-// Shows the player the scripts their flagship and its target are running. In
-// the HUD, each gets a small map of the code of the script that matters most
-// at the moment (a ship's maneuver, or a missile's guidance), with the lines
-// that ran on the latest step lit up. Clicking one opens a pane beside the
-// HUD with that script's code, showing which lines ran and what they made,
-// with a tab for every script the ship ran and the AI rules it followed.
+// Shows the player the scripts that ships and missiles are running. In the
+// HUD, the flagship and its target each get a small map of the code of the
+// script that matters most at the moment (a ship's maneuver, or a missile's
+// guidance), with the lines that ran on the latest step lit up. Clicking one
+// (or the "Show scripts" key) opens a pane beside the HUD with that script's
+// code, showing which lines ran and what they made, a tab for every script
+// that ran, and the AI rules followed. Buttons along the top of the pane
+// switch between everything being watched: the flagship, its target, the
+// selected escorts and the missile closest to hitting the flagship.
+//
+// Other ships' code can only be read with a code scanner, within its range,
+// and a code jammer garbles it or hides it entirely. With a code injector,
+// the pane can hack what it shows.
 class ScriptWatchDisplay {
+public:
+	// One ship or missile whose scripts the player is watching.
+	class Entry {
+	public:
+		// Which one it is: "flagship", "target", "escort 1"... or "incoming".
+		std::string key;
+		std::string name;
+		// Whether it is the player's own (so its code can always be read, and
+		// it can't be hacked).
+		bool isOwn = false;
+		// Why its code can't be read, or empty if it can.
+		std::string unreadable;
+		// Jamming that garbles its code, if any.
+		std::string interference;
+		script::Activity activity;
+	};
+
+	// What the player's code injector can do at the moment.
+	class Injector {
+	public:
+		bool isInstalled = false;
+		bool isReady = false;
+		// "ready", or why it isn't.
+		std::string status;
+	};
+
+
 public:
 	ScriptWatchDisplay();
 
-	// Take what the scripts did on the latest step. The target is null if the
-	// flagship has no target ship.
-	void Update(const script::Activity &flagship, const script::Activity *target, const std::string &targetName);
+	// Take what the watched scripts did on the latest step.
+	void Update(const std::vector<Entry> &entries, const Injector &injector);
 
 	// Draw the code maps in the given parts of the HUD, and the pane if open.
 	void Draw(const Rectangle &flagshipBox, const Rectangle &targetBox) const;
 
+	// Open the pane on the target (or the flagship), or close it.
+	void Toggle();
 	// Handle a click or scroll, returning false if it wasn't on this display.
-	bool Click(const Point &point);
+	// A click on the pane's hack button sets which entry to hack.
+	bool Click(const Point &point, std::string &hack);
 	bool Scroll(const Point &point, double dy);
+	// Which entry the pane shows, if it is open.
+	const std::string &Shown() const;
 
 
 private:
-	enum class Shown { NONE, FLAGSHIP, TARGET };
-
 	// What a script's source looks like, for drawing its map.
 	class Source {
 	public:
@@ -67,10 +103,13 @@ private:
 
 private:
 	const Source &GetSource(const std::string &kind, const std::string &name) const;
-	// The run worth showing first: what decided where the ship goes, or how
-	// its missile steers.
-	static const script::Activity::Run *MainRun(const script::Activity &activity);
-	const script::Activity &ShownActivity() const;
+	const Entry *Find(const std::string &key) const;
+	// The run worth showing first: what decided where a ship goes, or how a
+	// missile steers (the flagship's missiles come first, since the player
+	// flies the flagship).
+	static const script::Activity::Run *MainRun(const Entry &entry);
+	// Open the pane on the given entry.
+	void Show(const std::string &key);
 	// The selected script's run on the latest step, or if it didn't run, its
 	// last run (if it was the one that mattered most), or null.
 	const script::Activity::Run *SelectedRun(bool *isRunning = nullptr) const;
@@ -78,22 +117,20 @@ private:
 	void ShowSelected();
 	void Layout();
 
-	void DrawMap(const Rectangle &box, const script::Activity &activity) const;
+	void DrawMap(const Rectangle &box, const Entry *entry) const;
 	void DrawPane() const;
 
 
 private:
-	script::Activity flagship;
-	script::Activity target;
-	// The last run of each one's most important script, kept so the pane can
-	// show it after it stops (e.g. when a missile is gone).
-	script::Activity::Run lastFlagshipRun;
-	script::Activity::Run lastTargetRun;
-	bool hasTarget = false;
-	std::string targetName;
+	std::vector<Entry> entries;
+	Injector injector;
+	// The last run of each entry's most important script, kept so the pane
+	// can show it after it stops (e.g. when a missile is gone).
+	std::map<std::string, script::Activity::Run> lastRuns;
+	std::map<std::string, std::string> lastNames;
 
-	Shown shown = Shown::NONE;
-	// The script shown in the pane.
+	// The entry the pane shows, or empty if it is closed, and its script.
+	std::string shown;
 	std::string selectedKind;
 	std::string selectedName;
 	CodeDocument document;
@@ -107,6 +144,8 @@ private:
 	mutable Rectangle targetArea;
 	Rectangle pane;
 	Rectangle closeBox;
+	Rectangle hackBox;
+	std::vector<std::pair<Rectangle, std::string>> entryButtons;
 	std::vector<std::pair<Rectangle, size_t>> tabs;
 
 	mutable std::map<std::string, Source> sources;

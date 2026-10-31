@@ -2050,6 +2050,28 @@ void Ship::SetCommands(const FireCommand &firingCommand)
 
 
 
+void Ship::HackScripts(int steps)
+{
+	scriptHackSteps = max(scriptHackSteps, steps);
+}
+
+
+
+bool Ship::AreScriptsHacked() const
+{
+	return scriptHackSteps > 0;
+}
+
+
+
+void Ship::StepScriptHack()
+{
+	if(scriptHackSteps > 0)
+		--scriptHackSteps;
+}
+
+
+
 const Command &Ship::Commands() const
 {
 	return commands;

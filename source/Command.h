@@ -49,6 +49,9 @@ public:
 	static const Command BOARD;
 	static const Command HAIL;
 	static const Command SCAN;
+	// Show the code the selected ship (or the flagship) is running, and hack it.
+	static const Command SCRIPTS;
+	static const Command HACK;
 	static const Command JUMP;
 	static const Command FLEET_JUMP;
 	static const Command TARGET;

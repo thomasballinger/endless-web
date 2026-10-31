@@ -458,29 +458,67 @@ rest are dimmed. There is a tab for each script that ran on the latest step
 (a ship may run a maneuver, "idle sweep" for its turrets, and the flotsam
 scripts), and a line listing the AI rules it followed. The values change a
 few times a second, so they can be read, and stay still while the game is
-paused. Clicking the map again, or the pane's close box, closes it.
+paused. Clicking the map again, or the pane's close box, closes it. The
+"Show scripts" key (K) opens and closes it too.
+
+Buttons along the top of the pane switch between everything being watched:
+the flagship, its target, the selected escorts, and the homing missile
+closest to hitting the flagship. Each ship's newest homing missile is
+watched along with it, so its guidance appears among the ship's scripts.
+
+**Reading other ships' code takes a code scanner.** The player's own ships
+and missiles can always be read. Anything else needs a "Code Scanner" outfit
+("code scan power" 25), within its range: like other scanners, 100 times the
+square root of the power, so 500 for one. Without one, the map and the pane
+say why the code can't be read: no scanner, out of range, or in another
+system.
+
+**A code jammer garbles it.** A ship with "code jamming" (the "Code Jammer"
+outfit has 6) garbles its code for scanners: letters turn to noise, lines
+jump, and a bar says it is being jammed, though the code and its values can
+still be read. Jamming as strong as the scanner hides the code entirely.
+
+**A code injector hacks it.** With a "Code Injector" ("code hacking" 4), the
+pane has a HACK button, and the "Hack selected ship's scripts" key (X) does
+the same for what the pane shows, or else the target. It works through the
+scanner, so it only reaches what can be read (or is being jammed), and costs
+"code hack energy" (200) and ten seconds to recharge. A hacked ship's scripts
+stop: it does nothing, not even fire, for 60 steps per point of hacking power
+(four seconds), divided by one plus its code jamming; jamming as strong as
+the injector blocks it. A hacked missile's seeker steers instead of its
+script, as a confused one does. Either way the code shows "HACKED" and breaks
+up, as confusion does. The three outfits are sold with the radar jammers
+("Common Outfits").
 
 How it works: `script::Activity` collects traces. While a watched ship's AI
 runs (or a watched missile moves), every script run asks
 `Activity::Begin()` for a trace, the AI notes each rule it follows, and a
-confused seeker notes that it took over. `AI::Watch()` says which ships to
-watch; the engine watches the flagship and its target, and marks the
-flagship's newest homing missile. Traces only record, so watching changes
-nothing (the AI scenarios still match the reference build, with the flagship
-watched throughout). They are handed from the simulation thread to the
-drawing thread with the draw lists, and `ScriptWatchDisplay` draws them.
+confused or hacked seeker notes that it took over. `AI::Watch()` says which
+ships to watch; `Engine::WatchScripts()` picks them, and the incoming missile,
+and works out what the scanner can read; `Engine::CarryOutHack()` carries out
+a hack on the next step. Traces only record, and hacks only happen when the
+player asks, so watching changes nothing (the AI scenarios still match the
+reference build, with the flagship watched throughout). The traces are
+handed from the simulation thread to the drawing thread with the draw lists,
+and `ScriptWatchDisplay` draws them.
 
 `watch-ui.sh` checks this without anyone at the keyboard: it departs into
-the Al Dhanab scenario on a virtual display, targets ships until one is
-running a script, and checks that the map lights up, that clicking it opens
-the code with lines marked as run, and that the close box closes it.
+the Al Dhanab scenario on a virtual display, with code scanners and an
+injector added to the flagship (`add-outfits.py` copies a test's saved game
+with more outfits), targets ships until one is running a script, and checks
+that the map lights up, that clicking it opens the code with lines marked as
+run, that the close box and the Show scripts key close and open it, and that
+hacking the target makes its code break up.
 
 ```sh
 tests/ai/watch-ui.sh build/endless-sky
 ```
 
-Later: a scanner outfit needed to see other ships' code, and jamming or
-hacking it.
+Not yet seen in a test: a missile aimed at the player's flagship. None of
+the AI scenarios has one (the pirates in Al Dhanab fire their missiles at
+other ships), so the "Incoming missile" button has only been checked by
+reading the code; it uses the same tagging as each watched ship's missiles,
+which is seen working.
 
 ## Turret scripts
 

@@ -168,6 +168,41 @@ outfit "Large Radar Jammer"
 	"radar jamming" 10
 	description "This high-power radar jammer will make it much more difficult for missiles that rely on radar to track you. It will not affect missiles that track you optically or that look for your ship's heat signature."
 
+outfit "Code Jammer"
+	category "Systems"
+	series "Jammers"
+	index 01030
+	cost 46000
+	thumbnail "outfit/small radar jammer"
+	"mass" 5
+	"outfit space" -5
+	"code jamming" 6
+	"energy consumption" .2
+	description "This jammer floods the space around your ship with false instructions, so that a code scanner reading your ship's flight computer sees garbage. Against a weak scanner it hides your ship's code entirely; against a stronger one, it garbles it. It also shortens the time a code injector can keep your ship's scripts down, and blocks injectors no stronger than it."
+
+outfit "Code Scanner"
+	category "Systems"
+	series "Scanners"
+	index 01050
+	cost 36000
+	thumbnail "outfit/tactical scanner"
+	"mass" 2
+	"outfit space" -2
+	"code scan power" 25
+	description "Every ship's flight computer, and every guided missile's, runs scripts that decide what it does next. This scanner reads them as they run, so you can watch another ship's (or an incoming missile's) code from your HUD. Its range grows with the square root of its power, as with other scanners: two of them see about 40% farther."
+
+outfit "Code Injector"
+	category "Systems"
+	series "Scanners"
+	index 01060
+	cost 180000
+	thumbnail "outfit/outfit scanner"
+	"mass" 6
+	"outfit space" -6
+	"code hacking" 4
+	"code hack energy" 200
+	description "Working through your code scanner, this device feeds a ship's flight computer (or a missile's) garbage until its scripts crash, leaving the ship drifting without firing, or the missile spinning, until they recover a few seconds later (four, against a ship without a code jammer). It needs ten seconds and a burst of energy to recharge, and a code jammer shortens or blocks its attacks."
+
 
 outfit "Ramscoop"
 	category "Systems"

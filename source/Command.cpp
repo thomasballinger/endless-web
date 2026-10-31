@@ -86,6 +86,8 @@ const Command Command::HARVEST(ONE << 35, "Fleet: Harvest flotsam");
 const Command Command::SCAN_ORDER(ONE << 36, "Fleet: Scan my target");
 const Command Command::AMMO(ONE << 37, "Fleet: Toggle ammo usage");
 const Command Command::AUTOSTEER(ONE << 38, "Auto steer");
+const Command Command::SCRIPTS(ONE << 42, "Show scripts");
+const Command Command::HACK(ONE << 43, "Hack selected ship's scripts");
 
 // These commands are not in the preferences panel, and do not have keys
 // assigned to them, but may have descriptions as needed to facilitate
@@ -288,6 +290,8 @@ void Command::Load(const DataNode &node)
 			{"board", Command::BOARD},
 			{"hail", Command::HAIL},
 			{"scan", Command::SCAN},
+			{"scripts", Command::SCRIPTS},
+			{"hack", Command::HACK},
 			{"jump", Command::JUMP},
 			{"mouse turning hold", Command::MOUSE_TURNING_HOLD},
 			{"aim turret hold", Command::AIM_TURRET_HOLD},

@@ -295,6 +295,11 @@ public:
 	void SetCommands(const FireCommand &firingCommand);
 	const Command &Commands() const;
 	const FireCommand &FiringCommands() const noexcept;
+	// A code injector can stop this ship's scripts (its AI) for a while. Each
+	// AI step counts down the time left, and the ship does nothing meanwhile.
+	void HackScripts(int steps);
+	bool AreScriptsHacked() const;
+	void StepScriptHack();
 	// Move this ship. A ship may create effects as it moves, in particular if
 	// it is in the process of blowing up.
 	void Move(std::vector<Visual> &visuals, std::list<std::shared_ptr<Flotsam>> &flotsam);
@@ -779,6 +784,8 @@ private:
 	// Number of AI steps this ship has spent lingering
 	int lingerSteps = 0;
 
+	// How many more steps this ship's scripts are hacked for.
+	int scriptHackSteps = 0;
 	Command commands;
 	FireCommand firingCommands;
 

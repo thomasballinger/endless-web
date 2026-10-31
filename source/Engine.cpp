@@ -80,6 +80,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <set>
 #include <string>
 
@@ -460,10 +461,13 @@ void Engine::Step(bool isActive)
 	events.swap(eventQueue);
 	eventQueue.clear();
 
-	// Show what the scripts the player is watching did on the latest step.
+	// Show what the scripts the player is watching did on the latest step, and
+	// hand any hack the player asked for to the next one.
 	const WatchedScripts &watched = watchedScripts[currentDrawBuffer];
 	if(watched.isFresh)
-		scriptDisplay.Update(watched.flagship, watched.hasTarget ? &watched.target : nullptr, watched.targetName);
+		scriptDisplay.Update(watched.entries, watched.injector);
+	scriptHack = scriptHackNextStep;
+	scriptHackNextStep.clear();
 
 	// About twice a second, pick up any edits to script files. The previous
 	// step's calculations are done, so no other thread is running scripts.
@@ -1420,7 +1424,22 @@ void Engine::ReleaseDrag(const Point &from, const Point &to)
 
 bool Engine::ScriptClick(const Point &point)
 {
-	return scriptDisplay.Click(point);
+	return scriptDisplay.Click(point, scriptHackNextStep);
+}
+
+
+
+void Engine::ToggleScripts()
+{
+	scriptDisplay.Toggle();
+}
+
+
+
+void Engine::HackScripts()
+{
+	// Hack what the pane shows, or else the target.
+	scriptHackNextStep = scriptDisplay.Shown().empty() ? "target" : scriptDisplay.Shown();
 }
 
 
@@ -1873,23 +1892,10 @@ void Engine::CalculateStep()
 // Calculate things that require the engine not to be paused.
 void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 {
-	// Note which scripts the flagship and its target run, for the player to see.
+	// Note which scripts run for what the player is watching.
 	WatchedScripts &watched = watchedScripts[currentCalcBuffer];
-	watched.isFresh = true;
-	watched.flagship.Clear();
-	watched.target.Clear();
-	watched.hasTarget = false;
-	ai.ClearWatches();
-	if(flagship)
-	{
-		ai.Watch(flagship, &watched.flagship);
-		if(shared_ptr<const Ship> target = flagship->GetTargetShip())
-		{
-			watched.hasTarget = true;
-			watched.targetName = target->GivenName().empty() ? target->DisplayModelName() : target->GivenName();
-			ai.Watch(target.get(), &watched.target);
-		}
-	}
+	WatchScripts(watched);
+	CarryOutHack(watched);
 
 	// Now, all the ships must decide what they are doing next.
 	ai.Step(activeCommands);
@@ -1988,12 +1994,22 @@ void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 		it->Move(newVisuals);
 	PrunePointers(flotsam);
 
-	// Move the projectiles. The player watches their newest homing missile.
+	// Move the projectiles, noting the scripts of the ones the player watches.
 	for(Projectile &projectile : projectiles)
 	{
-		script::Activity::Watch watch(projectile.IsWatched() ? &watched.flagship : nullptr);
+		script::Activity *activity = nullptr;
+		if(&projectile == incomingMissile)
+			activity = incomingActivity;
+		else if(projectile.WatchedBy())
+		{
+			auto it = watchedShips.find(projectile.WatchedBy());
+			if(it != watchedShips.end())
+				activity = it->second;
+		}
+		script::Activity::Watch watch(activity);
 		projectile.Move(newVisuals, newProjectiles);
 	}
+	incomingMissile = nullptr;
 	Prune(projectiles);
 
 	// Step the weather.
@@ -2069,6 +2085,172 @@ void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 
 // Move a ship. Also determine if the ship should generate hyperspace sounds or
 // boarding events, fire weapons, and launch fighters.
+void Engine::WatchScripts(WatchedScripts &watched)
+{
+	watched.isFresh = true;
+	watched.entries.clear();
+	watched.injector = ScriptWatchDisplay::Injector();
+	watchedObjects.clear();
+	watchedShips.clear();
+	incomingMissile = nullptr;
+	incomingActivity = nullptr;
+	ai.ClearWatches();
+	const shared_ptr<Ship> &flagship = player.FlagshipPtr();
+	if(!flagship)
+		return;
+
+	// Other ships' code can only be read with a code scanner, within its range
+	// (like other scanners, 100 times the square root of its power), and
+	// jamming garbles it, or hides it if it is as strong as the scanner.
+	const double scanPower = flagship->Attributes().Get("code scan power");
+	const double scanRange = 100. * sqrt(scanPower);
+	auto add = [&](const string &key, const string &name, bool isOwn, const Point &position, double jamming,
+			bool isHere, Ship *ship, Projectile *projectile)
+	{
+		ScriptWatchDisplay::Entry entry;
+		entry.key = key;
+		entry.name = name;
+		entry.isOwn = isOwn;
+		if(!isOwn)
+		{
+			if(!isHere)
+				entry.unreadable = "It is in another system.";
+			else if(!scanPower)
+				entry.unreadable = "Reading its code needs a code scanner.";
+			else if(position.Distance(flagship->Position()) > scanRange)
+				entry.unreadable = "It is out of your code scanner's range.";
+			else if(jamming >= scanPower)
+			{
+				entry.unreadable = "Its code is jammed.";
+				entry.interference = "CODE JAMMED: there is too much interference to read it";
+			}
+			else if(jamming > 0.)
+				entry.interference = "JAMMING: its code is being garbled";
+		}
+		watched.entries.push_back(std::move(entry));
+		watchedObjects.emplace_back(ship, projectile);
+	};
+	auto addShip = [&](const string &key, const shared_ptr<Ship> &ship)
+	{
+		const string name = ship->GivenName().empty() ? ship->DisplayModelName() : ship->GivenName();
+		add(key, key == "flagship" ? "Your ship" : name, ship->IsYours(), ship->Position(),
+			ship->Attributes().Get("code jamming"), ship->GetSystem() == flagship->GetSystem(), ship.get(), nullptr);
+	};
+
+	addShip("flagship", flagship);
+	const shared_ptr<Ship> target = flagship->GetTargetShip();
+	if(target && target != flagship)
+		addShip("target", target);
+	int escorts = 0;
+	for(const weak_ptr<Ship> &it : player.SelectedEscorts())
+	{
+		shared_ptr<Ship> escort = it.lock();
+		if(escort && escort != flagship && escort != target && escort->GetSystem())
+			addShip("escort " + to_string(++escorts), escort);
+	}
+	// The homing missile closest to the flagship that is chasing it.
+	double closest = numeric_limits<double>::infinity();
+	for(Projectile &projectile : projectiles)
+		if(projectile.GetWeapon().Homing() && projectile.Target() == flagship.get())
+		{
+			const double distance = projectile.Position().Distance(flagship->Position());
+			if(distance < closest)
+			{
+				closest = distance;
+				incomingMissile = &projectile;
+			}
+		}
+	if(incomingMissile)
+		add("incoming", "Incoming missile", false, incomingMissile->Position(), 0., true, nullptr, incomingMissile);
+
+	// Now that the list is complete, its activities stay where they are.
+	for(size_t i = 0; i < watched.entries.size(); ++i)
+	{
+		if(!watched.entries[i].unreadable.empty())
+			continue;
+		script::Activity *activity = &watched.entries[i].activity;
+		if(Ship *ship = watchedObjects[i].first)
+		{
+			ai.Watch(ship, activity);
+			watchedShips[ship] = activity;
+		}
+		else
+			incomingActivity = activity;
+	}
+
+	// What the flagship's code injector can do.
+	ScriptWatchDisplay::Injector &injector = watched.injector;
+	injector.isInstalled = flagship->Attributes().Get("code hacking") > 0.;
+	const double energy = flagship->Attributes().Get("code hack energy");
+	if(scriptHackCooldown > 0)
+		--scriptHackCooldown;
+	if(!injector.isInstalled)
+		injector.status = "no code injector";
+	else if(scriptHackCooldown)
+		injector.status = "recharging";
+	else if(flagship->EnergyFraction() * flagship->MaxEnergy() < energy)
+		injector.status = "low energy";
+	else
+	{
+		injector.isReady = true;
+		injector.status = "ready";
+	}
+}
+
+
+
+void Engine::CarryOutHack(WatchedScripts &watched)
+{
+	if(scriptHack.empty())
+		return;
+	const string key = scriptHack;
+	scriptHack.clear();
+	const shared_ptr<Ship> &flagship = player.FlagshipPtr();
+	auto message = [](const string &text) {
+		Messages::Add({text, GameData::MessageCategories().Get("normal")});
+	};
+	size_t index = 0;
+	while(index < watched.entries.size() && watched.entries[index].key != key)
+		++index;
+	if(!flagship || index == watched.entries.size())
+		return;
+	const ScriptWatchDisplay::Entry &entry = watched.entries[index];
+	if(!watched.injector.isReady)
+	{
+		message("Your code injector can't hack anything: " + watched.injector.status + ".");
+		return;
+	}
+	if(entry.isOwn)
+		return;
+	// The injector works through the scanner: it can only hack what it reads.
+	if(!entry.unreadable.empty() && entry.interference.empty())
+	{
+		message("Your code injector can't reach " + entry.name + ". " + entry.unreadable);
+		return;
+	}
+
+	// Jamming shortens a hack, and as strong a jammer blocks it.
+	auto [ship, projectile] = watchedObjects[index];
+	const double power = flagship->Attributes().Get("code hacking");
+	const double jamming = ship ? ship->Attributes().Get("code jamming") : 0.;
+	flagship->TransferEnergy(flagship->Attributes().Get("code hack energy"), nullptr);
+	scriptHackCooldown = 600;
+	if(jamming >= power)
+	{
+		message("The code jammer on " + entry.name + " blocked your code injector.");
+		return;
+	}
+	const int steps = min(600, static_cast<int>(round(60. * power / (1. + jamming))));
+	if(ship)
+		ship->HackScripts(steps);
+	else if(projectile)
+		projectile->Hack(steps);
+	message("Your code injector hacked " + (ship ? entry.name : string("the incoming missile")) + ": its scripts are down"
+		" for " + to_string((steps + 30) / 60) + " seconds.");
+}
+
+
+
 void Engine::MoveShip(const shared_ptr<Ship> &ship)
 {
 	Random::Scope randomScope(ship->RandomStream());
@@ -2162,16 +2344,18 @@ void Engine::MoveShip(const shared_ptr<Ship> &ship)
 	// Fire weapons.
 	const size_t firstFired = newProjectiles.size();
 	ship->Fire(newProjectiles, newVisuals, ship.get() == flagship ? &emptySoundsTimer : nullptr);
-	// The player watches the scripts of the flagship's newest homing missile.
-	if(isFlagship)
+	// The player watches the scripts of a watched ship's newest homing missile.
+	if(watchedShips.contains(ship.get()))
 		for(size_t i = newProjectiles.size(); i > firstFired; --i)
 			if(newProjectiles[i - 1].GetWeapon().Homing())
 			{
 				for(Projectile &projectile : projectiles)
-					projectile.SetWatched(false);
+					if(projectile.WatchedBy() == ship.get())
+						projectile.SetWatchedBy(nullptr);
 				for(Projectile &projectile : newProjectiles)
-					projectile.SetWatched(false);
-				newProjectiles[i - 1].SetWatched(true);
+					if(projectile.WatchedBy() == ship.get())
+						projectile.SetWatchedBy(nullptr);
+				newProjectiles[i - 1].SetWatchedBy(ship.get());
 				break;
 			}
 

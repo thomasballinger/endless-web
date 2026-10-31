@@ -16,10 +16,16 @@
 # scripts run in the game. On a virtual display (Xvfb), depart into the Al
 # Dhanab scenario and target ships until one is running a script; then:
 #
+# The flagship carries a code scanner, without which other ships' code can't
+# be read, and a code injector.
+#
 #   1. The HUD's map of the target's code lights up the lines that ran.
 #   2. Clicking the map opens a pane with the script's code, with the lines
 #      that ran marked.
 #   3. Clicking the pane's close box closes it.
+#   4. The "Show scripts" key (k) opens and closes it too.
+#   5. Hacking the target ("Hack selected ship's scripts", x) takes over its
+#      code, which the pane shows breaking up.
 #
 # Usage: watch-ui.sh BINARY
 #
@@ -41,13 +47,18 @@ mkdir -p "$OUT"
 cp -r "$ROOT/tests/integration/config" "$OUT/config"
 LOOK="$HERE/simulator-ui.py"
 
-# An integration test that departs and then waits, so there is time to look.
-cat > "$OUT/config/plugins/integration-tests/data/tests/tests_watch_ui.txt" << EOF
+# The Al Dhanab scenario's saved game, with code scanners (64, for a range of
+# 4,000, so that ships nearby are in range) and an injector on the flagship,
+# and a test that departs and then waits, so there is time to look.
+TESTS="$OUT/config/plugins/integration-tests/data/tests"
+"$HERE/add-outfits.py" "$TESTS/tests_ai_scenarios.txt" "AI Combat Carriers Save" "Watch Scripts Save" \
+	"Code Scanner:64" "Code Injector" > "$TESTS/tests_watch_ui.txt"
+cat >> "$TESTS/tests_watch_ui.txt" << EOF
 test "Watch scripts"
 	status active
 	description "Depart Burthen into a system with pirates, merchants and miners, and wait."
 	sequence
-		inject "AI Combat Carriers Save"
+		inject "Watch Scripts Save"
 		call "Load First Savegame"
 		call "Depart"
 		apply
@@ -100,14 +111,22 @@ MAP="5 491 145 517"
 # Wait for the game to depart (one test step every 30 frames), then target
 # ships ("Select next ship", the n key) until one is running a script.
 sleep 20
-for i in $(seq 12); do
-	xdotool keydown n
+key() {
+	xdotool keydown "$1"
 	sleep 0.15
-	xdotool keyup n
+	xdotool keyup "$1"
 	sleep 1
-	shot target
-	"$LOOK" lit "$OUT/target.png" $MAP && break
-done
+}
+# Ships come and go, so do this again before each check.
+target_running() {
+	for i in $(seq 20); do
+		shot target
+		"$LOOK" lit "$OUT/target.png" $MAP && return 0
+		key n
+	done
+	return 1
+}
+target_running
 check "the target's code map lights up the lines that ran" lit "$OUT/target.png" $MAP
 
 xdotool mousemove 75 504 click 1
@@ -125,6 +144,27 @@ if "$LOOK" pane "$OUT/closed.png"; then
 else
 	echo "ok: the close box closes the pane"
 fi
+
+# The "Show scripts" key.
+target_running
+key k
+shot key-open
+check "the Show scripts key opens the code" pane "$OUT/key-open.png"
+key k
+shot key-closed
+if "$LOOK" pane "$OUT/key-closed.png"; then
+	echo "FAILED: the Show scripts key closes it again"
+	FAILED=1
+else
+	echo "ok: the Show scripts key closes it again"
+fi
+
+# Hack the target, with its code open.
+target_running
+key k
+key x
+shot hacked
+check "hacking the target makes its code break up" hacked "$OUT/hacked.png"
 
 echo "Screenshots in $OUT"
 exit $FAILED

@@ -624,6 +624,8 @@ void PreferencesPanel::DrawControls()
 		Command::BOARD,
 		Command::NEAREST_ASTEROID,
 		Command::SCAN,
+		Command::SCRIPTS,
+		Command::HACK,
 		Command::NONE,
 		Command::PRIMARY,
 		Command::TURRET_TRACKING,
