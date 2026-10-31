@@ -150,7 +150,7 @@ else
 	echo "FAILED: taking off saves the program with the game"
 	FAILED=1
 fi
-if [ -n "$SAVE" ] && grep -q "maneuver program" "$SAVE" && grep -q "let position-deadband 600" "$SAVE"; then
+if [ -n "$SAVE" ] && grep -q "maneuver program" "$SAVE" && grep -q "let position_deadband = 600" "$SAVE"; then
 	echo "ok: and the escorts' program"
 else
 	echo "FAILED: and the escorts' program"

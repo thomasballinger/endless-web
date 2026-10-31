@@ -47,85 +47,88 @@
 #   (stopping-reverse target-velocity)          whether reverse thrust stops it sooner
 #   (turn-toward v)                             the turn command that points it along v
 
+# (A maneuver may also be written in the C-like infix form, with names written
+# with underscores for hyphens, as "keep station" is: see guidance.txt.)
+
 # Hold position near a moving target, matching its velocity and then its
 # facing. Escorts use this to stay with their parent. This reproduces the
 # game's built-in behavior exactly.
 maneuver "keep station"
-	let max-time 600
-	let lead-time 500
-	let position-deadband 200
-	let velocity-deadband 1.5
-	let time-deadband 120
-	let thrust-deadband .5
+	let max_time = 600
+	let lead_time = 500
+	let position_deadband = 200
+	let velocity_deadband = 1.5
+	let time_deadband = 120
+	let thrust_deadband = .5
 
 	# How many degrees the ship must turn to face along v.
-	function degrees-to-face v
-		let difference (abs (- facing-degrees (heading v)))
-		return (min difference (- 360 difference))
+	function degrees_to_face(v)
+		let difference = abs(facing_degrees - heading(v))
+		return min(difference, 360 - difference)
 
 	# Where to be, relative to where the ship is now.
-	let velocity-delta (- target-velocity velocity)
-	let position-delta (- (+ target-position (* lead-time velocity-delta)) position)
-	let position-size (length position-delta)
-	let position-weight (/ position-size (+ position-size position-deadband))
+	let velocity_delta = target_velocity - velocity
+	let position_delta = target_position + lead_time * velocity_delta - position
+	let position_size = length(position_delta)
+	let position_weight = position_size / (position_size + position_deadband)
 	# How fast to be going, relative to how fast the ship is going now.
-	set velocity-delta (- velocity-delta (* facing velocity-deadband))
-	let velocity-size (length velocity-delta)
-	let velocity-weight (/ velocity-size (+ velocity-size velocity-deadband))
+	velocity_delta = velocity_delta - facing * velocity_deadband
+	let velocity_size = length(velocity_delta)
+	let velocity_weight = velocity_size / (velocity_size + velocity_deadband)
 
 	# Roughly how long it will take to get to the target.
-	let position-time (rendezvous-time position-delta target-velocity max-velocity)
-	if (or (is-nan position-time) (> position-time max-time))
-		set position-time max-time
-	let rendezvous (+ position-delta (* target-velocity position-time))
-	set position-time (+ position-time (/ (degrees-to-face rendezvous) turn-rate))
-	set position-time (+ position-time (/ (length (- (* (unit rendezvous) max-velocity) velocity)) acceleration))
+	let position_time = rendezvous_time(position_delta, target_velocity, max_velocity)
+	if is_nan(position_time) || position_time > max_time
+		position_time = max_time
+	let rendezvous = position_delta + target_velocity * position_time
+	position_time = position_time + degrees_to_face(rendezvous) / turn_rate
+	position_time = position_time + length(unit(rendezvous) * max_velocity - velocity) / acceleration
 	# If very close, stop trying to adjust.
-	set position-time (* position-time (* position-weight position-weight))
+	position_time = position_time * (position_weight * position_weight)
 
 	# Roughly how long it will take to match the target's velocity.
-	let velocity-time (/ (length velocity-delta) acceleration)
-	set velocity-time (+ velocity-time (/ (degrees-to-face velocity-delta) turn-rate))
-	set velocity-time (* velocity-time (* velocity-weight velocity-weight))
+	let velocity_time = length(velocity_delta) / acceleration
+	velocity_time = velocity_time + degrees_to_face(velocity_delta) / turn_rate
+	velocity_time = velocity_time * (velocity_weight * velocity_weight)
 
 	# Focus on matching position or velocity, whichever will take longer.
-	let total-time (+ position-time velocity-time time-deadband)
-	set position-weight (/ position-time total-time)
-	set velocity-weight (/ velocity-time total-time)
-	let facing-weight (/ time-deadband total-time)
+	let total_time = position_time + velocity_time + time_deadband
+	position_weight = position_time / total_time
+	velocity_weight = velocity_time / total_time
+	let facing_weight = time_deadband / total_time
 
 	# Face somewhere between the rendezvous point, the velocity change, and
 	# the target's own facing.
-	let facing-goal (+ (* (unit rendezvous) position-weight) (* (unit velocity-delta) velocity-weight) (* target-facing facing-weight))
-	let target-angle (- (heading facing-goal) facing-degrees)
-	if (> (abs target-angle) 180)
-		set target-angle (+ target-angle (if (< target-angle 0) 360 -360))
+	let facing_goal = unit(rendezvous) * position_weight + unit(velocity_delta) * velocity_weight + target_facing * facing_weight
+	let target_angle = heading(facing_goal) - facing_degrees
+	if abs(target_angle) > 180
+		target_angle = target_angle + (target_angle < 0 ? 360 : -360)
 	# Avoid "turn jitter" when position and velocity are well matched.
-	let changed-direction (!= (signbit last-turn) (signbit target-angle))
-	let target-turn (abs (/ target-angle turn-rate))
-	let previous-turn (abs last-turn)
-	if (and (!= previous-turn 0) (or changed-direction (and (< previous-turn 1) (> target-turn previous-turn))))
+	let changed_direction = signbit(last_turn) != signbit(target_angle)
+	let target_turn = abs(target_angle / turn_rate)
+	let previous_turn = abs(last_turn)
+	if previous_turn != 0 && (changed_direction || (previous_turn < 1 && target_turn > previous_turn))
 		# Keep turning the same way, but limit how fast the turn speeds up.
-		let damped-turn (+ (if changed-direction 0 previous-turn) (min .025 target-turn))
-		set turn (copysign damped-turn target-angle)
-	elif (< target-turn 1)
-		set turn (copysign target-turn target-angle)
+		let damped_turn = (changed_direction ? 0 : previous_turn) + min(.025, target_turn)
+		turn = copysign(damped_turn, target_angle)
+	else if target_turn < 1
+		turn = copysign(target_turn, target_angle)
 	else
-		set turn target-angle
+		turn = target_angle
 
 	# Decide whether to thrust. Drag is left out for reverse thrust, because
 	# the estimate of how it applies can be quite inaccurate.
-	let drag (* velocity drag-force)
-	if (!= reverse-thrust 0)
-		let reverse (unit (* facing (/ (- reverse-thrust) inertial-mass)))
-		let direction (+ (/ (* position-weight (dot position-delta reverse)) position-deadband) (/ (* velocity-weight (dot velocity-delta reverse)) velocity-deadband))
-		if (> direction thrust-deadband)
-			set back true
+	let drag = velocity * drag_force
+	if reverse_thrust != 0
+		let reverse = unit(facing * (-reverse_thrust / inertial_mass))
+		let direction = position_weight * dot(position_delta, reverse) / position_deadband + velocity_weight * dot(velocity_delta, reverse) / velocity_deadband
+		if direction > thrust_deadband
+			back = true
 			stop
-	let ahead (unit (- (* facing acceleration) drag))
-	let direction (+ (/ (* position-weight (dot position-delta ahead)) position-deadband) (/ (* velocity-weight (dot velocity-delta ahead)) velocity-deadband))
-	if (> direction thrust-deadband)
-		set forward true
+	let ahead = unit(facing * acceleration - drag)
+	let direction = position_weight * dot(position_delta, ahead) / position_deadband + velocity_weight * dot(velocity_delta, ahead) / velocity_deadband
+	if direction > thrust_deadband
+		forward = true
 
 # Stay close to a target without matching its velocity: point at it, and fly
 # toward it when it is more than 200 units away and ahead of the ship (using
