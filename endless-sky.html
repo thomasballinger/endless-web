@@ -368,6 +368,13 @@
           // capture at the top level so meta-alt-i still opens dev console
           e.stopPropagation()
         }
+        // The game's code editor uses ctrl+s, ctrl+d, ctrl+r and ctrl+z, so
+        // keep the browser from saving the page, bookmarking it, or reloading
+        // it. Copy, cut and paste still go to the browser.
+        else if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey
+            && /^Key[A-Z]$/.test(e.code) && !['KeyC', 'KeyV', 'KeyX'].includes(e.code)) {
+          e.preventDefault();
+        }
       }, {capture: true})
 
       document.querySelector('.toggle-debug').addEventListener('click', toggleDebugWindow);

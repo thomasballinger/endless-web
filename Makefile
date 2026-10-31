@@ -103,12 +103,8 @@ TEMP := $(subst source/,build/emcc/,$(CPPS_EXCEPT_MAIN))
 OBJS_EXCEPT_MAIN := $(subst .cpp,.o,$(TEMP))
 HEADERS := $(shell find source -name '*.h' -o -name '*.hpp' | grep -v windows/)
 
-BUILD_DIRS := build/emcc build/emcc/text build/emcc/ship build/emcc/audio \
-	build/emcc/audio/player build/emcc/audio/supplier build/emcc/audio/supplier/effect \
-	build/emcc/image build/emcc/shader build/emcc/comparators build/emcc/orders build/emcc/test
-
 build/emcc/%.o: source/%.cpp $(HEADERS) libjpeg-turbo-2.1.0/libturbojpeg.a
-	@mkdir -p $(BUILD_DIRS)
+	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 lib/emcc/libendless-sky.a: $(OBJS_EXCEPT_MAIN)

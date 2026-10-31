@@ -512,9 +512,6 @@ namespace {
 	// An offset to prevent the ship from being not quite over the point to departure.
 	const double SAFETY_OFFSET = 1.;
 
-	// The minimum speed advantage a ship has to have to consider running away.
-	const double SAFETY_MULTIPLIER = 1.1;
-
 	// If a ship's velocity is below this value, the ship is considered stopped.
 	constexpr double VELOCITY_ZERO = .001;
 
