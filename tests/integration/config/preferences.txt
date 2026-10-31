@@ -1,5 +1,6 @@
 "Automatic aiming" 1
 "Automatic firing" 1
+"Classic AI scripts" 1
 "help: bank" 1
 "help: bank advanced" 1
 "help: basics 1" 1

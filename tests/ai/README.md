@@ -87,6 +87,9 @@ in a way that depends on what an object did, and needs a `Random::Scope`.
 - `ES_MISSILE_STATS=1`: at exit, print how many projectiles of each homing
   weapon hit something, expired, or were shot down.
 - `ES_SCRIPT_STATS=1`: at exit, print how often each script statement ran.
+- `ES_FACTION_MANEUVERS=1`: ships fly their factions' own maneuvers (see
+  `data/faction maneuvers.txt`) even with the "Classic AI scripts" preference
+  on, as it is in the integration tests' configuration.
 - `ES_SIMULATOR_LOG=1`: in the simulator, print what each edit that compiles
   did: `SIMULATOR edit at step <now>: first difference at step <step>, missile
   <n>`, or `no difference`.

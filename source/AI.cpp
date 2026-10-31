@@ -172,13 +172,32 @@ namespace {
 		return input;
 	}
 
+	// Whether ships fly their factions' own maneuvers, where there are any,
+	// rather than the classic ones (see RunManeuver).
+	bool useFactionManeuvers = true;
+
 	// Fly a ship with the named maneuver script (see data/maneuvers.txt), and
 	// add what it decided to the command. Returns false if there is no such
-	// script or it failed.
-	bool RunManeuver(const string &name, ShipManeuver::Input input, Command &command,
+	// script or it failed. A faction may have its own version of a maneuver,
+	// named for its government (e.g. "attack (Pirate)"), which its ships fly
+	// unless the "Classic AI scripts" preference is set; a government's
+	// variants (e.g. "Pirate (Rival)") use the same one.
+	bool RunManeuver(const Ship &ship, const string &name, ShipManeuver::Input input, Command &command,
 		ShipManeuver::Output &output, const ShipManeuver::Context *context = nullptr)
 	{
-		const ShipManeuver *maneuver = GameData::Maneuvers().Find(name);
+		const ShipManeuver *maneuver = nullptr;
+		if(useFactionManeuvers && ship.GetGovernment())
+		{
+			const string &government = ship.GetGovernment()->TrueName();
+			maneuver = GameData::Maneuvers().Find(name + " (" + government + ")");
+			const size_t variant = government.find(" (");
+			if(!maneuver && variant != string::npos)
+				maneuver = GameData::Maneuvers().Find(name + " (" + government.substr(0, variant) + ")");
+			if(maneuver && !maneuver->IsValid())
+				maneuver = nullptr;
+		}
+		if(!maneuver)
+			maneuver = GameData::Maneuvers().Find(name);
 		if(!maneuver || !maneuver->IsValid())
 		{
 			static set<string> warned;
@@ -1003,6 +1022,8 @@ void AI::Step(Command &activeCommands)
 	state.opportunisticEscorts = !Preferences::Has("Turrets focus fire");
 	state.fightersRetreat = Preferences::Has("Damaged fighters retreat");
 	state.npcMaxMiningTime = GameData::GetGamerules().NPCMaxMiningTime();
+	static const bool forceFactionManeuvers = getenv("ES_FACTION_MANEUVERS");
+	useFactionManeuvers = forceFactionManeuvers || !Preferences::Has("Classic AI scripts");
 	state.defaultRules = GameData::AIRuleSets().Find("default");
 	state.escortRules = GameData::AIRuleSets().Find("player escorts");
 	if(!state.defaultRules || !state.defaultRules->HasTurnRules())
@@ -3024,7 +3045,7 @@ bool AI::MoveTo(const Ship &ship, Command &command, const Point &targetPosition,
 	input.cruiseSpeed = cruiseSpeed;
 	ManeuverContext context(ship);
 	ShipManeuver::Output output;
-	return RunManeuver("move to", input, command, output, &context) && output.arrived;
+	return RunManeuver(ship, "move to", input, command, output, &context) && output.arrived;
 }
 
 
@@ -3159,7 +3180,7 @@ void AI::PrepareForHyperspace(const Ship &ship, Command &command)
 void AI::CircleAround(const Ship &ship, Command &command, const Body &target)
 {
 	ShipManeuver::Output output;
-	RunManeuver("circle around", ManeuverInput(ship, target), command, output);
+	RunManeuver(ship, "circle around", ManeuverInput(ship, target), command, output);
 }
 
 
@@ -3180,7 +3201,7 @@ void AI::Swarm(const Ship &ship, Command &command, const Body &target)
 void AI::KeepStation(const Ship &ship, Command &command, const Body &target)
 {
 	ShipManeuver::Output output;
-	RunManeuver("keep station", ManeuverInput(ship, target), command, output);
+	RunManeuver(ship, "keep station", ManeuverInput(ship, target), command, output);
 }
 
 
@@ -3210,7 +3231,7 @@ void AI::Attack(const Ship &ship, Command &command, const Ship &target, FireComm
 	input.reverseAcceleration = ship.ReverseAcceleration();
 	ManeuverContext context(ship);
 	ShipManeuver::Output output;
-	if(!RunManeuver("fight", input, command, output, &context))
+	if(!RunManeuver(ship, "fight", input, command, output, &context))
 		return;
 	if(output.attack)
 		MoveToAttack(ship, command, target, targeting);
@@ -3235,7 +3256,7 @@ void AI::MoveToAttack(const Ship &ship, Command &command, const Body &target, Fi
 	input.aim = TargetAim(ship, target, targeting);
 	ManeuverContext context(ship);
 	ShipManeuver::Output output;
-	RunManeuver("attack", input, command, output, &context);
+	RunManeuver(ship, "attack", input, command, output, &context);
 }
 
 
@@ -3244,7 +3265,7 @@ void AI::PickUp(const Ship &ship, Command &command, const Body &target)
 {
 	ManeuverContext context(ship);
 	ShipManeuver::Output output;
-	RunManeuver("pick up", ManeuverInput(ship, target), command, output, &context);
+	RunManeuver(ship, "pick up", ManeuverInput(ship, target), command, output, &context);
 }
 
 

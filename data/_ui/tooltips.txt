@@ -1678,6 +1678,9 @@ tip "Damaged fighters retreat"
 	`If your fighters cannot be repaired above this threshold while docked in their carrier, they will not leave the carrier if you send another deploy command without holding <shift>.`
 	`The health of a ship is calculated as its shields plus the amount of hull prior to the ship becoming disabled.`
 
+tip "Classic AI scripts"
+	`Other factions' ships fly the game's classic maneuvers, rather than their own versions of some of them (pirates jink as they attack, for example).`
+
 tip "Fighters transfer cargo"
 	`Fighters transfer any cargo that they have to their carried ship when they dock.`
 

@@ -822,6 +822,7 @@ void PreferencesPanel::DrawSettings()
 		"Damaged fighters retreat",
 		"Fighters transfer cargo",
 		AMMO_REFILL,
+		"Classic AI scripts",
 		"\t",
 		"HUD",
 		STATUS_OVERLAYS_ALL,

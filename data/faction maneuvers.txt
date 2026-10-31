@@ -1,0 +1,78 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Factions' own versions of the maneuvers in maneuvers.txt. A ship flies the
+# version named for its government (or for the government it is a variant of,
+# so "Pirate (Rival)" ships fly the "Pirate" ones) instead of the classic
+# one, unless the "Classic AI scripts" preference is on. Unlike the classic
+# maneuvers, these don't reproduce the game's built-in behavior: they give
+# each faction a way of flying of its own. They take the same inputs as the
+# maneuver they replace.
+
+# Pirates jink as they close in, so they're harder to hit, and burn their
+# afterburners to get there.
+maneuver "attack (Pirate)"
+	# A little to one side or the other, at random, every step.
+	set turn (+ (turn-toward aim) (* .7 (- (random) .5)))
+
+	let direction (- target-position position)
+	let alignment (dot facing (unit direction))
+	if (and (< alignment -.75) (!= reverse-thrust 0))
+		set back true
+	elif (> alignment .3)
+		set forward true
+		if (and (> (length direction) 400) should-use-afterburner)
+			set afterburner true
+
+# Korath raiders don't hold off or back away: they close in, burning hard.
+maneuver "attack (Korath)"
+	set turn (turn-toward aim)
+	let direction (- target-position position)
+	if (> (dot facing (unit direction)) 0)
+		set forward true
+		if should-use-afterburner
+			set afterburner true
+
+# Merchant freighters lumber along at three quarters of their top speed,
+# saving fuel and wear. Otherwise as the classic "move to".
+maneuver "move to (Merchant)"
+	let offset (- target-position position)
+	let relative-speed (length (- target-velocity velocity))
+	let is-close (< (length offset) radius)
+	if (and is-close (< relative-speed slow))
+		set arrived true
+		stop
+
+	set offset (- target-position (stopping-point target-velocity))
+	let should-reverse (stopping-reverse target-velocity)
+
+	let aim offset
+	let has-cruise-speed (> cruise-speed 0)
+	if has-cruise-speed
+		set aim (- (* (unit offset) cruise-speed) velocity)
+		if (< (dot aim aim) .01)
+			set aim offset
+
+	let is-facing (> (dot (unit aim) facing) .95)
+	if (or (not is-close) (and (not is-facing) (not should-reverse)))
+		set turn (turn-toward aim)
+
+	# Changed: thrust only up to three quarters of top speed.
+	let limit (* top-speed .75)
+	if (and is-facing (or (<= (dot velocity velocity) (* limit limit)) (< (dot (unit offset) (unit velocity)) .95)))
+		let heading-there (> (dot (unit velocity) (unit offset)) .95)
+		if (or (not has-cruise-speed) (not heading-there) (< (length velocity) cruise-speed))
+			set forward true
+	elif should-reverse
+		set turn (turn-toward velocity)
+		set back true
