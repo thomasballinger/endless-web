@@ -75,6 +75,8 @@ namespace {
 	const Color MATTERED(.55f, .80f, 1.f, 1.f);
 	const Color CONFUSED(.95f, .40f, .95f, 1.f);
 	const Color PANEL(0.f, .03f, .015f, .85f);
+	// Values, as the editor shows them.
+	const Color NOTE_COLOR(.95f, .82f, .40f, 1.f);
 
 	const string NOT_RUNNING = "The script has mistakes, so the last version without any is running.";
 	// How long the old run's trails linger after the new run passes where it was.
@@ -369,6 +371,14 @@ bool SimulatorPanel::Click(int x, int y, MouseButton button, int clicks)
 		return true;
 	}
 	editor.SetFocus(false);
+	// Clicking a name in the list of what the program can use types it in.
+	for(const Reference &reference : references)
+		if(reference.box.Contains(point))
+		{
+			editor.SetFocus(true);
+			editor.TextInput(reference.text);
+			return true;
+		}
 	// Clicking or dragging on the timeline goes to that step.
 	if(fabs(y - TimelineY()) <= 12. && x >= TimelineLeft() - 8. && x <= TimelineRight() + 8.)
 	{
@@ -985,7 +995,18 @@ void SimulatorPanel::DrawSelection() const
 	// A vector in the editor that the mouse is over, drawn from the missile:
 	// to scale if it is long enough to see (like an offset to the target),
 	// or else stretched, saying by how much (like a direction, or a velocity).
-	if(const CodeEditor::LineNote *note = editor.NoteAt(UI::GetMouse()))
+	// (Or one in the list of what a program can use.)
+	const CodeEditor::LineNote *note = editor.NoteAt(UI::GetMouse());
+	CodeEditor::LineNote listed;
+	for(const Reference &reference : references)
+		if(reference.isVector && reference.box.Contains(UI::GetMouse()))
+		{
+			listed.text = reference.text;
+			listed.isVector = true;
+			listed.vector = reference.vector;
+			note = &listed;
+		}
+	if(note && followed->endStep < 0)
 		if(note->isVector && note->vector)
 		{
 			const double length = note->vector.Length() * zoom;
@@ -1101,6 +1122,102 @@ void SimulatorPanel::DrawInspector() const
 		snprintf(text, sizeof(text), "%.0f%%", 100. * record->output.thrust / max(1e-9, weapon.Acceleration()));
 		gauge("thrust", confused ? 1. : record->output.thrust / max(1e-9, weapon.Acceleration()),
 			confused ? "seeker" : text, confused ? CONFUSED : TEXT);
+	}
+	DrawReference(*missile, y + 8.);
+}
+
+
+
+void SimulatorPanel::DrawReference(const GuidanceSimulation::Missile &missile, double y) const
+{
+	// What a program can use, with the followed missile's values: everything
+	// the game gives it, with what this weapon's hardware can't do greyed out.
+	// Clicking a name types it into the program.
+	references.clear();
+	const Font &font = FontSet::Get(14);
+	const double left = Screen::Right() - INSPECTOR_WIDTH + 12.;
+	const double right = Screen::Right() - 12.;
+	const double LINE = 17.;
+	font.Draw("what the program can use (click to add)", Point(left, y), DIM);
+	y += LINE + 2.;
+
+	const Weapon &weapon = simulation->GetWeapon();
+	const script::Interface &interface = MissileGuidance::GetInterface();
+	vector<script::Value> values;
+	const MissileGuidance::Input &input = missile.projectile.LastGuidanceInput();
+	MissileGuidance::Variables(input, values);
+	for(int i = 0; i < interface.VariableCount() && y < Screen::Bottom() - FOOTER_HEIGHT - LINE; ++i)
+	{
+		// The name as an infix script writes it.
+		string name = interface.VariableName(i);
+		if(name == "has-lock")
+			name = "target";
+		else if(name.compare(0, 7, "target-") == 0)
+			name = "target." + name.substr(7);
+		replace(name.begin(), name.end(), '-', '_');
+		string missing;
+		if(!weapon.Leading() && (name == "target.velocity" || name.compare(0, 16, "target.intercept") == 0))
+			missing = "needs leading";
+		else if(!weapon.OpticalTracking() && name == "target.facing")
+			missing = "needs optical";
+		else if(!weapon.ThrottleControl() && name == "thrust")
+			missing = "needs throttle";
+		const bool isOutput = interface.IsOutput(i);
+		const bool unknown = (interface.Guard(i) >= 0 && !input.hasLock);
+
+		const Color &color = !missing.empty() ? GRID_MAJOR : isOutput ? SELECTED : TEXT;
+		// (Code is drawn as code, so that underscores show.)
+		font.DrawCode(name, Point(left, y), {color});
+		references.push_back({Rectangle::WithCorners(Point(left - 4., y - 2.), Point(right, y + LINE - 2.)), name,
+			// (Positions aren't drawn from the missile; they are places, not offsets.)
+			missing.empty() && !unknown && !isOutput && values[i].GetType() == script::Value::Type::VECTOR
+				&& name != "position" && name != "target.position",
+			values[i].GetType() == script::Value::Type::VECTOR ? values[i].Vector() : Point()});
+		// Its value, or why it has none.
+		const Point valueAt(left + 160., y);
+		if(!missing.empty())
+			font.Draw(missing, valueAt, GRID_MAJOR);
+		else if(unknown)
+			font.Draw("(no target)", valueAt, DIM);
+		else if(isOutput)
+			font.Draw("output", valueAt, DIM);
+		else if(values[i].GetType() == script::Value::Type::VECTOR)
+		{
+			const Point vector = values[i].Vector();
+			const Point center = valueAt + Point(6., 8.);
+			if(vector)
+			{
+				const Point unit = vector.Unit();
+				LineShader::Draw(center - unit * 6., center + unit * 3., 1.5f, NOTE_COLOR, false);
+				PointerShader::Draw(center + unit * 3., unit, 6.f, 5.f, 0.f, NOTE_COLOR);
+			}
+			char text[32];
+			snprintf(text, sizeof(text), vector.Length() >= 1000. ? "%.0f" : "%.3g", vector.Length());
+			font.Draw(text, valueAt + Point(16., 0.), NOTE_COLOR);
+		}
+		else if(values[i].GetType() == script::Value::Type::BOOLEAN)
+			font.Draw(values[i].Boolean() ? "true" : "false", valueAt, NOTE_COLOR);
+		else
+		{
+			char text[32];
+			snprintf(text, sizeof(text), fabs(values[i].Number()) >= 1000. ? "%.0f" : "%.3g", values[i].Number());
+			font.Draw(text, valueAt, NOTE_COLOR);
+		}
+		y += LINE;
+	}
+	// The functions the game gives guidance scripts.
+	y += 4.;
+	double x = left;
+	for(const string &function : {"turn_toward(", "bearing("})
+	{
+		const string label = function + ")";
+		if(y < Screen::Bottom() - FOOTER_HEIGHT - LINE)
+		{
+			font.DrawCode(label, Point(x, y), {TEXT});
+			references.push_back({Rectangle::WithCorners(Point(x - 4., y - 2.), Point(x + font.Width(label) + 4.,
+				y + LINE - 2.)), function, false, Point()});
+		}
+		x += font.Width(label) + 14.;
 	}
 }
 

@@ -269,11 +269,10 @@ string MissileGuidance::MissingCapability(bool leading, bool throttleControl, bo
 
 
 
-bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *memory, script::Trace *trace) const
+void MissileGuidance::Variables(const Input &input, vector<script::Value> &variables)
 {
-	// Each thread reuses its own variables.
-	thread_local vector<script::Value> variables;
-	variables.resize(program.SlotCount());
+	if(variables.size() < static_cast<size_t>(THRUST + 1))
+		variables.resize(THRUST + 1);
 	const bool locked = input.hasLock;
 	variables[POSITION] = script::Value(input.position);
 	variables[VELOCITY] = script::Value(input.velocity);
@@ -331,6 +330,18 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	variables[TARGET_STEPS_AWAY] = script::Value(steps);
 	variables[TARGET_INTERCEPT] = script::Value(intercept);
 	variables[TARGET_INTERCEPT_STEPS] = script::Value(interceptSteps);
+	variables[TURN] = script::Value(input.maxTurn);
+	variables[THRUST] = script::Value(input.acceleration);
+}
+
+
+
+bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *memory, script::Trace *trace) const
+{
+	// Each thread reuses its own variables.
+	thread_local vector<script::Value> variables;
+	variables.resize(program.SlotCount());
+	Variables(input, variables);
 	CurrentInput() = &input;
 	variables[TURN] = script::Value(input.maxTurn);
 	variables[THRUST] = script::Value(input.acceleration);

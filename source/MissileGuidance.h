@@ -136,6 +136,9 @@ public:
 	};
 
 	static const script::Interface &GetInterface();
+	// What a script is given for the given input: a value for each of the
+	// interface's variables (inputs, then outputs at their starting values).
+	static void Variables(const Input &input, std::vector<script::Value> &variables);
 
 	// The script that reproduces the built-in behavior of the given weapon.
 	static const MissileGuidance *Default(const Weapon &weapon);

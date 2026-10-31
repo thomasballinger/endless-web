@@ -29,6 +29,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 class Outfit;
@@ -105,6 +106,8 @@ private:
 	// Replay to the step under the given point of the timeline.
 	void ScrubTo(double x);
 	void DrawCloseUp(const GuidanceSimulation::Missile &missile, const Rectangle &box) const;
+	// The list of what a program can use, starting at the given height.
+	void DrawReference(const GuidanceSimulation::Missile &missile, double y) const;
 	// Follow the next (or previous) missile in flight.
 	void CycleMissile(int direction);
 	// Keep following one missile until it is gone, and then the next.
@@ -159,6 +162,16 @@ private:
 	bool isScrubbing = false;
 	// Whether the arrow keys were flying the launcher on the last step.
 	bool wasFlying = false;
+	// Where each name in the list of what a program can use was drawn, the
+	// text clicking it types, and its value if it is a vector.
+	class Reference {
+	public:
+		Rectangle box;
+		std::string text;
+		bool isVector = false;
+		Point vector;
+	};
+	mutable std::vector<Reference> references;
 
 	// Whether a key gave the editor the keyboard on this frame, so that the
 	// text of that same key press isn't typed into it.
