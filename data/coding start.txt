@@ -1,0 +1,43 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# A start for trying out missile programming: no mortgage, enough credits for
+# a ship that carries homing missiles, on a world that sells them. Geminus's
+# shipyards have the Raven (torpedoes and Sidewinders) and the Firebird
+# (Meteors); its outfitters sell Meteor, Sidewinder and Torpedo launchers, and
+# the Code Scanner, Jammer and Injector.
+start "missile lab"
+	name "Missile Lab"
+	description `A start for trying out missile programming. You begin on Geminus, one of the Republic's great shipyards, with 10,000,000 credits and no mortgage: enough for a ship that carries homing missiles, a Code Scanner, and plenty of ammunition.`
+	description `	Buy a Raven (torpedoes and Sidewinder missiles) or a Firebird (Meteor missiles), then press W while landed to open the missile workshop.`
+	thumbnail "land/mountain18-harro"
+	date 16 11 3013
+	system "Castor"
+	planet "Geminus"
+	conversation "missile lab intro"
+	account
+		credits 10000000
+		score 400
+	set "license: Pilot's"
+	set "species: human"
+	set "human space start"
+	set "start: missile lab"
+
+conversation "missile lab intro"
+	action
+		log "Came to Geminus with a fortune to spend on a ship that carries missiles, and a head full of ideas for programming them."
+	scene "land/mountain18-harro"
+	`Geminus's shipyards build half the Navy's warships, and its outfitters sell the missiles that arm them. You have ten million credits, a new pilot's license, and a notebook full of guidance programs you're itching to try.`
+	`	The clerk at the licensing office hands you a stylus. You sign your name:`
+	name
+	`	The Raven and the Firebird both come with homing missiles. Once you have a ship, the outfitter sells more launchers, and a Code Scanner to read other ships' code. Land anywhere with an outfitter and press W to open the missile workshop.`
