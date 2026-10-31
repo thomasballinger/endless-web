@@ -1,86 +1,107 @@
-# Deploying the scriptable fork to its own subdomain
+# Deploying the scriptable fork to code.play-endless-web.com
 
-The vanilla web port is served from `s3://play-endless-sky.com/live` by two
-CloudFront distributions (E2TZUW922XPLEF and E3D0Y4DMGSVPWC). The scriptable
-fork goes in the same bucket, under `live/scriptable/`, served by a new
-distribution on its own subdomain (below, `code.play-endless-web.com`; any
-name works). A separate domain also keeps its saves apart from vanilla's,
-because browsers keep IndexedDB per origin.
+How the vanilla web port is hosted (account 700134640850, all looked up
+2026-10-31):
 
-Nothing below has been run yet. Each step needs credentials with admin access
-to the AWS account, so run them from a machine that has them, checking each
-result before the next.
+- Bucket `play-endless-sky.com`, publicly readable. Vanilla is in `live/`.
+- CloudFront E3D0Y4DMGSVPWC serves play-endless-web.com from `/live` (and
+  `/editor`); E2TZUW922XPLEF serves play-endless-sky.com from `/live`.
+- DNS for both domains is in Route 53; play-endless-web.com is zone
+  `Z0956029IY6ZW2VC4C1K`.
+- A wildcard certificate for `*.play-endless-web.com` already exists:
+  `arn:aws:acm:us-east-1:700134640850:certificate/1e94e90d-cca4-4683-9e32-79208e617c60`.
+- CI (the endless-web repo's `aws-deploy` environment) deploys as the IAM
+  user `endless-web-github-deployer`, whose policy `endless-sky-upload-live`
+  allows only `live/` and the two distributions above.
 
-## 1. Look at what's there
+The scriptable fork goes in the same bucket's `code/` folder, served by its
+own distribution on code.play-endless-web.com. Being its own domain also
+keeps its saves apart from vanilla's (browsers keep IndexedDB per origin).
 
-```sh
-aws cloudfront get-distribution-config --id E3D0Y4DMGSVPWC > vanilla-a.json
-aws cloudfront get-distribution-config --id E2TZUW922XPLEF > vanilla-b.json
-jq '.DistributionConfig | {Aliases, Origins: .Origins.Items[] | {DomainName, OriginPath, OriginAccessControlId, S3OriginConfig}}' vanilla-*.json
-aws route53 list-hosted-zones
-aws s3api get-bucket-policy --bucket play-endless-sky.com
-```
+## 1. Distribution
 
-Pick the distribution whose alias is `play-endless-web.com` as the template,
-and note whether the bucket policy names each distribution (an origin access
-control policy with an `AWS:SourceArn` condition) or is public.
-
-## 2. Certificate (must be in us-east-1 for CloudFront)
+A copy of play-endless-sky.com's distribution, serving `/code` under the new
+name with the wildcard certificate:
 
 ```sh
-aws acm request-certificate --region us-east-1 \
-  --domain-name code.play-endless-web.com --validation-method DNS
-aws acm describe-certificate --region us-east-1 --certificate-arn ARN \
-  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
+CERT=arn:aws:acm:us-east-1:700134640850:certificate/1e94e90d-cca4-4683-9e32-79208e617c60
+aws cloudfront get-distribution-config --id E2TZUW922XPLEF --query DistributionConfig > base.json
+jq --arg cert "$CERT" '
+  .CallerReference = "scriptable-2026-10-31"
+  | .Comment = "Endless Sky, scriptable fork"
+  | .Aliases = {Quantity: 1, Items: ["code.play-endless-web.com"]}
+  | .Origins.Items[0].OriginPath = "/code"
+  | .ViewerCertificate.ACMCertificateArn = $cert
+  | .ViewerCertificate.Certificate = $cert' base.json > code.json
+aws cloudfront create-distribution --distribution-config file://code.json \
+  --query 'Distribution.{Id:Id,Domain:DomainName}'
 ```
 
-Add that CNAME to the domain's DNS (Route 53: `change-resource-record-sets`
-with an UPSERT), then wait for `aws acm wait certificate-validated`.
+Note the new distribution's `Id` and `Domain` (`d….cloudfront.net`).
 
-## 3. Distribution
-
-From the template's `DistributionConfig`, make a new config:
-
-- `CallerReference`: something new, e.g. `scriptable-<date>`
-- `Aliases`: `{"Quantity": 1, "Items": ["code.play-endless-web.com"]}`
-- the S3 origin's `OriginPath`: `/live/scriptable`
-- `ViewerCertificate.ACMCertificateArn`: the new certificate
-- `Comment`: "Endless Sky, scriptable fork"
+## 2. DNS
 
 ```sh
-aws cloudfront create-distribution --distribution-config file://scriptable.json
+aws route53 change-resource-record-sets --hosted-zone-id Z0956029IY6ZW2VC4C1K \
+  --change-batch '{"Changes": [{"Action": "CREATE", "ResourceRecordSet": {
+    "Name": "code.play-endless-web.com", "Type": "A",
+    "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2",
+      "DNSName": "NEW_DOMAIN.cloudfront.net", "EvaluateTargetHealth": false}}}]}'
 ```
 
-If the bucket policy names distributions, add the new one's ARN to it.
+(`Z2FDTNDATAQYW2` is CloudFront's own zone ID, the same for every alias.)
 
-## 4. DNS
+## 3. Let CI deploy it
 
-An alias record (Route 53) or CNAME for `code.play-endless-web.com` pointing at
-the new distribution's `*.cloudfront.net` domain (alias hosted zone
-`Z2FDTNDATAQYW2`).
+A separate policy for the existing deploy user, so the vanilla policy stays
+as it is and no new keys are needed:
 
-## 5. Let CI deploy it
+```sh
+aws iam create-policy --policy-name endless-sky-upload-code --policy-document '{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Effect": "Allow", "Action": "s3:ListBucket",
+     "Resource": "arn:aws:s3:::play-endless-sky.com"},
+    {"Effect": "Allow", "Action": ["s3:PutObject", "s3:GetObject"],
+     "Resource": "arn:aws:s3:::play-endless-sky.com/code/*"},
+    {"Effect": "Allow",
+     "Action": ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation", "cloudfront:ListInvalidations"],
+     "Resource": "arn:aws:cloudfront::700134640850:distribution/NEW_ID"}
+  ]}'
+aws iam attach-user-policy --user-name endless-web-github-deployer \
+  --policy-arn arn:aws:iam::700134640850:policy/endless-sky-upload-code
+```
 
-- The IAM user whose keys are in the endless-web repo's `aws-deploy`
-  environment must be allowed `cloudfront:CreateInvalidation` on the new
-  distribution, and `s3:PutObject`/`s3:ListBucket` under `live/scriptable/`
-  (probably already true if its policy covers the whole bucket).
-- In the endless-web repo, set the variable `SCRIPTABLE_DISTRIBUTION_ID` to
-  the new distribution's ID (Settings > Environments > aws-deploy >
-  Environment variables, or as a repository variable).
-- If `aws-deploy` limits which branches may deploy, allow `scriptable`.
+In GitHub, give the endless-web repo the new distribution's ID, and check
+whether `aws-deploy` limits which branches may use it:
 
-## 6. Deploy
+```sh
+gh variable set SCRIPTABLE_DISTRIBUTION_ID --repo thomasballinger/endless-web --env aws-deploy --body NEW_ID
+gh api repos/thomasballinger/endless-web/environments/aws-deploy --jq .deployment_branch_policy
+```
+
+If that policy is not null, allow the `scriptable` branch in Settings >
+Environments > aws-deploy.
+
+## 4. Deploy
 
 Push the fork's `scriptable-ai` branch to the endless-web repo as
-`scriptable`. The browser workflow builds it and, on that branch only, runs
-`make deploy-scriptable`, which syncs `output/` to `live/scriptable/` and
-invalidates the new distribution. Pushes to the vanilla `endless-web` branch
-deploy as before; the vanilla deploy never deletes, so it leaves
-`live/scriptable/` alone.
-
-To deploy by hand instead, from a scriptable-ai checkout with emsdk active:
+`scriptable`:
 
 ```sh
-make deploy-scriptable SCRIPTABLE_DISTRIBUTION_ID=<id>
+git fetch tom-endless-sky scriptable-ai
+git push origin tom-endless-sky/scriptable-ai:refs/heads/scriptable
 ```
+
+The browser workflow builds it and, on that branch only, runs
+`make deploy-scriptable`, which syncs `output/` to `code/` and invalidates
+the new distribution. Pushes to the vanilla `endless-web` branch deploy as
+before. To deploy by hand instead, from a scriptable-ai checkout with emsdk
+active:
+
+```sh
+make deploy-scriptable SCRIPTABLE_DISTRIBUTION_ID=NEW_ID
+```
+
+To update the deployed game later, push `scriptable-ai` to `scriptable`
+again.

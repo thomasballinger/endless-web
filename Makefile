@@ -150,8 +150,8 @@ deploy: output/index.html
 	aws cloudfront create-invalidation --distribution-id E3D0Y4DMGSVPWC --paths / /index.html
 
 # The scriptable fork has its own subdomain, served by its own CloudFront
-# distribution from this prefix of the same bucket.
-SCRIPTABLE_PREFIX := s3://play-endless-sky.com/live/scriptable
+# distribution from the code/ folder of the same bucket.
+SCRIPTABLE_PREFIX := s3://play-endless-sky.com/code
 deploy-scriptable: output/index.html
 ifndef SCRIPTABLE_DISTRIBUTION_ID
 	$(error "set SCRIPTABLE_DISTRIBUTION_ID to the scriptable subdomain's CloudFront distribution")
