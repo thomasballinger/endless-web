@@ -161,6 +161,7 @@ outfitter "Basic Outfits"
 	"Hyperdrive"
 	"Meteor Missile"
 	"Cargo Scanner"
+	"Code Scanner"
 	"Local Map"
 	"Pilot's License"
 

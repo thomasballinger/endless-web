@@ -523,6 +523,23 @@ other ships), so the "Incoming missile" button has only been checked by
 reading the code; it uses the same tagging as each watched ship's missiles,
 which is seen working.
 
+## Playing with code
+
+`docs/coding.md` is a guide to the parts of this meant for players, and a
+list of ideas. In short:
+
+- **The missile workshop** (`WorkshopPanel`; the planet's Workshop button)
+  opens the simulator in a workshop mode for one of the player's guided
+  weapons. Its program is saved with the game (`PlayerInfo`'s "guidance
+  program" nodes) and compiled into `MissileGuidance`'s player programs,
+  which the player's own projectiles fly. `workshop-ui.sh` checks it.
+- **Code styles** (`CodeStyle`, `data/code styles.txt`) give each faction's
+  code its own colors, header comments and, for aliens, a cipher.
+- **Faction maneuvers** (`data/faction maneuvers.txt`): a ship flies the
+  version of a maneuver named for its government, such as "attack
+  (Pirate)", unless the "Classic AI scripts" preference is on (as it is in
+  the integration tests' configuration).
+
 ## Turret scripts
 
 `data/turrets.txt` holds scripts that move one turret, or one moving

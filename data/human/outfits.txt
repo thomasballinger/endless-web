@@ -184,7 +184,7 @@ outfit "Code Scanner"
 	category "Systems"
 	series "Scanners"
 	index 01050
-	cost 36000
+	cost 12000
 	thumbnail "outfit/tactical scanner"
 	"mass" 2
 	"outfit space" -2
