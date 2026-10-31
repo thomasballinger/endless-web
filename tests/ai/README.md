@@ -360,6 +360,14 @@ The weapon's guidance script is in an editor on the left:
 - Click a missile to select it. The editor then shows how its script ran this
   step: each line that ran gets a green mark and the value it computed, and
   the lines that didn't run are dimmed.
+- While a missile's seeker is confused (it has lost its lock, and jamming or
+  poor tracking has fooled it), the seeker steers instead of the script. The
+  missile's trail turns magenta for as long as that lasts, and if it is
+  selected, it is ringed and labeled "CONFUSED", and the code in the editor
+  breaks up, with a bar saying why. That is a first try at what watching a
+  missile's code in the game could look like when it is jammed. (The glitch
+  takes no random numbers, so it can't change the battle.) A target with
+  radar jammers shows it: `--simulator-target Carrier`.
 - Ctrl+S saves the script into a "simulator scripts" plugin, where it replaces
   the script of the same name in the game.
 - Space pauses, `.` steps, `-` and `+` change the speed, and 1 to 8 pick a
@@ -425,7 +433,9 @@ simulator on a virtual display (Xvfb), types with xdotool, and looks at
 screenshots and at what the game reports with `ES_SIMULATOR_LOG`: a mistake is
 marked and undo clears it, coasting sooner first makes a difference partway
 into the jinking drill, saving writes the script, and one undo takes the edit
-back, making a difference at that same step.
+back, making a difference at that same step. Then it fires at a Carrier, whose
+jammers confuse the missiles, and checks that a confused missile's trail is
+marked and that selecting it makes the code glitch.
 
 ```sh
 tests/ai/simulator-ui.sh build/endless-sky

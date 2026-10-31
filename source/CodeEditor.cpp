@@ -150,9 +150,9 @@ namespace {
 	uint32_t Hash(uint32_t a, uint32_t b, uint32_t c)
 	{
 		uint32_t h = a * 0x9e3779b1u ^ (b + 0x7f4a7c15u) * 0x85ebca6bu ^ (c + 0x165667b1u) * 0xc2b2ae35u;
-		h ^= h >> 15;
+		h = h ^ (h >> 15);
 		h *= 0x2c1b3c6du;
-		h ^= h >> 12;
+		h = h ^ (h >> 12);
 		h *= 0x297a2d39u;
 		return h ^ (h >> 15);
 	}
