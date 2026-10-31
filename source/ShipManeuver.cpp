@@ -227,7 +227,7 @@ bool ShipManeuver::Run(const Input &input, Output &output, const Context *contex
 	output = Output();
 	const Context *previousContext = currentContext;
 	currentContext = context;
-	bool ran = program.Run(variables, effects);
+	bool ran = program.Run(variables, effects, nullptr, script::Activity::Begin("maneuver", Name()));
 	currentContext = previousContext;
 	if(!ran || variables[TURN].GetType() != Value::Type::NUMBER
 			|| variables[FORWARD].GetType() != Value::Type::BOOLEAN || variables[BACK].GetType() != Value::Type::BOOLEAN

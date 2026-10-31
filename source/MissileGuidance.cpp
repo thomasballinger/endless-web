@@ -157,6 +157,8 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	const script::Value &turn = variables[TURN];
 	const script::Value &thrust = variables[THRUST];
 	output = Output();
+	if(!trace)
+		trace = script::Activity::Begin("guidance", name);
 	if(!program.Run(variables, effects, memory, trace) || turn.GetType() != script::Value::Type::NUMBER
 			|| thrust.GetType() != script::Value::Type::NUMBER)
 		return false;

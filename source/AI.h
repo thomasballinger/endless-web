@@ -42,6 +42,9 @@ class Minable;
 class Outfit;
 class PlayerInfo;
 class Ship;
+namespace script {
+	class Activity;
+}
 class ShipEvent;
 class StellarObject;
 class System;
@@ -80,6 +83,10 @@ public:
 	void ClearOrders();
 	// Issue AI commands to all ships for one game step.
 	void Step(Command &activeCommands);
+	// Note which scripts run for the given ship on each step, and which AI
+	// rules it follows, in the given activity, for showing them to the player.
+	void Watch(const Ship *ship, script::Activity *activity);
+	void ClearWatches();
 	// Process commands for the player only, called by Step in non-paused mode.
 	void MovePlayer(Ship &ship, Command &activeCommands);
 	void DisengageAutopilot(bool sendMessage = true);
@@ -276,6 +283,9 @@ private:
 	const List<Ship> &ships;
 	const List<Minable> &minables;
 	const List<Flotsam> &flotsam;
+
+	// Ships whose scripts the player is watching.
+	std::map<const Ship *, script::Activity *> watched;
 
 	// The current step count for the AI, incremented once per frame.
 	// Its value helps limit how often certain actions occur (such as changing targets).

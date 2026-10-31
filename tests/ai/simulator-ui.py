@@ -12,7 +12,8 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
-"""Look at screenshots of the simulator, for simulator-ui.sh.
+"""Look at screenshots of the simulator and the game, for simulator-ui.sh and
+watch-ui.sh.
 
 Usage:
   simulator-ui.py ready IMAGE          exit 0 if the simulator is showing
@@ -22,6 +23,9 @@ Usage:
                                        and print where the newest part of one is
   simulator-ui.py glitch IMAGE         exit 0 if the editor shows that the seeker
                                        is steering instead of the script
+  simulator-ui.py lit IMAGE L T R B    exit 0 if code that ran is lit up in that
+                                       part of the screen
+  simulator-ui.py pane IMAGE           exit 0 if the game shows a script's code
 
 Screenshots are of a 1600x1000 screen.
 """
@@ -95,6 +99,30 @@ def glitch(image):
     return count > 30
 
 
+def is_lit(r, g, b):
+    # LIT_LINE in ScriptWatchDisplay, and RAN in CodeEditor.
+    return g > 170 and r < 140 and b < 160
+
+
+def lit(image, box):
+    left, top, right, bottom = box
+    count = sum(1 for y in range(top, bottom) for x in range(left, right) if is_lit(*image.getpixel((x, y))))
+    return count > 10
+
+
+# The pane of code in the game, beside the HUD's target display.
+PANE = (270, 70, 910, 830)
+PANE_GUTTER = (300, 140, 312, 800)
+
+
+def pane(image):
+    # Its background is a dark green, and the lines that ran are marked.
+    left, top, right, bottom = PANE
+    points = [(left + 300, bottom - 40), (left + 500, bottom - 100), (left + 400, bottom - 300)]
+    dark_green = all(g > r and g > b for r, g, b in (image.getpixel(p) for p in points))
+    return dark_green and lit(image, PANE_GUTTER)
+
+
 def main(args):
     if len(args) == 2 and args[0] == 'ready':
         return ready(load(args[1]))
@@ -106,6 +134,10 @@ def main(args):
         return confused(load(args[1]))
     if len(args) == 2 and args[0] == 'glitch':
         return glitch(load(args[1]))
+    if len(args) == 6 and args[0] == 'lit':
+        return lit(load(args[1]), tuple(int(a) for a in args[2:]))
+    if len(args) == 2 and args[0] == 'pane':
+        return pane(load(args[1]))
     print(__doc__)
     sys.exit(2)
 

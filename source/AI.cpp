@@ -44,6 +44,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Random.h"
 #include "RoutePlan.h"
 #include "ScanType.h"
+#include "script/Script.h"
 #include "Ship.h"
 #include "ship/ShipAICache.h"
 #include "ShipEvent.h"
@@ -910,6 +911,9 @@ namespace {
 	void RecordRuleUse(const AIRules &rules, const char *list, size_t index, const string &description,
 		bool ended)
 	{
+		// Tell a player watching this ship which rules it followed.
+		if(script::Activity *activity = script::Activity::Current())
+			activity->notes.push_back(string(list) + ": " + description + (ended ? " (done)" : ""));
 		static const bool collect = getenv("ES_AI_RULE_STATS");
 		if(!collect)
 			return;
@@ -932,6 +936,20 @@ bool AI::GovernmentOrder::operator()(const Government *a, const Government *b) c
 	if(a->TrueName() != b->TrueName())
 		return a->TrueName() < b->TrueName();
 	return a < b;
+}
+
+
+
+void AI::Watch(const Ship *ship, script::Activity *activity)
+{
+	watched[ship] = activity;
+}
+
+
+
+void AI::ClearWatches()
+{
+	watched.clear();
 }
 
 
@@ -1006,6 +1024,8 @@ void AI::Step(Command &activeCommands)
 
 		// Each ship's decisions use its own random numbers.
 		Random::Scope randomScope(it->RandomStream());
+		auto watch = watched.find(it.get());
+		script::Activity::Watch activityWatch(watch == watched.end() ? nullptr : watch->second);
 		if(it.get() == flagship)
 		{
 			// Player cannot do anything if the flagship is landing.

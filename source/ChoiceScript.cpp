@@ -120,7 +120,7 @@ bool ChoiceScript::Rate(const Input &input, double &score) const
 	variables[SCORE] = script::Value(0.);
 
 	uint32_t effects = 0;
-	if(!program.Run(variables, effects) || (effects & (1u << SKIP))
+	if(!program.Run(variables, effects, nullptr, script::Activity::Begin("rate", Name())) || (effects & (1u << SKIP))
 			|| variables[SCORE].GetType() != script::Value::Type::NUMBER)
 		return false;
 	score = variables[SCORE].Number();
@@ -140,7 +140,8 @@ int ChoiceScript::Choose(const Input &input) const
 	variables[CHOSEN] = script::Value(-1.);
 
 	uint32_t effects = 0;
-	if(!program.Run(variables, effects) || variables[CHOSEN].GetType() != script::Value::Type::NUMBER)
+	if(!program.Run(variables, effects, nullptr, script::Activity::Begin("choose", Name()))
+			|| variables[CHOSEN].GetType() != script::Value::Type::NUMBER)
 		return -1;
 	const double chosen = variables[CHOSEN].Number();
 	if(!(chosen >= 0.) || chosen >= static_cast<double>(input.candidates->Size()) || chosen != floor(chosen))

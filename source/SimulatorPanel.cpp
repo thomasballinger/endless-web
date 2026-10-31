@@ -37,7 +37,6 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <fstream>
 #include <map>
 #include <sstream>
 #include <string>
@@ -72,40 +71,6 @@ namespace {
 	// How long the old run's trails linger after the new run passes where it was.
 	const int GHOST_LINGER = 120;
 
-	// The lines of a data file that define the given node: from its first
-	// line up to the next line that isn't indented.
-	string NodeText(const filesystem::path &path, const string &kind, const string &name)
-	{
-		if(path.empty())
-			return "";
-		size_t start = 0;
-		for(const DataNode &node : DataFile(path))
-			if(node.Token(0) == kind)
-				for(int i = 1; i < node.Size(); ++i)
-					if(node.Token(i) == name)
-						start = node.LineNumber();
-		if(!start)
-			return "";
-		ifstream in(path);
-		vector<string> lines;
-		for(string line; getline(in, line); )
-			lines.push_back(line);
-		string text;
-		for(size_t i = start - 1; i < lines.size(); ++i)
-		{
-			const string &line = lines[i];
-			if(i >= start && !line.empty() && line[0] != '\t' && line[0] != ' ')
-				break;
-			text += line + "\n";
-		}
-		// Leave off blank lines at the end.
-		while(text.size() > 1 && text[text.size() - 2] == '\n')
-			text.pop_back();
-		if(!text.empty() && text.back() == '\n')
-			text.pop_back();
-		return text;
-	}
-
 	// With ES_SIMULATOR_LOG set, say what each edit did, for tests.
 	void LogEdit(const GuidanceSimulation::Difference &difference, int now)
 	{
@@ -139,7 +104,7 @@ SimulatorPanel::SimulatorPanel(const Outfit &outfit, const Ship &target)
 	const MissileGuidance *original = weapon.Guidance() ? weapon.Guidance() : MissileGuidance::Default(weapon);
 	guidanceName = original ? original->Name() : "basic";
 	sourcePath = GameData::ScriptSource("guidance", guidanceName);
-	string text = NodeText(sourcePath, "guidance", guidanceName);
+	string text = GameData::ScriptText("guidance", guidanceName);
 	if(text.empty())
 		text = "guidance \"" + guidanceName + "\"\n\tset turn 0";
 	document.SetText(text);
@@ -440,38 +405,7 @@ void SimulatorPanel::UpdateRunNotes()
 	map<size_t, CodeEditor::LineNote> notes;
 	const GuidanceSimulation::Missile *missile = simulation->SelectedMissile();
 	if(missile && missile->endStep < 0)
-	{
-		using Kind = script::Trace::Step::Kind;
-		const script::Trace &trace = simulation->SelectedTrace();
-		for(const script::Trace::Step &step : trace.steps)
-		{
-			string text;
-			switch(step.kind)
-			{
-				case Kind::ASSIGN:
-					text = step.name + " = " + step.value.ToString();
-					break;
-				case Kind::CONDITION:
-					text = step.value.ToString();
-					break;
-				case Kind::EFFECT:
-					text = step.name;
-					break;
-				case Kind::STOP:
-					text = "stopped";
-					break;
-				case Kind::RETURN:
-					text = "returned " + step.value.ToString();
-					break;
-				case Kind::LOOP:
-					text = "#" + step.value.ToString();
-					break;
-			}
-			notes[step.line] = {text, false};
-		}
-		if(!trace.error.empty())
-			notes[trace.errorLine] = {"error: " + trace.error, true};
-	}
+		notes = CodeEditor::RunNotes(simulation->SelectedTrace());
 	editor.SetRun(notes);
 	editor.SetGlitch(missile && missile->endStep < 0 && missile->projectile.IsConfused()
 		? "SEEKER CONFUSED: it is steering, not the script" : "");

@@ -26,6 +26,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <vector>
 
 class Color;
+namespace script {
+	class Trace;
+}
 
 
 
@@ -59,6 +62,9 @@ public:
 	void SetErrors(const std::map<size_t, std::string> &errors);
 	// Which lines ran, and a note to show beside each, or none to show none.
 	void SetRun(const std::map<size_t, LineNote> &notes);
+	// The notes for a traced run of a script whose first line is the given
+	// line of its data file.
+	static std::map<size_t, LineNote> RunNotes(const script::Trace &trace, size_t firstLine = 1);
 	// Show the code breaking up, with this message over it, because the
 	// hardware has taken over from it (or an empty message to stop).
 	void SetGlitch(const std::string &message);

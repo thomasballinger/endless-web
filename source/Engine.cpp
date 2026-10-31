@@ -460,6 +460,11 @@ void Engine::Step(bool isActive)
 	events.swap(eventQueue);
 	eventQueue.clear();
 
+	// Show what the scripts the player is watching did on the latest step.
+	const WatchedScripts &watched = watchedScripts[currentDrawBuffer];
+	if(watched.isFresh)
+		scriptDisplay.Update(watched.flagship, watched.hasTarget ? &watched.target : nullptr, watched.targetName);
+
 	// About twice a second, pick up any edits to script files. The previous
 	// step's calculations are done, so no other thread is running scripts.
 	static int scriptCheckCountdown = 0;
@@ -1332,6 +1337,7 @@ void Engine::Draw() const
 
 	// Draw the heads-up display.
 	hud->Draw(info);
+	scriptDisplay.Draw(hud->GetBox("player code"), hud->GetBox("target code"));
 	if(hud->HasPoint("radar"))
 	{
 		radar[currentDrawBuffer].Draw(
@@ -1408,6 +1414,20 @@ void Engine::ReleaseDrag(const Point &from, const Point &to)
 	}
 	else
 		clickBox = Rectangle::WithCorners(from / zoom + camera.Center(), to / zoom + camera.Center());
+}
+
+
+
+bool Engine::ScriptClick(const Point &point)
+{
+	return scriptDisplay.Click(point);
+}
+
+
+
+bool Engine::ScriptScroll(const Point &point, double dy)
+{
+	return scriptDisplay.Scroll(point, dy);
 }
 
 
@@ -1655,6 +1675,7 @@ void Engine::CalculateStep()
 	draw[currentCalcBuffer].Clear(step, zoom);
 	batchDraw[currentCalcBuffer].Clear(step, zoom);
 	radar[currentCalcBuffer].Clear();
+	watchedScripts[currentCalcBuffer].isFresh = false;
 
 	if(!player.GetSystem())
 		return;
@@ -1852,6 +1873,24 @@ void Engine::CalculateStep()
 // Calculate things that require the engine not to be paused.
 void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 {
+	// Note which scripts the flagship and its target run, for the player to see.
+	WatchedScripts &watched = watchedScripts[currentCalcBuffer];
+	watched.isFresh = true;
+	watched.flagship.Clear();
+	watched.target.Clear();
+	watched.hasTarget = false;
+	ai.ClearWatches();
+	if(flagship)
+	{
+		ai.Watch(flagship, &watched.flagship);
+		if(shared_ptr<const Ship> target = flagship->GetTargetShip())
+		{
+			watched.hasTarget = true;
+			watched.targetName = target->GivenName().empty() ? target->DisplayModelName() : target->GivenName();
+			ai.Watch(target.get(), &watched.target);
+		}
+	}
+
 	// Now, all the ships must decide what they are doing next.
 	ai.Step(activeCommands);
 
@@ -1949,9 +1988,12 @@ void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 		it->Move(newVisuals);
 	PrunePointers(flotsam);
 
-	// Move the projectiles.
+	// Move the projectiles. The player watches their newest homing missile.
 	for(Projectile &projectile : projectiles)
+	{
+		script::Activity::Watch watch(projectile.IsWatched() ? &watched.flagship : nullptr);
 		projectile.Move(newVisuals, newProjectiles);
+	}
 	Prune(projectiles);
 
 	// Step the weather.
@@ -2118,7 +2160,20 @@ void Engine::MoveShip(const shared_ptr<Ship> &ship)
 		Random::SeedStream((*it)->RandomStream());
 
 	// Fire weapons.
+	const size_t firstFired = newProjectiles.size();
 	ship->Fire(newProjectiles, newVisuals, ship.get() == flagship ? &emptySoundsTimer : nullptr);
+	// The player watches the scripts of the flagship's newest homing missile.
+	if(isFlagship)
+		for(size_t i = newProjectiles.size(); i > firstFired; --i)
+			if(newProjectiles[i - 1].GetWeapon().Homing())
+			{
+				for(Projectile &projectile : projectiles)
+					projectile.SetWatched(false);
+				for(Projectile &projectile : newProjectiles)
+					projectile.SetWatched(false);
+				newProjectiles[i - 1].SetWatched(true);
+				break;
+			}
 
 	// Anti-missile and tractor beam systems are fired separately from normal weaponry.
 	// Track which ships have at least one such system ready to fire.

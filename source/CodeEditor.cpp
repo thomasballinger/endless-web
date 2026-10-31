@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "text/Font.h"
 #include "text/FontSet.h"
 #include "shader/LineShader.h"
+#include "script/Script.h"
 
 #include <algorithm>
 #include <cctype>
@@ -223,6 +224,46 @@ void CodeEditor::SetErrors(const map<size_t, string> &errors)
 void CodeEditor::SetRun(const map<size_t, LineNote> &notes)
 {
 	this->notes = notes;
+}
+
+
+
+map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trace, size_t firstLine)
+{
+	map<size_t, LineNote> notes;
+	auto line = [firstLine](size_t fileLine) { return fileLine + 1 - firstLine; };
+	using Kind = script::Trace::Step::Kind;
+	for(const script::Trace::Step &step : trace.steps)
+	{
+		if(step.line < firstLine)
+			continue;
+		string text;
+		switch(step.kind)
+		{
+			case Kind::ASSIGN:
+				text = step.name + " = " + step.value.ToString();
+				break;
+			case Kind::CONDITION:
+				text = step.value.ToString();
+				break;
+			case Kind::EFFECT:
+				text = step.name;
+				break;
+			case Kind::STOP:
+				text = "stopped";
+				break;
+			case Kind::RETURN:
+				text = "returned " + step.value.ToString();
+				break;
+			case Kind::LOOP:
+				text = "#" + step.value.ToString();
+				break;
+		}
+		notes[line(step.line)] = {text, false};
+	}
+	if(!trace.error.empty() && trace.errorLine >= firstLine)
+		notes[line(trace.errorLine)] = {"error: " + trace.error, true};
+	return notes;
 }
 
 

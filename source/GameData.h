@@ -105,6 +105,10 @@ public:
 	// The data file the given script came from (e.g. kind "guidance" and name
 	// "basic"), or an empty path.
 	static std::filesystem::path ScriptSource(const std::string &kind, const std::string &name);
+	// The lines of that file that define the script, from its first line up to
+	// the next line that isn't indented, or an empty string. The given line
+	// number, if any, is set to the file's line number for the first of them.
+	static std::string ScriptText(const std::string &kind, const std::string &name, size_t *firstLine = nullptr);
 	static void LoadSettings();
 	static void LoadShaders();
 	static double GetProgress();

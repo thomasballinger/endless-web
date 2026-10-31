@@ -268,6 +268,54 @@ public:
 
 
 
+// The scripts that ran for one object (such as a ship) during a step, for
+// showing a player. While an activity is being watched on a thread, every
+// program run that asks for a trace with Begin() gets one in it.
+class Activity {
+public:
+	// One script's latest run.
+	class Run {
+	public:
+		// The kind of script, as its data file names it ("maneuver", "turret",
+		// "guidance" and so on), and its name.
+		std::string kind;
+		std::string name;
+		Trace trace;
+	};
+
+	// Note runs on this thread in the given activity (or in none) until this
+	// is destroyed.
+	class Watch {
+	public:
+		explicit Watch(Activity *activity);
+		~Watch();
+		Watch(const Watch &) = delete;
+		Watch &operator=(const Watch &) = delete;
+
+	private:
+		Activity *previous = nullptr;
+	};
+
+
+public:
+	// The activity being noted on this thread, if any.
+	static Activity *Current();
+	// Where to trace a run of the given script, or null if nothing is being
+	// watched. A script that runs more than once in a step keeps its latest.
+	static Trace *Begin(const std::string &kind, const std::string &name);
+
+	void Clear();
+
+	std::vector<Run> runs;
+	// Anything else worth telling about the step, such as which AI rules ran.
+	std::vector<std::string> notes;
+	// If not empty, why the object's scripts were overridden (e.g. a confused
+	// seeker steering instead of its guidance script).
+	std::string overriddenBy;
+};
+
+
+
 class Program {
 public:
 	// A mistake that keeps a program from compiling, and the line of the data

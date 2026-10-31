@@ -265,6 +265,13 @@ bool MainPanel::Click(int x, int y, MouseButton button, int clicks)
 	dragSource = Point(x, y);
 	dragPoint = dragSource;
 
+	// The code the player is watching may be under the click.
+	if(engine.ScriptClick(dragSource))
+	{
+		canDrag = false;
+		return true;
+	}
+
 	SDL_Keymod mod = SDL_GetModState();
 	hasShift = (mod & KMOD_SHIFT);
 	hasControl = (mod & KMOD_CTRL);
@@ -309,6 +316,8 @@ bool MainPanel::Release(int x, int y, MouseButton button)
 
 bool MainPanel::Scroll(double dx, double dy)
 {
+	if(engine.ScriptScroll(UI::GetMouse(), dy))
+		return true;
 	if(dy < 0)
 		Preferences::ZoomViewOut();
 	else if(dy > 0)

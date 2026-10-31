@@ -340,6 +340,8 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 	{
 		if(guidanceTrace)
 			guidanceTrace->Clear();
+		if(script::Activity *activity = script::Activity::Current())
+			activity->overriddenBy = "SEEKER CONFUSED: it is steering, not the script";
 		turn *= confusionDirection;
 		return;
 	}
@@ -438,6 +440,20 @@ void Projectile::SetGuidanceTrace(script::Trace *trace)
 const MissileGuidance::Input &Projectile::LastGuidanceInput() const
 {
 	return lastGuidanceInput;
+}
+
+
+
+void Projectile::SetWatched(bool watched)
+{
+	isWatched = watched;
+}
+
+
+
+bool Projectile::IsWatched() const
+{
+	return isWatched;
 }
 
 

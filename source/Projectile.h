@@ -77,6 +77,10 @@ public:
 	// Whether the seeker has lost its lock and is confused, so that it steers
 	// the projectile instead of the guidance script.
 	bool IsConfused() const;
+	// Whether the player is watching this projectile's guidance script run.
+	// (Projectiles it creates are not watched.)
+	void SetWatched(bool watched);
+	bool IsWatched() const;
 	// Add a record of each run of the guidance script to the given list (or
 	// stop, with null), so that another script can be checked against them.
 	void SetGuidanceRecords(std::vector<MissileGuidance::Record> *records);
@@ -171,6 +175,7 @@ private:
 	script::Trace *guidanceTrace = nullptr;
 	MissileGuidance::Input lastGuidanceInput;
 	std::vector<MissileGuidance::Record> *guidanceRecords = nullptr;
+	bool isWatched = false;
 	// A positive value means this projectile will turn to the right;
 	// a negative value means this projectile will turn left.
 	int confusionDirection = 0;

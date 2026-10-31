@@ -37,12 +37,15 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Radar.h"
 #include "Random.h"
 #include "Rectangle.h"
+#include "script/Script.h"
+#include "ScriptWatchDisplay.h"
 #include "TaskQueue.h"
 
 #include <condition_variable>
 #include <list>
 #include <map>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -100,6 +103,10 @@ public:
 	void LeftClick(const Point &point, bool hasShift, bool hasControl, int clicks);
 	void ReleaseDrag(const Point &from, const Point &to);
 	void RightOrMiddleClick(const Point &point, MouseButton button, int clicks);
+	// Clicks and scrolling on the display of the scripts the player is
+	// watching. Each returns false if the point isn't on it.
+	bool ScriptClick(const Point &point);
+	bool ScriptScroll(const Point &point, double dy);
 	void SelectGroup(int group, bool hasShift, bool hasControl);
 
 	// Break targeting on all projectiles between the player and the given
@@ -286,6 +293,20 @@ private:
 	int lastTargetType = 0;
 	EscortDisplay escorts;
 	AmmoDisplay ammoDisplay;
+	// The scripts that ran for the player's flagship (and its newest homing
+	// missile) and for its target on the latest step, double buffered like the
+	// draw lists, and the display of them.
+	class WatchedScripts {
+	public:
+		// Whether these are from a step that ran (not one while paused).
+		bool isFresh = false;
+		bool hasTarget = false;
+		std::string targetName;
+		script::Activity flagship;
+		script::Activity target;
+	};
+	WatchedScripts watchedScripts[2];
+	ScriptWatchDisplay scriptDisplay;
 	std::vector<Outline> outlines;
 	std::vector<Status> statuses;
 	std::vector<PlanetLabel> labels;

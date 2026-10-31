@@ -318,6 +318,8 @@ target_sources(EndlessSkyLib PRIVATE
 	ScanType.h
 	Screen.cpp
 	Screen.h
+	ScriptWatchDisplay.cpp
+	ScriptWatchDisplay.h
 	ScrollBar.cpp
 	ScrollBar.h
 	ScrollArea.cpp

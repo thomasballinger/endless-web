@@ -441,6 +441,47 @@ marked and that selecting it makes the code glitch.
 tests/ai/simulator-ui.sh build/endless-sky
 ```
 
+## Watching scripts in the game
+
+The HUD shows what the scripts of the player's flagship and its target are
+doing. Under the target's name, and beside the flagship's status, is a small
+map of the code of the script that matters most at the moment: a ship's
+maneuver ("keep station", "attack", "fight"...), or the guidance of the
+newest homing missile the flagship fired. Each line of code is a dash (turned
+on its side under the target), lit when the line ran on the latest step. A
+ship following one of the AI's built-in (C++) rules instead shows that rule's
+name. A confused missile's map breaks up.
+
+Clicking a map opens a pane beside the HUD with that script's code. As in the
+simulator, the lines that ran are marked, with what each produced, and the
+rest are dimmed. There is a tab for each script that ran on the latest step
+(a ship may run a maneuver, "idle sweep" for its turrets, and the flotsam
+scripts), and a line listing the AI rules it followed. The values change a
+few times a second, so they can be read, and stay still while the game is
+paused. Clicking the map again, or the pane's close box, closes it.
+
+How it works: `script::Activity` collects traces. While a watched ship's AI
+runs (or a watched missile moves), every script run asks
+`Activity::Begin()` for a trace, the AI notes each rule it follows, and a
+confused seeker notes that it took over. `AI::Watch()` says which ships to
+watch; the engine watches the flagship and its target, and marks the
+flagship's newest homing missile. Traces only record, so watching changes
+nothing (the AI scenarios still match the reference build, with the flagship
+watched throughout). They are handed from the simulation thread to the
+drawing thread with the draw lists, and `ScriptWatchDisplay` draws them.
+
+`watch-ui.sh` checks this without anyone at the keyboard: it departs into
+the Al Dhanab scenario on a virtual display, targets ships until one is
+running a script, and checks that the map lights up, that clicking it opens
+the code with lines marked as run, and that the close box closes it.
+
+```sh
+tests/ai/watch-ui.sh build/endless-sky
+```
+
+Later: a scanner outfit needed to see other ships' code, and jamming or
+hacking it.
+
 ## Turret scripts
 
 `data/turrets.txt` holds scripts that move one turret, or one moving

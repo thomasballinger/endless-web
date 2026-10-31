@@ -77,7 +77,8 @@ bool TurretScript::Run(const Input &input, double &aim) const
 	variables[AIM] = script::Value(input.previousAim);
 
 	uint32_t effects = 0;
-	if(!program.Run(variables, effects) || variables[AIM].GetType() != script::Value::Type::NUMBER)
+	if(!program.Run(variables, effects, nullptr, script::Activity::Begin("turret", Name()))
+			|| variables[AIM].GetType() != script::Value::Type::NUMBER)
 		return false;
 	aim = variables[AIM].Number();
 	return true;

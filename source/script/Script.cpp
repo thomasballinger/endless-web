@@ -430,6 +430,7 @@ namespace {
 	// function calls deep it is, and the line of the statement running.
 	thread_local Trace *currentTrace = nullptr;
 	thread_local RandomTape *currentTape = nullptr;
+	thread_local Activity *currentActivity = nullptr;
 	thread_local int traceDepth = 0;
 	thread_local size_t currentLine = 0;
 
@@ -1767,6 +1768,50 @@ double RandomTape::Draw(uint32_t modulus)
 	// A different draw than before: what it gets no longer matters.
 	matches = false;
 	return 0.;
+}
+
+
+
+Activity::Watch::Watch(Activity *activity)
+	: previous(currentActivity)
+{
+	currentActivity = activity;
+}
+
+
+
+Activity::Watch::~Watch()
+{
+	currentActivity = previous;
+}
+
+
+
+Activity *Activity::Current()
+{
+	return currentActivity;
+}
+
+
+
+Trace *Activity::Begin(const string &kind, const string &name)
+{
+	if(!currentActivity)
+		return nullptr;
+	for(Run &run : currentActivity->runs)
+		if(run.kind == kind && run.name == name)
+			return &run.trace;
+	currentActivity->runs.push_back({kind, name, Trace()});
+	return &currentActivity->runs.back().trace;
+}
+
+
+
+void Activity::Clear()
+{
+	runs.clear();
+	notes.clear();
+	overriddenBy.clear();
 }
 
 

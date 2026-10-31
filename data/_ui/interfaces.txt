@@ -1267,6 +1267,10 @@ interface "hud"
 		dimensions 0 -192
 		color "dim"
 		size 2
+	# A map of the code the flagship (or its newest homing missile) is running.
+	point "player code"
+		center -108 330
+		dimensions 80 170
 
 	# Targets.
 	anchor top left
@@ -1353,6 +1357,10 @@ interface "hud"
 	string "mission target"
 		center 75 455
 		color "medium"
+	# A map of the code the target's AI is running.
+	point "target code"
+		center 75 495
+		dimensions 140 44
 	
 	visible if "range display"
 	sprite "ui/tactical/range"

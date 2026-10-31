@@ -22,6 +22,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Command.h"
 #include "ConditionsStore.h"
 #include "Conversation.h"
+#include "DataFile.h"
 #include "DataNode.h"
 #include "DataWriter.h"
 #include "Effect.h"
@@ -72,6 +73,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cassert>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <queue>
 #include <ranges>
 #include <utility>
@@ -234,6 +236,43 @@ vector<string> GameData::ReloadChangedScripts()
 filesystem::path GameData::ScriptSource(const string &kind, const string &name)
 {
 	return objects.ScriptSource(kind, name);
+}
+
+
+
+string GameData::ScriptText(const string &kind, const string &name, size_t *firstLine)
+{
+	const filesystem::path path = ScriptSource(kind, name);
+	if(path.empty())
+		return "";
+	size_t start = 0;
+	for(const DataNode &node : DataFile(path))
+		if(node.Token(0) == kind)
+			for(int i = 1; i < node.Size(); ++i)
+				if(node.Token(i) == name)
+					start = node.LineNumber();
+	if(!start)
+		return "";
+	if(firstLine)
+		*firstLine = start;
+	ifstream in(path);
+	vector<string> lines;
+	for(string line; getline(in, line); )
+		lines.push_back(line);
+	string text;
+	for(size_t i = start - 1; i < lines.size(); ++i)
+	{
+		const string &line = lines[i];
+		if(i >= start && !line.empty() && line[0] != '\t' && line[0] != ' ')
+			break;
+		text += line + "\n";
+	}
+	// Leave off blank lines at the end.
+	while(text.size() > 1 && text[text.size() - 2] == '\n')
+		text.pop_back();
+	if(!text.empty() && text.back() == '\n')
+		text.pop_back();
+	return text;
 }
 
 
