@@ -86,6 +86,42 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   escorts (no outfit needed, for now; you don't even need an escort to try
   it).
 
+- **Factions' missiles fly their own firmware.** Pirate missiles corkscrew
+  on the way in (harder for anti-missile turrets), Navy and Militia ones use
+  proportional navigation, Korath ones come in at an angle from a side they
+  pick at random, Hai ones coast until they face you, merchants' turn
+  gently. Each is a "program" in `data/programs.txt`; "Classic AI scripts"
+  turns them off too. Watch an incoming missile's code (with a scanner) to
+  see which one it runs.
+- **The program exchange and your library.** In the workshop, **X** (or the
+  tab) opens the exchange: each faction's programs, sold where its authors
+  live (Navy programs in Republic space, the Syndicate's in Syndicate
+  space...), or all of them to a pilot who chose the **Missile Lab** start.
+  Number keys buy. Back on the fleet tab (**F**), each weapon, your
+  escorts and your defense daemon have a program chooser: the arrows (or
+  **Shift+number**, **Shift+E**, **H**) cycle through the factory's
+  program, the ones you bought that its hardware can run, and the ones in
+  your library. Installing an edited program in the simulator puts it in
+  your library (named for the weapon, unless you renamed it on its first
+  line), so you can keep several and switch between them.
+- **Defense Daemon** (Systems, with the Common Outfits, 120,000): with a
+  Code Scanner and a Code Injector, it hacks incoming missiles for you.
+  Whenever the injector is ready, its program rates every missile chasing
+  you or your escorts that the scanner can read, and the injector hacks the
+  highest scorer. The factory program ("nearest first") takes whichever will
+  hit first; the exchange sells "Triage" (Syndicate: most damage soonest,
+  ignoring missiles that lost their lock), "Last Instant" (Korath: waits
+  until a missile is too close to recover) and "Swarm Breaker" (Hai: the
+  farthest missile that will run out of fuel before it recovers). **Korath
+  and Hai ships run their own daemons against your missiles.** In the
+  simulator, **H** has the target run each daemon in turn: hacked missiles
+  get a lightning bolt on their trail and "HACKED" in their log.
+- **Code as loot.** In the code pane, **COPY** (beside HACK) copies the
+  guidance or maneuver you're reading into your library as "... (copied)",
+  as long as jamming doesn't garble it. Copy a pirate missile's corkscrew as
+  it closes in, then choose it for your own launcher, or open it in the
+  simulator and improve it.
+
 Things worth trying: make your Meteors lead their targets (they can't, on
 basic hardware: the workshop will tell you why), make them coast instead of
 overshooting, or make a missile that gives up and flies straight when it
@@ -96,6 +132,15 @@ scanner.
 
 - Nothing in the test scenarios fires a homing missile at the player, so the
   "Incoming missile" button has only been checked by reading the code.
+  (`tests/ai/daemon-test.sh` adds pirate Ravens to Al Dhanab to test the
+  Defense Daemon, and could be used for that.)
+- You can choose a defense daemon, buy one, or copy one, but not yet write
+  one: daemons have no editor or simulator of their own.
+- A copied maneuver (say, a pirate's "fight") shows up as a choice for how
+  your escorts keep station, which is probably not what it's for.
+- Faction firmware is only tuned roughly against the guidance bench; some
+  of it (Flanker, Patient Strike) hits less often than the factory's on the
+  bench's drills, which is fine for flavor but may not be for balance.
 - The Al Dhanab test scenario isn't quite deterministic on a busy machine:
   its last few state hashes sometimes differ between two runs of the same
   build (the reference build too).
@@ -111,21 +156,22 @@ Things that would build on what's here, roughly from smallest to largest:
 - **A scorecard in the workshop.** The guidance bench already scores
   scripts against every drill; show its table next to the simulator, so
   improving a program is a game of its own.
-- **Code as loot.** Boarding a disabled ship copies its scripts into your
-  library ("salvaged pirate attack routine"), to install on your escorts, or
-  to study.
-- **Programming escorts.** The same workshop for your escorts' maneuvers
-  ("keep station", "attack"), with a fleet drill in the simulator.
+- **A daemon workshop.** The missile simulator with the editor on the
+  target's defense daemon instead of the missiles' guidance: write a daemon,
+  and watch which missiles it picks.
+- **Boarding loot.** Boarding a disabled ship copies all its scripts, even
+  jammed ones ("salvaged pirate attack routine").
+- **More escort maneuvers.** "attack", "fight" and "move to" in the escort
+  workshop, with a fleet drill.
 - **Programmable turrets.** Point-defense priorities and idle sweeps.
-- **Firmware for sale.** Outfits that are programs: "Southbound Missile
-  Firmware 2.0" for sale, licensed, with a header comment to match.
 - **Hardware for thinking.** Missile computers with a limit on how many steps
   a program may take, so better hardware runs smarter code.
 - **Decoys that fool code.** A confused seeker could report a phantom target
   instead of taking over, so programs can learn to distrust a target that
   jumps (this changes how missiles behave, so it was left out so far).
-- **Counter-hacking.** NPCs with injectors (Korath hackers?) going after your
-  missiles and ships, and a firewall outfit.
+- **Counter-hacking.** NPCs with injectors going after your ships (Korath
+  daemons already go after your missiles), and a firewall outfit; missiles
+  whose guidance notices it was hacked.
 - **Law and order.** Flying with hacked or unlicensed code in Republic space
   is illegal, like illegal outfits; the Syndicate puts bounties on leaked
   code.
