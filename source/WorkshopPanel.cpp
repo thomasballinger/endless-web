@@ -256,8 +256,10 @@ bool WorkshopPanel::Click(int x, int y, MouseButton button, int clicks)
 			Cycle(*row, -1);
 		else if(row->next.Contains(point))
 			Cycle(*row, 1);
-		else if((row->kind == "daemon" || row->kind == "role") && row->box.Contains(point))
+		else if(row->kind == "daemon" && row->box.Contains(point))
 			Cycle(*row, 1);
+		else if(row->kind == "role" && row->box.Contains(point))
+			OpenEscorts(row->uuid);
 		else if(row->box.Contains(point))
 		{
 			if(row->outfit)
@@ -317,7 +319,8 @@ void WorkshopPanel::DrawFleet(const Rectangle &box, double y)
 		: "needs a Defense Daemon outfit on your flagship");
 	y += ROW_HEIGHT + 10.;
 	// Roles: one for all escorts, and each escort's own, if it has one.
-	font.Draw("Escort roles: what each escort does in a fight (r changes the role for all).",
+	font.Draw("Escort roles: what each escort does in a fight. Click one to try it against a raider; r changes"
+		" all.",
 		Point(box.Left() + 24., y), TEXT);
 	y += 22.;
 	for(Row &row : roleRows)
@@ -726,14 +729,15 @@ void WorkshopPanel::Buy(const Firmware &firmware)
 
 
 
-void WorkshopPanel::OpenEscorts()
+void WorkshopPanel::OpenEscorts(const string &roleUuid)
 {
-	// The player's flagship leads; the escort is one of the player's own, if
-	// they have any, or else a light warship.
+	// The player's flagship leads; the escort is the one whose role this is,
+	// or one of the player's own, if they have any, or else a light warship.
 	const Ship *leader = player.Flagship();
 	const Ship *escort = nullptr;
 	for(const shared_ptr<Ship> &ship : player.Ships())
-		if(ship.get() != leader && !ship->IsDestroyed() && !ship->IsParked() && !ship->CanBeCarried())
+		if(ship.get() != leader && !ship->IsDestroyed() && !ship->IsParked() && !ship->CanBeCarried()
+				&& (roleUuid.empty() || roleUuid == "*" || ship->UUID().ToString() == roleUuid))
 		{
 			escort = ship.get();
 			break;
@@ -743,7 +747,7 @@ void WorkshopPanel::OpenEscorts()
 	if(!leader)
 		leader = GameData::Ships().Find("Argosy");
 	if(leader && escort)
-		GetUI().Push(new EscortWorkshopPanel(&player, *leader, *escort));
+		GetUI().Push(new EscortWorkshopPanel(&player, *leader, *escort, roleUuid));
 }
 
 

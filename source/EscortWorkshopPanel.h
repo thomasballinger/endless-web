@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "CodeDocument.h"
 #include "CodeEditor.h"
+#include "EscortRole.h"
 #include "EscortSimulation.h"
 #include "Point.h"
 #include "Rectangle.h"
@@ -36,14 +37,18 @@ class Ship;
 
 
 // Where the player programs how their escorts fly: the "keep station"
-// maneuver, which holds an escort near its leader. A leader flies a drill (or
-// the player flies it, with the arrow keys) and an escort keeps station on
-// it, with the program being edited. Every edit replays the run so far with
-// the new program, the old escort's course showing faintly. Installing the
-// program makes the player's escorts fly it.
+// maneuver, which holds an escort near its leader, or an escort's role (see
+// EscortRole), which decides what it does in a fight. A leader flies a drill
+// (or the player flies it, with the arrow keys) and an escort keeps station
+// on it, or for a role, does what the role says while a raider attacks.
+// Every edit replays the run so far with the new program, the old escort's
+// course showing faintly. Installing the program makes the player's escorts
+// fly it.
 class EscortWorkshopPanel : public Panel {
 public:
-	EscortWorkshopPanel(PlayerInfo *player, const Ship &leader, const Ship &escort);
+	// With a role UUID, edit the role of that escort ("*" for all escorts).
+	EscortWorkshopPanel(PlayerInfo *player, const Ship &leader, const Ship &escort,
+		const std::string &roleUuid = "");
 
 	virtual void Step() override;
 	virtual void Draw() override;
@@ -68,6 +73,7 @@ private:
 	void DrawGrid() const;
 	void DrawInspector() const;
 	void DrawStatus() const;
+	bool IsRole() const;
 	void ScrubTo(double x);
 
 
@@ -77,6 +83,9 @@ private:
 	std::unique_ptr<EscortSimulation> simulation;
 	// The program in use, and the version of the document it came from.
 	ShipManeuver program;
+	// For a role: whose it is, and the role.
+	std::string roleUuid;
+	EscortRole role;
 	CodeDocument document;
 	CodeEditor editor;
 	uint64_t compiledVersion = 0;

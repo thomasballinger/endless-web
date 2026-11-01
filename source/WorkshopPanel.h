@@ -92,8 +92,9 @@ private:
 	int Current(const Row &row, const std::vector<Choice> &choices) const;
 	void Cycle(const Row &row, int direction);
 	void Open(const Outfit &outfit);
-	// Open the escort workshop, for how the player's escorts keep station.
-	void OpenEscorts();
+	// Open the escort workshop, for how the player's escorts keep station, or
+	// for the role of an escort (or of all of them).
+	void OpenEscorts(const std::string &roleUuid = "");
 	bool IsSoldHere(const Firmware &firmware) const;
 	void Buy(const Firmware &firmware);
 

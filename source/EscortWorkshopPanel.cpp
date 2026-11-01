@@ -36,6 +36,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <sstream>
 
@@ -64,6 +65,9 @@ namespace {
 	const Color BAD(.95f, .35f, .30f, 1.f);
 	const Color PANEL(0.f, .02f, .04f, .85f);
 	const Color GHOST(.98f * .3f, .75f * .3f, .30f * .3f, .3f);
+	const Color RAIDER(.95f, .35f, .30f, 1.f);
+	// The role to start from, for an escort without one.
+	const string FIRST_ROLE = "Bodyguard";
 
 	// Ships to try as the escort, if the player has none of their own.
 	const vector<string> ESCORTS = {"Sparrow", "Hawk", "Clipper", "Argosy", "Bulk Freighter"};
@@ -71,14 +75,28 @@ namespace {
 
 
 
-EscortWorkshopPanel::EscortWorkshopPanel(PlayerInfo *player, const Ship &leader, const Ship &escort)
+EscortWorkshopPanel::EscortWorkshopPanel(PlayerInfo *player, const Ship &leader, const Ship &escort,
+		const string &roleUuid)
 	: player(player), leaderModel(&leader), simulation(make_unique<EscortSimulation>(leader, escort)),
-	editor(document)
+	roleUuid(roleUuid), editor(document)
 {
 	SetIsFullScreen(true);
 	SetInterruptible(false);
 	string text = FactoryText();
-	if(player)
+	if(player && IsRole())
+	{
+		// The escort's own role, or else the one all escorts play.
+		for(const string &uuid : {roleUuid, string("*")})
+		{
+			auto it = player->EscortRoles().find(uuid);
+			if(it != player->EscortRoles().end())
+			{
+				text = it->second;
+				break;
+			}
+		}
+	}
+	else if(player)
 	{
 		auto it = player->ManeuverPrograms().find("keep station");
 		if(it != player->ManeuverPrograms().end())
@@ -121,9 +139,17 @@ void EscortWorkshopPanel::Step()
 		wasFlying = flying;
 		if(simulation->CurrentStep() >= LOOP_STEPS)
 			simulation->Reset();
+		const int destroyed = simulation->RaidersDestroyed();
 		simulation->Step();
+		// For tests: note each raider the escort destroys.
+		static const bool log = getenv("ES_SIMULATOR_LOG");
+		if(log && simulation->RaidersDestroyed() > destroyed)
+		{
+			printf("ESCORT WORKSHOP raider destroyed at step %d\n", simulation->CurrentStep());
+			fflush(stdout);
+		}
 	}
-	editor.SetRun(CodeEditor::RunNotes(simulation->LastTrace()));
+	editor.SetRun(CodeEditor::RunNotes(IsRole() ? simulation->RoleTrace() : simulation->LastTrace()));
 }
 
 
@@ -133,9 +159,18 @@ void EscortWorkshopPanel::Draw()
 	Layout();
 	const Point leader = simulation->Leader().Position();
 	const Point escort = simulation->Escort().Position();
-	const Point span = Point(fabs(leader.X() - escort.X()), fabs(leader.Y() - escort.Y())) + Point(1200., 1200.);
+	// Keep every ship in view (the raider too, once it is close).
+	Point low(min(leader.X(), escort.X()), min(leader.Y(), escort.Y()));
+	Point high(max(leader.X(), escort.X()), max(leader.Y(), escort.Y()));
+	if(simulation->HasRaider() && simulation->Raider().Position().Distance(leader) < 2500.)
+	{
+		const Point raider = simulation->Raider().Position();
+		low = Point(min(low.X(), raider.X()), min(low.Y(), raider.Y()));
+		high = Point(max(high.X(), raider.X()), max(high.Y(), raider.Y()));
+	}
+	const Point span = high - low + Point(1200., 1200.);
 	const double fit = min(view.Width() / span.X(), view.Height() / span.Y());
-	center += ((leader + escort) / 2. - center) * .1;
+	center += ((low + high) / 2. - center) * .1;
 	zoom += (fit - zoom) * .1;
 
 	FillShader::Fill(Point(), Screen::Dimensions(), BACKGROUND);
@@ -154,17 +189,35 @@ void EscortWorkshopPanel::Draw()
 	};
 	trail(simulation->LeaderTrail(), LEADER);
 	trail(simulation->EscortTrail(), ESCORT);
+	if(simulation->HasRaider())
+		trail(simulation->RaiderTrail(), RAIDER);
 
-	// How close counts as on station, and how far off the escort is.
-	const double distance = simulation->Distance();
-	const Color &state = distance <= CLOSE ? GOOD : BAD;
-	RingShader::Draw(ToScreen(leader), CLOSE * zoom, CLOSE * zoom - 1.5,
-		Color(state.Get()[0] * .5f, state.Get()[1] * .5f, state.Get()[2] * .5f, .5f));
-	LineShader::DrawDashed(ToScreen(escort), ToScreen(leader), (leader - escort).Unit(), 1.f, state, 6., 6.);
+	if(IsRole())
+	{
+		// Where the role sends the escort: its station, or the raider.
+		const Point station = simulation->StationPoint();
+		const Color &color = simulation->HasRaider() && station == simulation->Raider().Position() ? RAIDER : GOOD;
+		LineShader::DrawDashed(ToScreen(escort), ToScreen(station), (station - escort).Unit(), 1.f, color, 6., 6.);
+		const Point at = ToScreen(station);
+		LineShader::Draw(at + Point(-8., 0.), at + Point(8., 0.), 1.5f, color, false);
+		LineShader::Draw(at + Point(0., -8.), at + Point(0., 8.), 1.5f, color, false);
+	}
+	else
+	{
+		// How close counts as on station, and how far off the escort is.
+		const double distance = simulation->Distance();
+		const Color &state = distance <= CLOSE ? GOOD : BAD;
+		RingShader::Draw(ToScreen(leader), CLOSE * zoom, CLOSE * zoom - 1.5,
+			Color(state.Get()[0] * .5f, state.Get()[1] * .5f, state.Get()[2] * .5f, .5f));
+		LineShader::DrawDashed(ToScreen(escort), ToScreen(leader), (leader - escort).Unit(), 1.f, state, 6., 6.);
+	}
 
 	// The ships, drawn at least big enough to see, each where it is.
 	const double shipZoom = max(zoom, .3);
-	for(const Ship *ship : {&simulation->Leader(), &simulation->Escort()})
+	vector<const Ship *> ships = {&simulation->Leader(), &simulation->Escort()};
+	if(simulation->HasRaider())
+		ships.push_back(&simulation->Raider());
+	for(const Ship *ship : ships)
 	{
 		DrawList draw;
 		draw.Clear(simulation->CurrentStep(), shipZoom);
@@ -175,6 +228,8 @@ void EscortWorkshopPanel::Draw()
 	const Font &font = FontSet::Get(14);
 	font.Draw("you", ToScreen(leader) + Point(18., -20.), LEADER);
 	font.Draw("escort", ToScreen(escort) + Point(18., -20.), ESCORT);
+	if(simulation->HasRaider())
+		font.Draw("raider", ToScreen(simulation->Raider().Position()) + Point(18., -20.), RAIDER);
 
 	// The timeline.
 	const double left = view.Left() + 20.;
@@ -200,9 +255,12 @@ bool EscortWorkshopPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &co
 	else if(control && key == SDLK_d)
 	{
 		document.SetText(FactoryText());
-		if(player)
+		if(player && IsRole())
+			player->SetEscortRole(roleUuid, "");
+		else if(player)
 			player->SetManeuverProgram("keep station", "");
-		status = "Restored the factory's flight program for your escorts.";
+		status = IsRole() ? "Back to " + FIRST_ROLE + " (not installed: ctrl+s installs it)."
+			: "Restored the factory's flight program for your escorts.";
 		statusTime = 300;
 	}
 	else if(control && key == SDLK_SPACE)
@@ -335,14 +393,34 @@ void EscortWorkshopPanel::Recompile()
 	istringstream in(document.Text());
 	DataFile file(in);
 	const DataNode *node = nullptr;
+	const string kind = IsRole() ? "role" : "maneuver";
 	for(const DataNode &child : file)
-		if(!node && child.Token(0) == "maneuver" && child.Size() >= 2)
+		if(!node && child.Token(0) == kind && child.Size() >= 2)
 			node = &child;
 	if(!node)
 	{
-		errors[1] = "The first line should be: maneuver \"keep station\"";
+		errors[1] = IsRole() ? "The first line should be: role \"<name>\""
+			: "The first line should be: maneuver \"keep station\"";
 		editor.SetErrors(errors);
 		hasErrors = true;
+		return;
+	}
+	if(IsRole())
+	{
+		EscortRole candidate;
+		candidate.Load(*node, false);
+		for(const script::Program::Error &error : candidate.Program().Errors())
+			errors.emplace(error.line, error.message);
+		editor.SetErrors(errors);
+		hasErrors = !errors.empty();
+		if(hasErrors)
+			return;
+		if(role.IsValid())
+			ghost = simulation->EscortTrail();
+		const int step = simulation->CurrentStep();
+		role = std::move(candidate);
+		simulation->SetRole(&role);
+		simulation->ReplayTo(step);
 		return;
 	}
 	ShipManeuver candidate;
@@ -382,6 +460,33 @@ void EscortWorkshopPanel::Install()
 		statusTime = 300;
 		return;
 	}
+	if(IsRole())
+	{
+		// A role the game has is given as it is; an edited one is the player's,
+		// and kept in their library.
+		string text = document.Text();
+		string name = Firmware::NameOf(text);
+		const bool isGameScript = Firmware::IsGameScript("role", name);
+		const bool unchanged = isGameScript && text == GameData::ScriptText("role", name);
+		if(!unchanged && (isGameScript || name.empty()))
+		{
+			name = name.empty() ? "Escort role" : name + " (edited)";
+			text = Firmware::Renamed(text, name);
+			document.SetText(text);
+			compiledVersion = document.Version();
+		}
+		if(!player->SetEscortRole(roleUuid, text))
+			status = "That role doesn't compile.";
+		else
+		{
+			if(!unchanged)
+				player->SetLibraryProgram(name, text);
+			status = (roleUuid == "*" ? "Installed: your escorts play " : "Installed: this escort plays ") + name
+				+ (unchanged ? "." : ", saved in your library.");
+		}
+		statusTime = 300;
+		return;
+	}
 	// As in the missile workshop: a program the game has is installed as it
 	// is, and an edited one is the player's, and kept in their library.
 	const bool isFactory = (document.Text() == FactoryText());
@@ -411,8 +516,20 @@ void EscortWorkshopPanel::Install()
 
 
 
+bool EscortWorkshopPanel::IsRole() const
+{
+	return !roleUuid.empty();
+}
+
+
+
 string EscortWorkshopPanel::FactoryText() const
 {
+	if(IsRole())
+	{
+		const string text = GameData::ScriptText("role", FIRST_ROLE);
+		return text.empty() ? "role \"" + FIRST_ROLE + "\"\n\tkeep_station" : text;
+	}
 	string text = GameData::ScriptText("maneuver", "keep station");
 	return text.empty() ? "maneuver \"keep station\"\n\tset forward true" : text;
 }
@@ -431,6 +548,8 @@ void EscortWorkshopPanel::NextEscort()
 		simulation = make_unique<EscortSimulation>(*leaderModel, *model);
 		simulation->SetDrill(drill);
 		simulation->SetProgram(program.IsValid() ? &program : nullptr);
+		simulation->SetRole(IsRole() && role.IsValid() ? &role : nullptr);
+		simulation->Reset();
 		ghost.clear();
 		status = "Your escort is a " + model->DisplayModelName() + ".";
 		statusTime = 180;
@@ -495,6 +614,48 @@ void EscortWorkshopPanel::DrawInspector() const
 	line("Drill: " + simulation->Drills()[simulation->DrillIndex()].name, TEXT);
 	line("(arrow keys: fly it yourself)", DIM);
 	y += 10.;
+	if(IsRole())
+	{
+		// The fight: how each ship is doing, and what the role decided.
+		auto bar = [&](const string &label, double fraction, const Color &color) {
+			font.Draw(label, Point(left + 12., y), DIM);
+			const double x = left + 90.;
+			const double width = INSPECTOR_WIDTH - 110.;
+			FillShader::Fill(Point(x + width / 2., y + 7.), Point(width, 8.), GRID_MAJOR);
+			FillShader::Fill(Point(x + width * fraction / 2., y + 7.), Point(width * fraction, 8.), color);
+			y += 18.;
+		};
+		bar("you", simulation->LeaderHull(), LEADER);
+		bar("escort", simulation->EscortHull(), ESCORT);
+		if(simulation->HasRaider())
+			bar("raider", simulation->RaiderHull(), RAIDER);
+		else
+			line("no raider (yet)", DIM);
+		snprintf(text, sizeof(text), "raiders destroyed: %d", simulation->RaidersDestroyed());
+		line(text, DIM);
+		y += 10.;
+		static const char *const WHAT[] = {"keeping station", "attacking the threat", "attacking your target",
+			"attacking its target", "retreating", "left to the usual AI"};
+		const EscortRole::Output &decided = simulation->RoleOutput();
+		if(!simulation->RoleRan())
+			line("the role failed this step", BAD);
+		else if(!decided.chose)
+			line("the role chose nothing (usual AI)", DIM);
+		else
+		{
+			line(string("the escort is ") + WHAT[decided.behavior], TEXT);
+			if(decided.behavior == EscortRole::KEEP_STATION)
+			{
+				snprintf(text, sizeof(text), "station: %.0f right, %.0f ahead", decided.station.X(),
+					decided.station.Y());
+				line(text, DIM);
+			}
+		}
+		y += 10.;
+		line("The escort is a " + simulation->Escort().DisplayModelName(), DIM);
+		line("(t to try another)", DIM);
+		return;
+	}
 	const double distance = simulation->Distance();
 	snprintf(text, sizeof(text), "escort %.0f away", distance);
 	line(text, distance <= CLOSE ? GOOD : BAD);
@@ -542,8 +703,10 @@ void EscortWorkshopPanel::DrawStatus() const
 {
 	const Font &font = FontSet::Get(14);
 	FillShader::Fill(Point(0., Screen::Top() + STATUS_HEIGHT / 2.), Point(Screen::Width(), STATUS_HEIGHT), PANEL);
-	const string line = string("ESCORT WORKSHOP   maneuver \"keep station\"   step ")
-		+ to_string(simulation->CurrentStep()) + (paused ? "  (paused)" : "");
+	const string what = IsRole() ? "role \"" + role.Name() + "\" for " + (roleUuid == "*" ? "all your escorts"
+		: "this escort") : "maneuver \"keep station\"";
+	const string line = "ESCORT WORKSHOP   " + what + "   step " + to_string(simulation->CurrentStep())
+		+ (paused ? "  (paused)" : "");
 	font.Draw(line, Point(Screen::Left() + 14., Screen::Top() + 11.), TEXT);
 	const string &note = statusTime ? status : hasErrors
 		? string("The program has mistakes, so the last version without any is running.") : string();

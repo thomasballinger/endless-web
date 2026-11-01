@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "EscortRole.h"
 #include "GuidanceDrill.h"
 #include "Point.h"
 #include "script/Script.h"
@@ -28,12 +29,16 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 
-// A small, repeatable world for trying out the "keep station" maneuver that
-// escorts fly: a leader flies a drill (or is flown by the player), and an
-// escort keeps station on it with a maneuver script. Ships move as the game
-// moves them: turning at their turn rate, thrusting forward or in reverse,
-// and slowed by drag. Nothing is random, so replaying to a step after the
-// script changes shows exactly what the change did.
+// A small, repeatable world for trying out how escorts fly: a leader flies a
+// drill (or is flown by the player), and an escort keeps station on it with
+// a maneuver script. Given a role (see EscortRole), the escort does what the
+// role says instead, and a raider comes to attack: it circles in on the
+// leader (or on the escort, if the escort is fighting it), and is destroyed
+// if the escort fights it long enough, to come back later from somewhere
+// else. Ships hurt what they are close to and facing, and slowly recover.
+// Ships move as the game moves them: turning at their turn rate, thrusting
+// forward or in reverse, and slowed by drag. Nothing is random, so replaying
+// to a step after the script changes shows exactly what the change did.
 class EscortSimulation {
 public:
 	class Drill {
@@ -48,6 +53,9 @@ public:
 
 	// Fly the escort with this maneuver (or, if null, the game's).
 	void SetProgram(const ShipManeuver *program);
+	// Have the escort play this role (or, if null, only keep station, with no
+	// raider). Takes effect from the next Reset().
+	void SetRole(const EscortRole *role);
 
 	const std::vector<Drill> &Drills() const;
 	int DrillIndex() const;
@@ -79,6 +87,22 @@ public:
 	const ShipManeuver::Output &LastOutput() const;
 	bool LastRan() const;
 
+	// The raider, if there is one now, and where it has been; how healthy each
+	// ship is (from 0 to 1); and how many raiders the escort has destroyed.
+	bool HasRaider() const;
+	const Ship &Raider() const;
+	const std::deque<Point> &RaiderTrail() const;
+	double LeaderHull() const;
+	double EscortHull() const;
+	double RaiderHull() const;
+	int RaidersDestroyed() const;
+	// How the role ran on the latest step, and what it decided, and where the
+	// escort's station is (if it is keeping station).
+	const script::Trace &RoleTrace() const;
+	bool RoleRan() const;
+	const EscortRole::Output &RoleOutput() const;
+	const Point &StationPoint() const;
+
 	// How far the escort is from the leader now, on average so far, and the
 	// fraction of steps so far that it was within the given distance.
 	double Distance() const;
@@ -88,6 +112,11 @@ public:
 
 private:
 	void Fly(GuidanceDrill::Motion &motion, const Ship &ship, double turn, bool forward, bool back);
+	// The escort's step: keep station at a point, or chase the raider.
+	void KeepStationAt(const Point &point);
+	void ChaseRaider();
+	void StepRaider();
+	EscortRole::Input RoleInput() const;
 
 
 private:
@@ -108,4 +137,24 @@ private:
 	ShipManeuver::Input input;
 	ShipManeuver::Output output;
 	bool ran = false;
+
+	const EscortRole *role = nullptr;
+	script::Memory roleMemory;
+	script::Trace roleTrace;
+	EscortRole::Output roleOutput;
+	bool roleRan = false;
+	Point stationPoint;
+	// The raider, and the ships' health.
+	Ship raider;
+	bool hasRaiderModel = false;
+	bool raiderHere = false;
+	GuidanceDrill::Motion raiderMotion;
+	std::deque<Point> raiderTrail;
+	int raiderReturns = 0;
+	int raids = 0;
+	int destroyed = 0;
+	double leaderHull = 1.;
+	double escortHull = 1.;
+	double raiderHull = 1.;
+	bool escortAttacking = false;
 };

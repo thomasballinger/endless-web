@@ -29,6 +29,42 @@ namespace {
 
 	// How many recent positions to keep for each ship's trail.
 	const size_t TRAIL_LENGTH = 600;
+	// When the first raider arrives, how far from the leader, how long until
+	// another comes after one is destroyed, and the ship it flies.
+	const int RAIDER_ARRIVES = 240;
+	const double RAIDER_DISTANCE = 2000.;
+	const int RAIDER_RETURNS = 300;
+	const string RAIDER_MODEL = "Headhunter";
+	// Within what range, and how close to facing it, a ship hurts another, and
+	// how much each step (as a fraction of the other's hull), and how fast
+	// ships recover.
+	const double GUN_RANGE = 500.;
+	const double GUN_ARC = 25.;
+	const double RAIDER_DAMAGE = .0012;
+	const double ESCORT_DAMAGE = .003;
+	const double REPAIR = .0002;
+
+	// Turn toward a direction, given in any vector, and thrust while facing
+	// roughly that way.
+	GuidanceDrill::Control Toward(const GuidanceDrill::Motion &motion, const Point &direction, double turnRate)
+	{
+		GuidanceDrill::Control control;
+		if(!direction)
+			return control;
+		const double off = (Angle(direction) - motion.facing).Degrees();
+		control.turn = max(-1., min(1., off / max(.001, turnRate)));
+		control.thrust = fabs(off) < 40. ? 1. : 0.;
+		return control;
+	}
+
+	// Whether one ship faces another closely enough, and is near enough, to hurt
+	// it.
+	bool CanHit(const GuidanceDrill::Motion &shooter, const Point &target)
+	{
+		const Point offset = target - shooter.position;
+		return offset.Length() < GUN_RANGE && offset
+			&& fabs((Angle(offset) - shooter.facing).Degrees()) < GUN_ARC;
+	}
 
 	// Turn toward a heading, as fast as the ship can but without overshooting,
 	// thrusting once it is facing roughly that way.
@@ -73,7 +109,19 @@ namespace {
 EscortSimulation::EscortSimulation(const Ship &leaderModel, const Ship &escortModel)
 	: drills(MakeDrills()), leader(leaderModel), escort(escortModel)
 {
+	if(const Ship *model = GameData::Ships().Find(RAIDER_MODEL))
+	{
+		raider = *model;
+		hasRaiderModel = true;
+	}
 	Reset();
+}
+
+
+
+void EscortSimulation::SetRole(const EscortRole *role)
+{
+	this->role = role;
 }
 
 
@@ -124,6 +172,21 @@ void EscortSimulation::Reset()
 	input = ShipManeuver::Input();
 	output = ShipManeuver::Output();
 	ran = false;
+
+	roleMemory.Clear();
+	roleTrace.Clear();
+	roleOutput = EscortRole::Output();
+	roleRan = false;
+	stationPoint = Point();
+	raiderHere = false;
+	raiderTrail.clear();
+	raiderReturns = RAIDER_ARRIVES;
+	raids = 0;
+	destroyed = 0;
+	leaderHull = 1.;
+	escortHull = 1.;
+	raiderHull = 1.;
+	escortAttacking = false;
 }
 
 
@@ -148,7 +211,74 @@ void EscortSimulation::Step()
 	GuidanceDrill::Fly(leaderMotion, control, leader.TurnRate(), leader.Acceleration(), leader.MaxVelocity());
 	leader.SetKinematics(leaderMotion.position, leaderMotion.velocity, leaderMotion.facing);
 
-	// Then the escort keeps station on it, as the AI has it do.
+	// The raider moves, if there is one.
+	if(role && hasRaiderModel)
+		StepRaider();
+
+	// Then the escort does what its role says, or keeps station. (The role
+	// is told whether the escort was attacking on the last step.)
+	if(role)
+	{
+		roleTrace.Clear();
+		roleRan = role->Run(RoleInput(), roleOutput, &roleMemory, &roleTrace);
+		const EscortRole::Effect behavior = (roleRan && roleOutput.chose) ? roleOutput.behavior
+			: EscortRole::INDEPENDENT;
+		const bool attacks = (behavior == EscortRole::ATTACK_THREAT || behavior == EscortRole::ATTACK_LEADER_TARGET
+			|| behavior == EscortRole::ATTACK_TARGET);
+		escortAttacking = attacks && raiderHere;
+		if(escortAttacking)
+			ChaseRaider();
+		else
+		{
+			// The station is relative to the leader: x to its right, y ahead.
+			const Point station = (behavior == EscortRole::RETREAT) ? Point(0., -600.)
+				: (behavior == EscortRole::KEEP_STATION) ? roleOutput.station : Point(0., -250.);
+			const Point forward = leaderMotion.facing.Unit();
+			const Point right(-forward.Y(), forward.X());
+			KeepStationAt(leaderMotion.position + right * station.X() + forward * station.Y());
+		}
+	}
+	else
+	{
+		escortAttacking = false;
+		KeepStationAt(leaderMotion.position);
+	}
+
+	// Ships hurt what they face, and recover.
+	if(raiderHere && CanHit(escortMotion, raiderMotion.position))
+	{
+		raiderHull -= ESCORT_DAMAGE;
+		if(raiderHull <= 0.)
+		{
+			raiderHere = false;
+			raiderReturns = step + RAIDER_RETURNS;
+			++destroyed;
+		}
+	}
+	leaderHull = min(1., leaderHull + REPAIR);
+	escortHull = min(1., escortHull + REPAIR);
+
+	leaderTrail.push_back(leaderMotion.position);
+	escortTrail.push_back(escortMotion.position);
+	if(leaderTrail.size() > TRAIL_LENGTH)
+	{
+		leaderTrail.pop_front();
+		escortTrail.pop_front();
+	}
+	if(raiderHere)
+	{
+		raiderTrail.push_back(raiderMotion.position);
+		if(raiderTrail.size() > TRAIL_LENGTH)
+			raiderTrail.pop_front();
+	}
+	distances.push_back(escortMotion.position.Distance(leaderMotion.position));
+}
+
+
+
+void EscortSimulation::KeepStationAt(const Point &point)
+{
+	stationPoint = point;
 	input = ShipManeuver::Input();
 	input.position = escortMotion.position;
 	input.velocity = escortMotion.velocity;
@@ -162,7 +292,7 @@ void EscortSimulation::Step()
 	input.reverseThrust = escort.ReverseThrust();
 	input.lastTurn = lastTurn;
 	input.topSpeed = input.maxVelocity;
-	input.targetPosition = leaderMotion.position;
+	input.targetPosition = point;
 	input.targetVelocity = leaderMotion.velocity;
 	input.targetFacing = leaderMotion.facing.Unit();
 	const ShipManeuver *maneuver = program ? program : GameData::Maneuvers().Find("keep station");
@@ -175,15 +305,102 @@ void EscortSimulation::Step()
 	lastTurn = turn;
 	Fly(escortMotion, escort, turn, output.forward, output.back);
 	escort.SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
+}
 
-	leaderTrail.push_back(leaderMotion.position);
-	escortTrail.push_back(escortMotion.position);
-	if(leaderTrail.size() > TRAIL_LENGTH)
+
+
+void EscortSimulation::ChaseRaider()
+{
+	// Lead the raider while far off; close in, circle it once near.
+	const Point offset = raiderMotion.position - escortMotion.position;
+	const double distance = offset.Length();
+	Point aim = offset + raiderMotion.velocity * (distance / max(1., escort.MaxVelocity()));
+	if(distance < 250.)
+		aim = offset;
+	GuidanceDrill::Control control = Toward(escortMotion, aim, escort.TurnRate());
+	if(distance < 200.)
+		control.thrust = 0.;
+	lastTurn = control.turn;
+	Fly(escortMotion, escort, control.turn, control.thrust > 0., false);
+	escort.SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
+	stationPoint = raiderMotion.position;
+}
+
+
+
+void EscortSimulation::StepRaider()
+{
+	if(!raiderHere)
 	{
-		leaderTrail.pop_front();
-		escortTrail.pop_front();
+		if(step < raiderReturns)
+			return;
+		// Each raider comes from a different side.
+		const Angle from(110. + 137. * raids);
+		raiderMotion.position = leaderMotion.position + from.Unit() * RAIDER_DISTANCE;
+		raiderMotion.velocity = Point();
+		raiderMotion.facing = from + Angle(180.);
+		raiderHull = 1.;
+		raiderHere = true;
+		raiderTrail.clear();
+		++raids;
 	}
-	distances.push_back(escortMotion.position.Distance(leaderMotion.position));
+	// It goes after the escort if the escort is fighting it nearby, and
+	// otherwise the leader: closing in, then circling.
+	const bool onEscort = escortAttacking && escortMotion.position.Distance(raiderMotion.position) < 600.;
+	const Point victim = onEscort ? escortMotion.position : leaderMotion.position;
+	const Point offset = victim - raiderMotion.position;
+	Point aim = offset;
+	if(offset.Length() < 300.)
+		aim = Point(-offset.Y(), offset.X()) + offset * .3;
+	const GuidanceDrill::Control control = Toward(raiderMotion, aim, raider.TurnRate());
+	GuidanceDrill::Fly(raiderMotion, control, raider.TurnRate(), raider.Acceleration(), raider.MaxVelocity());
+	raider.SetKinematics(raiderMotion.position, raiderMotion.velocity, raiderMotion.facing);
+	if(CanHit(raiderMotion, victim))
+	{
+		if(onEscort)
+			escortHull = max(0., escortHull - RAIDER_DAMAGE * 1.5);
+		else
+			leaderHull = max(0., leaderHull - RAIDER_DAMAGE);
+	}
+}
+
+
+
+EscortRole::Input EscortSimulation::RoleInput() const
+{
+	// What a role is told in the game (see AI::RunRole): the leader targets
+	// the raider, which is the threat; the escort's own target is the raider
+	// once it has attacked it.
+	EscortRole::Input in;
+	in.position = escortMotion.position;
+	in.velocity = escortMotion.velocity;
+	in.facing = escortMotion.facing.Unit();
+	in.hull = escortHull;
+	in.shields = escortHull;
+	in.energy = 1.;
+	in.weaponRange = GUN_RANGE;
+	in.leaderPosition = leaderMotion.position;
+	in.leaderVelocity = leaderMotion.velocity;
+	in.leaderFacing = leaderMotion.facing.Unit();
+	in.leaderHull = leaderHull;
+	in.leaderShields = leaderHull;
+	if(raiderHere)
+	{
+		in.leaderTarget = true;
+		in.leaderTargetPosition = raiderMotion.position;
+		in.leaderTargetHull = raiderHull;
+		in.threat = true;
+		in.threatPosition = raiderMotion.position;
+		in.threatVelocity = raiderMotion.velocity;
+		in.threatHull = raiderHull;
+		in.threatTargetingLeader = !(escortAttacking && escortMotion.position.Distance(raiderMotion.position) < 600.);
+		in.target = escortAttacking;
+		in.targetPosition = raiderMotion.position;
+		in.targetHull = raiderHull;
+	}
+	in.escortIndex = 0;
+	in.escortCount = 1;
+	return in;
 }
 
 
@@ -244,6 +461,83 @@ const deque<Point> &EscortSimulation::LeaderTrail() const
 const deque<Point> &EscortSimulation::EscortTrail() const
 {
 	return escortTrail;
+}
+
+
+
+bool EscortSimulation::HasRaider() const
+{
+	return raiderHere;
+}
+
+
+
+const Ship &EscortSimulation::Raider() const
+{
+	return raider;
+}
+
+
+
+const deque<Point> &EscortSimulation::RaiderTrail() const
+{
+	return raiderTrail;
+}
+
+
+
+double EscortSimulation::LeaderHull() const
+{
+	return leaderHull;
+}
+
+
+
+double EscortSimulation::EscortHull() const
+{
+	return escortHull;
+}
+
+
+
+double EscortSimulation::RaiderHull() const
+{
+	return raiderHull;
+}
+
+
+
+int EscortSimulation::RaidersDestroyed() const
+{
+	return destroyed;
+}
+
+
+
+const script::Trace &EscortSimulation::RoleTrace() const
+{
+	return roleTrace;
+}
+
+
+
+bool EscortSimulation::RoleRan() const
+{
+	return roleRan;
+}
+
+
+
+const EscortRole::Output &EscortSimulation::RoleOutput() const
+{
+	return roleOutput;
+}
+
+
+
+const Point &EscortSimulation::StationPoint() const
+{
+	return stationPoint;
 }
 
 

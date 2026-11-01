@@ -536,6 +536,8 @@ void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversa
 				const Ship *leader = GameData::Ships().Find("Argosy");
 				if(simulatorOutfit == "escort" && target && leader)
 					menuPanels.Push(new EscortWorkshopPanel(nullptr, *leader, *target));
+				else if(simulatorOutfit == "role" && target && leader)
+					menuPanels.Push(new EscortWorkshopPanel(nullptr, *leader, *target, "*"));
 				else if(outfit && outfit->GetWeapon() && outfit->GetWeapon()->Homing() && target)
 					menuPanels.Push(new SimulatorPanel(*outfit, *target));
 				else
