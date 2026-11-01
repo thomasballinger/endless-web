@@ -66,8 +66,8 @@ Build as usual, then start a new pilot (or load one). Things to look for:
     close-up shows its thrust, drag, turn, life, lock and the odds of
     keeping it. Hover over a vector's value to see it drawn from the
     missile.
-  - **Arrow keys** fly your own ship (your flying is recorded, so replays
-    repeat it); **D** changes the drill (the first three are flown by a
+  - **Arrow keys** fly your own ship, or with **P**, the target, to dodge
+    (your flying is recorded, so replays repeat it); **D** changes the drill (the first three are flown by a
     pilot: evading, cruising, breaking away), **T** the target ship (one has
     radar jammers that confuse seekers), **Space** pauses, **,** and **.**
     step back and forward, and dragging on the timeline goes to any step.
@@ -164,6 +164,13 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   Shieldwall (Navy: a wall between you and the threat), Wolf Pack (pirates:
   pile onto whatever's hurt) and Hit and Run (Syndicate, linear: strike for
   ten seconds, fall back for five). See `data/roles.txt`.
+- **Trying roles against a raider.** Click an escort's role in the workshop
+  to open it in the escort workshop: the escort plays the role while a
+  raider attacks (circling in on you, or on the escort if it's fighting it).
+  Ships hurt what they're close to and facing, so health bars fall, raiders
+  get destroyed (another comes from elsewhere), and "retreat when hurt"
+  gambits get tried. Every edit replays the fight; **Ctrl+S** gives the role
+  to the escort (or all of them).
 - **Editing roles in flight.** Select an escort (click it in the escort list,
   bottom left) and open the scripts pane (**K**): its role runs there with
   its values. **EDIT** pauses the game; change the code, and once you stop
@@ -183,9 +190,9 @@ scanner.
   (`tests/ai/daemon-test.sh` adds pirate Ravens to Al Dhanab to test the
   Defense Daemon, and could be used for that.)
 - You can choose a defense daemon, buy one, or copy one, but not yet write
-  one: daemons have no editor or simulator of their own. Roles can only be
-  written in flight, in the scripts pane; the escort workshop doesn't
-  simulate them yet (it would need a ship to fight).
+  one: daemons have no editor or simulator of their own. The escort
+  workshop's raider is a stand-in: it fights with simple rules, not the
+  game's AI, and the damage is made up.
 - A role's "threat" is simply the nearest hostile ship to the leader; there
   is no list of all of them, or of incoming missiles, to choose from yet.
 - A copied maneuver (say, a pirate's "fight") shows up as a choice for how
