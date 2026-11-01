@@ -189,7 +189,7 @@ private:
 	int nextId = 0;
 	int hits = 0;
 
-	// The simulation's own random numbers (see OwnRandom).
+	// The simulation's own random numbers (see Random::Own).
 	Random::Saved random;
 	// How each projectile's guidance script ran, by projectile.
 	std::map<int, std::vector<MissileGuidance::Record>> records;

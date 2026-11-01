@@ -93,6 +93,21 @@ public:
 	};
 	static Saved Save();
 	static void Restore(const Saved &saved);
+	// While one exists, random numbers come from the given sequence (which it
+	// updates), rather than the game's: e.g. for a simulation that must make
+	// the same choices however often it is replayed, whatever else draws
+	// numbers in between its steps.
+	class Own {
+	public:
+		explicit Own(Saved &own);
+		~Own();
+		Own(const Own &) = delete;
+		Own &operator=(const Own &) = delete;
+
+	private:
+		Saved &own;
+		Saved outside;
+	};
 
 	// Seed the generator (e.g. to make it produce exactly the same random
 	// numbers it produced previously).

@@ -28,6 +28,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "System.h"
 #include "Visual.h"
 
+#include <algorithm>
 #include <sstream>
 
 using namespace std;
@@ -62,6 +63,17 @@ AIWorld::~AIWorld() = default;
 
 
 
+Command AIWorld::ToCommand(const GuidanceDrill::Control &control)
+{
+	Command command;
+	command.SetTurn(max(-1., min(1., control.turn)));
+	if(control.thrust > 0.)
+		command |= Command::FORWARD;
+	return command;
+}
+
+
+
 void AIWorld::AddPlayerShip(const shared_ptr<Ship> &ship)
 {
 	if(system)
@@ -69,31 +81,56 @@ void AIWorld::AddPlayerShip(const shared_ptr<Ship> &ship)
 	ship->Recharge();
 	player.CaptureShip(ship);
 	ships.push_back(ship);
+	moving.push_back(ship);
+}
+
+
+
+void AIWorld::AddShip(const shared_ptr<Ship> &ship, Pilot pilot, const string &personality)
+{
+	if(system)
+		ship->SetSystem(system);
+	ship->Recharge();
+	if(pilot == Pilot::AI)
+		ship->SetPersonality(MakePersonality(personality));
+	ships.push_back(ship);
+	if(pilot != Pilot::FIXED)
+		moving.push_back(ship);
 }
 
 
 
 void AIWorld::AddAIShip(const shared_ptr<Ship> &ship, const string &personality)
 {
-	if(system)
-		ship->SetSystem(system);
-	ship->Recharge();
-	ship->SetPersonality(MakePersonality(personality));
-	ships.push_back(ship);
-	flown.push_back(ship);
+	AddShip(ship, Pilot::AI, personality);
 }
 
 
 
-void AIWorld::Step()
+void AIWorld::Remove(const shared_ptr<Ship> &ship)
+{
+	ships.remove(ship);
+	moving.erase(remove(moving.begin(), moving.end(), ship), moving.end());
+}
+
+
+
+void AIWorld::Think()
 {
 	if(!system)
 		return;
 	Command commands;
 	ai->Step(commands);
-	// Only the AI's ships move here; the simulator moves the player's.
+}
+
+
+
+void AIWorld::Move()
+{
+	if(!system)
+		return;
 	vector<Visual> visuals;
-	for(const shared_ptr<Ship> &ship : flown)
+	for(const shared_ptr<Ship> &ship : moving)
 		ship->Move(visuals, flotsam);
 	// Firing is also how the game notes a ship is in the player's system (so
 	// that it stays a target); the shots themselves go nowhere.

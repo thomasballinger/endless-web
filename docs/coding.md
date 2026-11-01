@@ -194,8 +194,11 @@ scanner.
   Defense Daemon, and could be used for that.)
 - You can choose a defense daemon, buy one, or copy one, but not yet write
   one: daemons have no editor or simulator of their own. In the simulators,
-  ships flown by the game's AI move as in the game but don't fire; the
-  escort workshop's damage is made up (ships hurt what they face, nearby).
+  every ship (yours, the target, the escort, the raider) moves exactly as
+  ships move in the game, with the game's own code (drag only while
+  thrusting, so a ship that stops thrusting coasts; energy and heat count),
+  but no ship fires; the escort workshop's damage is made up (ships hurt
+  what they face, nearby).
 - A role's "threat" is simply the nearest hostile ship to the leader; there
   is no list of all of them, or of incoming missiles, to choose from yet.
 - A copied maneuver (say, a pirate's "fight") shows up as a choice for how

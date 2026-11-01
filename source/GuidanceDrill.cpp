@@ -143,17 +143,3 @@ vector<GuidanceDrill> GuidanceDrill::MakeFlownDrills(double distance)
 	drills.push_back(breaking);
 	return drills;
 }
-
-
-
-void GuidanceDrill::Fly(Motion &motion, const Control &control, double turnRate, double acceleration,
-	double topSpeed)
-{
-	motion.facing += Angle(max(-1., min(1., control.turn)) * turnRate);
-	motion.velocity += motion.facing.Unit() * acceleration * max(0., min(1., control.thrust));
-	// Drag takes away a fraction of the velocity each step, the fraction that
-	// makes it balance full thrust at top speed.
-	if(topSpeed > 0.)
-		motion.velocity *= 1. - acceleration / topSpeed;
-	motion.position += motion.velocity;
-}

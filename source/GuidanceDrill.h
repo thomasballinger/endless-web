@@ -27,8 +27,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 // A way for a target to fly while homing weapons are fired at it, for
 // testing guidance scripts. The launcher starts at the origin facing "up"
 // (negative y); the target starts some distance away. Either the target's
-// motion is given for each step, or a pilot flies it, as ships fly: turning
-// at its turn rate, and thrusting against its drag.
+// motion is given for each step, or a pilot flies it (or the game's AI does),
+// and it moves exactly as ships move in the game.
 class GuidanceDrill {
 public:
 	// Where a ship is, and how it is moving.
@@ -67,9 +67,6 @@ public:
 	static std::vector<GuidanceDrill> MakeDrills(double distance, double speed);
 	// Drills with a pilot: evading missiles, cruising, and breaking away.
 	static std::vector<GuidanceDrill> MakeFlownDrills(double distance);
-	// Move a ship for one step, as the game does: turn, thrust, then drag,
-	// which keeps it under its top speed.
-	static void Fly(Motion &motion, const Control &control, double turnRate, double acceleration, double topSpeed);
 
 
 public:

@@ -179,6 +179,22 @@ Random::Saved Random::Save()
 
 
 
+Random::Own::Own(Saved &own)
+	: own(own), outside(Save())
+{
+	Restore(own);
+}
+
+
+
+Random::Own::~Own()
+{
+	own = Save();
+	Restore(outside);
+}
+
+
+
 void Random::Restore(const Saved &saved)
 {
 	lock_guard<mutex> lock(generatorMutex);

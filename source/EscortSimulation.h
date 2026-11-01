@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "EscortRole.h"
 #include "GuidanceDrill.h"
 #include "Point.h"
+#include "Random.h"
 #include "script/Script.h"
 #include "Ship.h"
 #include "ShipManeuver.h"
@@ -41,9 +42,10 @@ class AIWorld;
 // (which sees the leader and the escort as the player's ships), and is destroyed
 // if the escort fights it long enough, to come back later from somewhere
 // else. Ships hurt what they are close to and facing, and slowly recover.
-// Ships move as the game moves them: turning at their turn rate, thrusting
-// forward or in reverse, and slowed by drag. Nothing is random, so replaying
-// to a step after the script changes shows exactly what the change did.
+// All three ships move in a small piece of the game (see AIWorld), exactly as
+// ships move in the game. The simulation has random numbers of its own, so
+// replaying to a step after the script changes shows exactly what the change
+// did.
 class EscortSimulation {
 public:
 	class Drill {
@@ -117,11 +119,11 @@ public:
 
 
 private:
-	void Fly(GuidanceDrill::Motion &motion, const Ship &ship, double turn, bool forward, bool back);
 	// The escort's step: keep station at a point, or chase the raider.
 	void KeepStationAt(const Point &point);
 	void ChaseRaider();
-	void StepRaider();
+	// A raider arrives, if one is due.
+	void ArriveRaider();
 	EscortRole::Input RoleInput() const;
 
 
@@ -130,8 +132,14 @@ private:
 	std::vector<Drill> drills;
 	int drill = 0;
 	int step = 0;
-	Ship leader;
-	Ship escort;
+	// The models the ships are made from, and the ships themselves, in the
+	// world they move in (made anew on each Reset()).
+	Ship leaderModel;
+	Ship escortModel;
+	std::shared_ptr<Ship> leader;
+	std::shared_ptr<Ship> escort;
+	std::unique_ptr<AIWorld> world;
+	Random::Saved random;
 	GuidanceDrill::Motion leaderMotion;
 	GuidanceDrill::Motion escortMotion;
 	std::vector<GuidanceDrill::Control> leaderControls;
@@ -150,13 +158,9 @@ private:
 	EscortRole::Output roleOutput;
 	bool roleRan = false;
 	Point stationPoint;
-	// The raider, the world its AI flies it in (with stand-ins for the leader
-	// and the escort), and the ships' health.
+	// The raider (flown by the game's AI), and the ships' health.
 	const Ship *raiderModel = nullptr;
 	std::shared_ptr<Ship> raider;
-	std::unique_ptr<AIWorld> world;
-	std::shared_ptr<Ship> leaderStandIn;
-	std::shared_ptr<Ship> escortStandIn;
 	bool raiderHere = false;
 	GuidanceDrill::Motion raiderMotion;
 	std::deque<Point> raiderTrail;

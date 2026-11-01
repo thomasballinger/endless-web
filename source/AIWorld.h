@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "GuidanceDrill.h"
 #include "PlayerInfo.h"
 
 #include <list>
@@ -23,6 +24,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <vector>
 
 class AI;
+class Command;
 class Flotsam;
 class Minable;
 class Ship;
@@ -31,26 +33,38 @@ class System;
 
 
 // A small piece of the game for the simulators: a system with a few ships in
-// it, some of which the game's own AI flies, as it flies ships in the game.
-// One ship stands in for the player's flagship; the simulator flies it (and
-// any others it adds as the player's) itself, by setting where they are each
-// step. The AI's ships move as ships do in the game, but don't fire. Make a
-// new world to start over: the AI remembers things from step to step.
+// it, which move exactly as ships do in the game (turning, thrusting, drag,
+// energy and heat), but don't fire. Each ship is flown by the game's own AI,
+// or by commands the simulator gives it each step (as a pilot would), or not
+// at all (the simulator sets where it is). The first of the player's ships
+// stands in for the player's flagship. Make a new world to start over: the
+// AI remembers things from step to step.
 class AIWorld {
 public:
+	enum class Pilot { AI, COMMANDS, FIXED };
+
+	// The command a pilot gives for a drill's control: its turn, and thrust if
+	// it asks for any.
+	static Command ToCommand(const GuidanceDrill::Control &control);
+
 	// The world is in the named system (or, if there is none, the first).
 	explicit AIWorld(const std::string &system = "Sol");
 	~AIWorld();
 	AIWorld(const AIWorld &) = delete;
 	AIWorld &operator=(const AIWorld &) = delete;
 
-	// Add one of the player's ships (the first is the flagship).
+	// Add one of the player's ships (the first is the flagship), flown by
+	// commands given to it.
 	void AddPlayerShip(const std::shared_ptr<Ship> &ship);
-	// Add a ship for the AI to fly, with a personality given as its words
-	// (e.g. "heroic staying"), in its own government.
+	// Add a ship, in its own government. One the AI flies has a personality,
+	// given as its words (e.g. "heroic staying").
+	void AddShip(const std::shared_ptr<Ship> &ship, Pilot pilot, const std::string &personality = "");
 	void AddAIShip(const std::shared_ptr<Ship> &ship, const std::string &personality);
-	// Let the AI decide what its ships do, then move them.
-	void Step();
+	void Remove(const std::shared_ptr<Ship> &ship);
+	// A step is: the AI decides what its ships do; then the simulator gives
+	// the ships it flies their commands (Ship::SetCommands); then they move.
+	void Think();
+	void Move();
 
 
 private:
@@ -59,6 +73,7 @@ private:
 	std::list<std::shared_ptr<Ship>> ships;
 	std::list<std::shared_ptr<Minable>> minables;
 	std::list<std::shared_ptr<Flotsam>> flotsam;
-	std::vector<std::shared_ptr<Ship>> flown;
+	// The ships that move (all but those on a fixed course).
+	std::vector<std::shared_ptr<Ship>> moving;
 	std::unique_ptr<AI> ai;
 };

@@ -42,31 +42,6 @@ namespace {
 	// The random seed everything starts from.
 	const uint64_t SEED = 1;
 
-	// While one exists, random numbers come from a simulation's own sequence,
-	// which picks up where it left off, rather than the game's: anything else
-	// that draws numbers between steps (while the game draws a frame, say)
-	// must not change what the simulation does, or replaying it to a step
-	// wouldn't show what happened there.
-	class OwnRandom {
-	public:
-		explicit OwnRandom(Random::Saved &own)
-			: own(own), outside(Random::Save())
-		{
-			Random::Restore(own);
-		}
-		~OwnRandom()
-		{
-			own = Random::Save();
-			Random::Restore(outside);
-		}
-		OwnRandom(const OwnRandom &) = delete;
-		OwnRandom &operator=(const OwnRandom &) = delete;
-
-	private:
-		Random::Saved &own;
-		Random::Saved outside;
-	};
-
 	bool Same(double a, double b)
 	{
 		return a == b || (isnan(a) && isnan(b));
@@ -177,7 +152,7 @@ void GuidanceSimulation::SetDrill(int index)
 
 void GuidanceSimulation::Reset()
 {
-	OwnRandom ownRandom(random);
+	Random::Own ownRandom(random);
 	Random::Seed(SEED);
 	missiles.clear();
 	step = 0;
@@ -198,41 +173,37 @@ void GuidanceSimulation::Reset()
 	const GuidanceDrill &current = drills[drill];
 	targetMotion = (current.pilot || !current.ai.empty()) ? current.start : current.motion(0);
 	target->SetKinematics(targetMotion.position, targetMotion.velocity, targetMotion.facing);
-	// For the game's AI, a fresh world each time, so replays are the same.
-	world.reset();
-	launcherShip.reset();
+	// The ships move in a world of their own, as ships move in the game: a
+	// fresh one each time, so replays are the same. The launcher stands in
+	// for the player's ship; the target is flown by the game's AI, by a pilot
+	// (or the player), or follows a fixed course.
+	world = make_unique<AIWorld>();
+	launcherShip = make_shared<Ship>(launcher);
+	launcherShip->SetGovernment(GameData::PlayerGovernment());
+	world->AddPlayerShip(launcherShip);
 	if(!current.ai.empty())
-	{
-		world = make_unique<AIWorld>();
-		launcherShip = make_shared<Ship>(launcher);
-		launcherShip->SetGovernment(GameData::PlayerGovernment());
-		world->AddPlayerShip(launcherShip);
-		world->AddAIShip(target, current.ai);
-		target->SetTargetShip(launcherShip);
-	}
+		world->AddShip(target, AIWorld::Pilot::AI, current.ai);
+	else
+		world->AddShip(target, current.pilot ? AIWorld::Pilot::COMMANDS : AIWorld::Pilot::FIXED);
+	target->SetTargetShip(launcherShip);
 }
 
 
 
 void GuidanceSimulation::Step()
 {
-	OwnRandom ownRandom(random);
+	Random::Own ownRandom(random);
 	++step;
 	// As in the game, ships move before projectiles do.
 	const GuidanceDrill &current = drills[drill];
-	if(world && !(targetControlStart >= 0 && step > targetControlStart))
+	// The AI decides what its ships do (seeing everything where it is now)...
+	world->Think();
+	// ...and the target's pilot, the player, or its course decides for it...
+	const bool flownByPlayer = (targetControlStart >= 0 && step > targetControlStart);
+	if(flownByPlayer)
 	{
-		// The game's AI flies the target, seeing the launcher where it is.
-		launcherShip->SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
-		world->Step();
-		targetMotion = GuidanceDrill::Motion{target->Position(), target->Velocity(), target->Facing()};
-	}
-	else if(targetControlStart >= 0 && step > targetControlStart)
-	{
-		// The player flew the target from here on.
 		const size_t index = min(static_cast<size_t>(step - 1 - targetControlStart), targetControls.size() - 1);
-		GuidanceDrill::Fly(targetMotion, targetControls[index], target->TurnRate(), target->Acceleration(),
-			target->MaxVelocity());
+		target->SetCommands(AIWorld::ToCommand(targetControls[index]));
 	}
 	else if(current.pilot)
 	{
@@ -246,20 +217,24 @@ void GuidanceSimulation::Step()
 			if(missile.endStep < 0)
 				situation.missiles.push_back({missile.projectile.Position(), missile.projectile.Velocity(),
 					missile.projectile.Facing()});
-		GuidanceDrill::Fly(targetMotion, current.pilot(situation), situation.turnRate, situation.acceleration,
-			target->MaxVelocity());
+		target->SetCommands(AIWorld::ToCommand(current.pilot(situation)));
 	}
-	else
-		targetMotion = current.motion(step);
-	target->SetKinematics(targetMotion.position, targetMotion.velocity, targetMotion.facing);
-	// The launcher, as it was flown on this step (if it ever was).
-	if(!launcherControls.empty())
+	else if(current.ai.empty())
 	{
-		const size_t index = min(static_cast<size_t>(step - 1), launcherControls.size() - 1);
-		GuidanceDrill::Fly(launcherMotion, launcherControls[index], launcher.TurnRate(), launcher.Acceleration(),
-			launcher.MaxVelocity());
-		launcher.SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
+		targetMotion = current.motion(step);
+		target->SetKinematics(targetMotion.position, targetMotion.velocity, targetMotion.facing);
 	}
+	// ...and the launcher flies as it was flown on this step (if it ever was).
+	GuidanceDrill::Control launcherControl;
+	if(!launcherControls.empty())
+		launcherControl = launcherControls[min(static_cast<size_t>(step - 1), launcherControls.size() - 1)];
+	launcherShip->SetCommands(AIWorld::ToCommand(launcherControl));
+	// Then they move, as ships move in the game.
+	world->Move();
+	targetMotion = GuidanceDrill::Motion{target->Position(), target->Velocity(), target->Facing()};
+	const Ship &moved = *launcherShip;
+	launcherMotion = GuidanceDrill::Motion{moved.Position(), moved.Velocity(), moved.Facing()};
+	launcher.SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
 	if((step - 1) % LAUNCH_INTERVAL == 0)
 		Fire();
 

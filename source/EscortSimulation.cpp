@@ -17,6 +17,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "AIWorld.h"
 #include "Angle.h"
+#include "Command.h"
 #include "GameData.h"
 #include "Government.h"
 
@@ -45,6 +46,8 @@ namespace {
 	const double RAIDER_DAMAGE = .0012;
 	const double ESCORT_DAMAGE = .003;
 	const double REPAIR = .0002;
+	// The random seed everything starts from.
+	const uint64_t SEED = 1;
 
 	// Turn toward a direction, given in any vector, and thrust while facing
 	// roughly that way.
@@ -109,10 +112,9 @@ namespace {
 
 
 EscortSimulation::EscortSimulation(const Ship &leaderModel, const Ship &escortModel)
-	: drills(MakeDrills()), leader(leaderModel), escort(escortModel)
+	: drills(MakeDrills()), leaderModel(leaderModel), escortModel(escortModel)
 {
 	raiderModel = GameData::Ships().Find(RAIDER_MODEL);
-	raider = make_shared<Ship>(raiderModel ? *raiderModel : escortModel);
 	Reset();
 }
 
@@ -162,11 +164,25 @@ void EscortSimulation::SetDrill(int index)
 
 void EscortSimulation::Reset()
 {
+	Random::Own ownRandom(random);
+	Random::Seed(SEED);
 	step = 0;
 	leaderMotion = GuidanceDrill::Motion{Point(), Point(), Angle()};
 	escortMotion = GuidanceDrill::Motion{Point(250., 300.), Point(), Angle()};
-	leader.SetKinematics(leaderMotion.position, leaderMotion.velocity, leaderMotion.facing);
-	escort.SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
+	// The leader and the escort are the player's ships, in a world of their
+	// own (a fresh one each time, so replays are the same), flown by the
+	// simulator's commands.
+	world = make_unique<AIWorld>();
+	leader = make_shared<Ship>(leaderModel);
+	escort = make_shared<Ship>(escortModel);
+	leader->SetKinematics(leaderMotion.position, leaderMotion.velocity, leaderMotion.facing);
+	escort->SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
+	for(const shared_ptr<Ship> &ship : {leader, escort})
+	{
+		ship->SetGovernment(GameData::PlayerGovernment());
+		world->AddPlayerShip(ship);
+	}
+	raider = make_shared<Ship>(raiderModel ? *raiderModel : escortModel);
 	leaderTrail.clear();
 	escortTrail.clear();
 	distances.clear();
@@ -182,7 +198,6 @@ void EscortSimulation::Reset()
 	roleRan = false;
 	stationPoint = Point();
 	raiderHere = false;
-	world.reset();
 	raiderTrail.clear();
 	raiderReturns = RAIDER_ARRIVES;
 	raids = 0;
@@ -197,8 +212,15 @@ void EscortSimulation::Reset()
 
 void EscortSimulation::Step()
 {
+	Random::Own ownRandom(random);
 	++step;
-	// The leader moves first: flown as recorded, if it was, or by its pilot.
+	// A raider arrives, if one is due. Then the game's AI decides what it
+	// does, seeing every ship where it is now.
+	if(role && raiderModel)
+		ArriveRaider();
+	world->Think();
+
+	// The leader is flown as recorded, if it was, or by its pilot.
 	GuidanceDrill::Control control;
 	if(!leaderControls.empty())
 		control = leaderControls[min(static_cast<size_t>(step - 1), leaderControls.size() - 1)];
@@ -207,20 +229,15 @@ void EscortSimulation::Step()
 		GuidanceDrill::Situation situation;
 		situation.step = step;
 		situation.ship = leaderMotion;
-		situation.turnRate = leader.TurnRate();
-		situation.acceleration = leader.Acceleration();
+		situation.turnRate = leader->TurnRate();
+		situation.acceleration = leader->Acceleration();
 		situation.launcher = escortMotion.position;
 		control = drills[drill].pilot(situation);
 	}
-	GuidanceDrill::Fly(leaderMotion, control, leader.TurnRate(), leader.Acceleration(), leader.MaxVelocity());
-	leader.SetKinematics(leaderMotion.position, leaderMotion.velocity, leaderMotion.facing);
+	leader->SetCommands(AIWorld::ToCommand(control));
 
-	// The raider moves, if there is one.
-	if(role && raiderModel)
-		StepRaider();
-
-	// Then the escort does what its role says, or keeps station. (The role
-	// is told whether the escort was attacking on the last step.)
+	// The escort does what its role says, or keeps station. (The role is told
+	// whether the escort was attacking on the last step.)
 	if(role)
 	{
 		roleTrace.Clear();
@@ -248,15 +265,36 @@ void EscortSimulation::Step()
 		KeepStationAt(leaderMotion.position);
 	}
 
+	// Then every ship moves, as ships move in the game.
+	world->Move();
+	leaderMotion = GuidanceDrill::Motion{leader->Position(), leader->Velocity(), leader->Facing()};
+	escortMotion = GuidanceDrill::Motion{escort->Position(), escort->Velocity(), escort->Facing()};
+	if(raiderHere)
+		raiderMotion = GuidanceDrill::Motion{raider->Position(), raider->Velocity(), raider->Facing()};
+
 	// Ships hurt what they face, and recover.
-	if(raiderHere && CanHit(escortMotion, raiderMotion.position))
+	if(raiderHere)
 	{
-		raiderHull -= ESCORT_DAMAGE;
-		if(raiderHull <= 0.)
+		// The raider hurts whichever of them it is after.
+		const bool onEscort = (raider->GetTargetShip() == escort);
+		const Point victim = onEscort ? escortMotion.position : leaderMotion.position;
+		if(CanHit(raiderMotion, victim))
 		{
-			raiderHere = false;
-			raiderReturns = step + RAIDER_RETURNS;
-			++destroyed;
+			if(onEscort)
+				escortHull = max(0., escortHull - RAIDER_DAMAGE * 1.5);
+			else
+				leaderHull = max(0., leaderHull - RAIDER_DAMAGE);
+		}
+		if(CanHit(escortMotion, raiderMotion.position))
+		{
+			raiderHull -= ESCORT_DAMAGE;
+			if(raiderHull <= 0.)
+			{
+				raiderHere = false;
+				world->Remove(raider);
+				raiderReturns = step + RAIDER_RETURNS;
+				++destroyed;
+			}
 		}
 	}
 	leaderHull = min(1., leaderHull + REPAIR);
@@ -288,12 +326,12 @@ void EscortSimulation::KeepStationAt(const Point &point)
 	input.velocity = escortMotion.velocity;
 	input.facing = escortMotion.facing.Unit();
 	input.facingDegrees = escortMotion.facing.Degrees();
-	input.maxVelocity = escort.MaxVelocity();
-	input.acceleration = escort.Acceleration();
-	input.turnRate = escort.TurnRate();
-	input.inertialMass = escort.InertialMass();
-	input.dragForce = escort.DragForce();
-	input.reverseThrust = escort.ReverseThrust();
+	input.maxVelocity = escort->MaxVelocity();
+	input.acceleration = escort->Acceleration();
+	input.turnRate = escort->TurnRate();
+	input.inertialMass = escort->InertialMass();
+	input.dragForce = escort->DragForce();
+	input.reverseThrust = escort->ReverseThrust();
 	input.lastTurn = lastTurn;
 	input.topSpeed = input.maxVelocity;
 	input.targetPosition = point;
@@ -305,10 +343,18 @@ void EscortSimulation::KeepStationAt(const Point &point)
 	ran = maneuver && maneuver->Run(input, output, nullptr, &trace);
 	if(!ran)
 		output = ShipManeuver::Output();
+	// The escort is given the commands the game gives it for this output.
 	const double turn = max(-1., min(1., output.turn));
 	lastTurn = turn;
-	Fly(escortMotion, escort, turn, output.forward, output.back);
-	escort.SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
+	Command command;
+	command.SetTurn(turn);
+	if(output.back)
+		command |= Command::BACK;
+	else if(output.forward)
+		command |= Command::FORWARD;
+	if(output.afterburner)
+		command |= Command::AFTERBURNER;
+	escort->SetCommands(command);
 }
 
 
@@ -318,62 +364,36 @@ void EscortSimulation::ChaseRaider()
 	// Lead the raider while far off; close in, circle it once near.
 	const Point offset = raiderMotion.position - escortMotion.position;
 	const double distance = offset.Length();
-	Point aim = offset + raiderMotion.velocity * (distance / max(1., escort.MaxVelocity()));
+	Point aim = offset + raiderMotion.velocity * (distance / max(1., escort->MaxVelocity()));
 	if(distance < 250.)
 		aim = offset;
-	GuidanceDrill::Control control = Toward(escortMotion, aim, escort.TurnRate());
+	GuidanceDrill::Control control = Toward(escortMotion, aim, escort->TurnRate());
 	if(distance < 200.)
 		control.thrust = 0.;
 	lastTurn = control.turn;
-	Fly(escortMotion, escort, control.turn, control.thrust > 0., false);
-	escort.SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
+	escort->SetCommands(AIWorld::ToCommand(control));
 	stationPoint = raiderMotion.position;
 }
 
 
 
-void EscortSimulation::StepRaider()
+void EscortSimulation::ArriveRaider()
 {
-	if(!raiderHere)
-	{
-		if(step < raiderReturns)
-			return;
-		// Each raider comes from a different side, a pirate with the game's
-		// AI, in a world of its own (so a replay makes the same choices).
-		const Angle from(110. + 137. * raids);
-		raider = make_shared<Ship>(*raiderModel);
-		raider->SetGovernment(GameData::Governments().Get("Pirate"));
-		raider->SetKinematics(leaderMotion.position + from.Unit() * RAIDER_DISTANCE, Point(), from + Angle(180.));
-		world = make_unique<AIWorld>();
-		leaderStandIn = make_shared<Ship>(leader);
-		escortStandIn = make_shared<Ship>(escort);
-		for(const shared_ptr<Ship> &ship : {leaderStandIn, escortStandIn})
-		{
-			ship->SetGovernment(GameData::PlayerGovernment());
-			world->AddPlayerShip(ship);
-		}
-		world->AddAIShip(raider, "heroic staying");
-		raider->SetTargetShip(leaderStandIn);
-		raiderHull = 1.;
-		raiderHere = true;
-		raiderTrail.clear();
-		++raids;
-	}
-	// The AI flies it, seeing the leader and the escort where they are.
-	leaderStandIn->SetKinematics(leaderMotion.position, leaderMotion.velocity, leaderMotion.facing);
-	escortStandIn->SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
-	world->Step();
+	if(raiderHere || step < raiderReturns)
+		return;
+	// Each raider comes from a different side: a pirate, flown by the game's
+	// AI, which sees the leader and the escort as the player's ships.
+	const Angle from(110. + 137. * raids);
+	raider = make_shared<Ship>(*raiderModel);
+	raider->SetGovernment(GameData::Governments().Get("Pirate"));
+	raider->SetKinematics(leaderMotion.position + from.Unit() * RAIDER_DISTANCE, Point(), from + Angle(180.));
+	world->AddShip(raider, AIWorld::Pilot::AI, "heroic staying");
+	raider->SetTargetShip(leader);
 	raiderMotion = GuidanceDrill::Motion{raider->Position(), raider->Velocity(), raider->Facing()};
-	// It hurts whichever of them it is after, if it faces it closely enough.
-	const bool onEscort = (raider->GetTargetShip() == escortStandIn);
-	const Point victim = onEscort ? escortMotion.position : leaderMotion.position;
-	if(CanHit(raiderMotion, victim))
-	{
-		if(onEscort)
-			escortHull = max(0., escortHull - RAIDER_DAMAGE * 1.5);
-		else
-			leaderHull = max(0., leaderHull - RAIDER_DAMAGE);
-	}
+	raiderHull = 1.;
+	raiderHere = true;
+	raiderTrail.clear();
+	++raids;
 }
 
 
@@ -405,7 +425,7 @@ EscortRole::Input EscortSimulation::RoleInput() const
 		in.threatPosition = raiderMotion.position;
 		in.threatVelocity = raiderMotion.velocity;
 		in.threatHull = raiderHull;
-		in.threatTargetingLeader = (raider->GetTargetShip() != escortStandIn);
+		in.threatTargetingLeader = (raider->GetTargetShip() != escort);
 		in.target = escortAttacking;
 		in.targetPosition = raiderMotion.position;
 		in.targetHull = raiderHull;
@@ -451,14 +471,14 @@ void EscortSimulation::ClearLeaderControls()
 
 const Ship &EscortSimulation::Leader() const
 {
-	return leader;
+	return *leader;
 }
 
 
 
 const Ship &EscortSimulation::Escort() const
 {
-	return escort;
+	return *escort;
 }
 
 
@@ -607,18 +627,4 @@ double EscortSimulation::FractionWithin(double distance) const
 		return 0.;
 	return static_cast<double>(count_if(distances.begin(), distances.end(),
 		[distance](double d) { return d <= distance; })) / distances.size();
-}
-
-
-
-void EscortSimulation::Fly(GuidanceDrill::Motion &motion, const Ship &ship, double turn, bool forward, bool back)
-{
-	// As a ship moves: turn, thrust forward or in reverse, then drag.
-	motion.facing += Angle(turn * ship.TurnRate());
-	if(back && ship.InertialMass() > 0.)
-		motion.velocity -= motion.facing.Unit() * (ship.ReverseThrust() / ship.InertialMass());
-	else if(forward)
-		motion.velocity += motion.facing.Unit() * ship.Acceleration();
-	motion.velocity *= 1. - ship.DragForce();
-	motion.position += motion.velocity;
 }
