@@ -1466,7 +1466,28 @@ void Engine::ReleaseDrag(const Point &from, const Point &to)
 
 bool Engine::ScriptClick(const Point &point)
 {
-	return scriptDisplay.Click(point, scriptHackNextStep);
+	const bool handled = scriptDisplay.Click(point, scriptHackNextStep);
+	// Code copied from the pane goes into the player's library, under a name
+	// that says where it came from.
+	string text;
+	string from;
+	if(scriptDisplay.TakeCopy(text, from))
+	{
+		// (Copying the same code twice keeps one copy.)
+		const string original = Firmware::NameOf(text);
+		string name = original + " (copied)";
+		for(int i = 2; player.ProgramLibrary().contains(name)
+				&& player.ProgramLibrary().at(name) != Firmware::Renamed(text, name); ++i)
+			name = original + " (copy " + to_string(i) + ")";
+		player.SetLibraryProgram(name, Firmware::Renamed(text, name));
+		// For tests, which watch the state hashes.
+		static const bool logCopies = getenv("ES_STATE_HASH");
+		if(logCopies)
+			printf("COPIED \"%s\" from %s\n", name.c_str(), from.c_str());
+		Messages::Add({"Copied " + from + "'s code into your library as \"" + name + "\". Choose it, or edit it, in the"
+			" missile workshop.", GameData::MessageCategories().Get("normal")});
+	}
+	return handled;
 }
 
 

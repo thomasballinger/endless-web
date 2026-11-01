@@ -163,6 +163,19 @@ void ScriptWatchDisplay::Toggle()
 
 
 
+bool ScriptWatchDisplay::TakeCopy(string &text, string &from)
+{
+	if(copiedText.empty())
+		return false;
+	text = std::move(copiedText);
+	from = std::move(copiedFrom);
+	copiedText.clear();
+	copiedFrom.clear();
+	return true;
+}
+
+
+
 bool ScriptWatchDisplay::Click(const Point &point, string &hack)
 {
 	if(!shown.empty() && pane.Contains(point))
@@ -171,6 +184,29 @@ bool ScriptWatchDisplay::Click(const Point &point, string &hack)
 			shown.clear();
 		else if(hackBox.Contains(point) && injector.isReady)
 			Arm();
+		else if(copyBox.Contains(point))
+		{
+			// Copy someone else's code, if it can be read clearly, into the
+			// player's library.
+			const Entry *entry = Find(shown);
+			const bool copyable = (selectedKind == "guidance" || selectedKind == "maneuver");
+			if(entry && !entry->isOwn && entry->unreadable.empty() && copyable)
+			{
+				if(!entry->interference.empty())
+					injectResult = "COPY FAILED: jamming garbles the code";
+				else
+				{
+					copiedText = GetSource(selectedKind, selectedName).text;
+					copiedFrom = entry->name;
+					injectResult = copiedText.empty() ? "COPY FAILED: the code isn't available"
+						: "COPIED to your library";
+					if(copiedText.empty())
+						copiedFrom.clear();
+				}
+				resultFrames = 120;
+			}
+			return true;
+		}
 		else if(armedFrames && editor.Area().Contains(point))
 		{
 			// Inject into the line clicked: only one that ran is reachable.
@@ -410,6 +446,8 @@ void ScriptWatchDisplay::Layout()
 		Point(pane.Right() - 4., pane.Top() + 24.));
 	hackBox = Rectangle::WithCorners(Point(pane.Right() - 150., pane.Top() + 4.),
 		Point(pane.Right() - 32., pane.Top() + 24.));
+	copyBox = Rectangle::WithCorners(Point(hackBox.Left() - 78., pane.Top() + 4.),
+		Point(hackBox.Left() - 8., pane.Top() + 24.));
 	editor.SetArea(Rectangle::WithCorners(Point(pane.Left(), pane.Top() + HEADER_HEIGHT), pane.BottomRight()));
 
 	// A button for everything being watched, and under them, a tab for each
@@ -551,6 +589,15 @@ void ScriptWatchDisplay::DrawPane() const
 		FillShader::Fill(hackBox.Center(), hackBox.Dimensions(), injector.isReady ? HACK_BUTTON : BUTTON);
 		const string text = Fit(font, label, hackBox.Width() - 8.);
 		font.Draw(text, hackBox.Center() - Point(font.Width(text) / 2., 8.), injector.isReady ? HACK : LABEL);
+	}
+
+	// With a code scanner, someone else's code can be copied.
+	if(entry && !entry->isOwn && entry->unreadable.empty() && (selectedKind == "guidance" || selectedKind == "maneuver"))
+	{
+		const bool clear = entry->interference.empty();
+		FillShader::Fill(copyBox.Center(), copyBox.Dimensions(), BUTTON);
+		const string label = "COPY";
+		font.Draw(label, copyBox.Center() - Point(font.Width(label) / 2., 8.), clear ? TITLE : LABEL);
 	}
 
 	// Everything being watched.

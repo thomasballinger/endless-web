@@ -23,8 +23,9 @@
 #   2. Clicking the map opens a pane with the script's code, with the lines
 #      that ran marked.
 #   3. Clicking the pane's close box closes it.
-#   4. The "Show scripts" key (k) opens and closes it too.
-#   5. Hacking the target ("Hack selected ship's scripts", x) takes over its
+#   4. The pane's copy button copies the code into the player's library.
+#   5. The "Show scripts" key (k) opens and closes it too.
+#   6. Hacking the target ("Hack selected ship's scripts", x) takes over its
 #      code, which the pane shows breaking up.
 #
 # Usage: watch-ui.sh BINARY
@@ -146,6 +147,21 @@ if "$LOOK" pane "$OUT/closed.png"; then
 	FAILED=1
 else
 	echo "ok: the close box closes the pane"
+fi
+
+# The pane's copy button (left of the hack button) copies the code shown
+# into the player's library.
+target_running
+key k
+xdotool mousemove 717 84 click 1
+sleep 1
+shot copied
+key k
+if grep -q '^COPIED ' "$OUT/game.log"; then
+	echo "ok: the copy button copies the code into the library ($(grep '^COPIED ' "$OUT/game.log" | head -1))"
+else
+	echo "FAILED: the copy button copies the code into the library"
+	FAILED=1
 fi
 
 # The "Show scripts" key.

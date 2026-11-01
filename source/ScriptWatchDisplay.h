@@ -100,6 +100,10 @@ public:
 	bool Arm();
 	// Count down an armed injector, once a frame.
 	void Step();
+	// If the player clicked the pane's copy button since this was last asked,
+	// the code they copied (the text of a "guidance" or "maneuver" node), and
+	// whose it was.
+	bool TakeCopy(std::string &text, std::string &from);
 
 
 private:
@@ -163,6 +167,10 @@ private:
 	Rectangle pane;
 	Rectangle closeBox;
 	Rectangle hackBox;
+	Rectangle copyBox;
+	// Code the player copied, until the engine takes it.
+	std::string copiedText;
+	std::string copiedFrom;
 	std::vector<std::pair<Rectangle, std::string>> entryButtons;
 	std::vector<std::pair<Rectangle, size_t>> tabs;
 

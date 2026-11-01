@@ -225,11 +225,23 @@ string Firmware::NameOf(const string &text)
 
 string Firmware::Renamed(const string &text, const string &name)
 {
+	// The node is the first line that starts (unindented) with its kind;
+	// comments may come before it.
 	const string kind = KindOf(text);
 	if(kind.empty())
 		return text;
-	const size_t end = text.find('\n');
-	return kind + " \"" + name + "\"" + (end == string::npos ? string() : text.substr(end));
+	size_t start = 0;
+	while(start < text.size())
+	{
+		const size_t end = text.find('\n', start);
+		if(!text.compare(start, kind.size() + 1, kind + " "))
+			return text.substr(0, start) + kind + " \"" + name + "\""
+				+ (end == string::npos ? string() : text.substr(end));
+		if(end == string::npos)
+			break;
+		start = end + 1;
+	}
+	return text;
 }
 
 
