@@ -1,0 +1,193 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Programs the galaxy's factions have written: guidance for their missiles, and
+# ways for their escorts to fly. The governments a program is "flown by" use it
+# instead of the game's own (unless the "Classic AI scripts" preference is
+# on), on any weapon whose hardware can run it. The player can buy them for
+# their library where their author's government owns the planet. Each
+# program's script is the "guidance" or "maneuver" node of the same name.
+
+program "Corkscrew"
+	guidance
+	author "Pirate"
+	"flown by" "Pirate" "Marauder" "Bounty Hunter"
+	price 18000
+	description "Pirate missile firmware, of uncertain origin. The missile weaves from side to side on its way in, which makes it harder for point defense to hit, and straightens out for the last stretch."
+
+program "Proportional Navigation"
+	guidance
+	author "Republic"
+	"flown by" "Republic" "Militia"
+	price 60000
+	description "Navy standard issue for missiles with leading seekers. Instead of chasing the target, the missile steers to stop its line of sight to the target from turning, which puts it on a collision course without predicting where the target will be."
+
+program "Flanker"
+	guidance
+	author "Korath"
+	"flown by" "Korath" "Kor Efret" "Kor Mereti" "Kor Sestor"
+	price 45000
+	description "Korath code: each missile picks a side at random and comes in at an angle, which shrinks as it closes, so that a ship that turns to face its attackers shows them its flank."
+
+program "Patient Strike"
+	guidance
+	author "Hai"
+	"flown by" "Hai"
+	price 40000
+	description "Hai firmware for missiles with throttle control: the missile coasts until it is facing its target, and only then burns, so no thrust goes into flying the wrong way."
+
+program "Thrifty Seeker"
+	guidance
+	author "Merchant"
+	"flown by" "Merchant" "Independent"
+	price 6000
+	description "Cheap, licensed firmware that turns gently, to spare the airframe. Hits less often; costs less."
+
+program "Lead Without Leading"
+	guidance
+	author "Syndicate"
+	"flown by" "Syndicate"
+	price 75000
+	description "A Syndicate patent: missiles without leading hardware can't measure their target's velocity, but this program remembers where the target was last step, works out how it is moving, and leads it anyway."
+
+program "Wingman (Right)"
+	maneuver "keep station"
+	author "Republic"
+	price 25000
+	description "Escort flight software from the Navy: hold position 250 behind the leader and 200 to its right, matching its heading, rather than milling around it."
+
+program "Vanguard"
+	maneuver "keep station"
+	author "Militia"
+	price 20000
+	description "The escort flies 350 ahead of its leader, to meet trouble first."
+
+program "Close Guard"
+	maneuver "keep station"
+	author "Syndicate"
+	price 20000
+	description "The escort tucks in 120 behind its leader, close enough to hide behind."
+
+
+
+# Weave from side to side on the way in, and straighten out at the end.
+guidance "Corkscrew"
+	if target
+		turn = turn_toward(target.direction)
+		if target.distance > 300
+			turn = turn + max_turn * .7 * sin(age / 5)
+	else
+		turn = 0
+
+# Steer to stop the line of sight to the target from turning.
+guidance "Proportional Navigation"
+	if target
+		if abs(target.bearing) > 40
+			# Too far off for that: face the target first.
+			turn = turn_toward(target.intercept)
+		else
+			# How fast the line of sight is turning, in radians per step, and
+			# a little of the bearing, to straighten out at the end.
+			let relative = target.velocity - velocity
+			let sight_rate = cross(target.offset, relative) / (target.distance * target.distance)
+			turn = 4 * sight_rate * to_deg + .1 * target.bearing
+	else
+		turn = 0
+
+# Come in from one side, at an angle that shrinks as it closes.
+guidance "Flanker"
+	memory side = 0
+	if side == 0
+		side = random() < .5 ? -1 : 1
+	if target
+		let angle = side * 30 * clamp((target.distance - 300) / 900, 0, 1) * to_rad
+		let d = target.direction
+		let aim = vec(d.x * cos(angle) - d.y * sin(angle), d.x * sin(angle) + d.y * cos(angle))
+		turn = turn_toward(aim)
+	else
+		turn = 0
+
+# Coast until facing the target, then burn.
+guidance "Patient Strike"
+	if target
+		turn = turn_toward(target.direction)
+		if abs(target.bearing) > 30
+			thrust = 0
+	else
+		turn = 0
+		thrust = 0
+
+# Turn gently.
+guidance "Thrifty Seeker"
+	if target
+		turn = turn_toward(target.direction) * .6
+	else
+		turn = 0
+
+# Remember where the target was, to work out how it is moving, and lead it.
+guidance "Lead Without Leading"
+	memory last_seen = vec(0, 0)
+	memory have_last = false
+	if target
+		let moving = have_last ? target.position - last_seen : vec(0, 0)
+		last_seen = target.position
+		have_last = true
+		turn = turn_toward(unit(target.offset + moving * target.steps_away))
+	else
+		have_last = false
+		turn = 0
+
+# Hold position 250 behind the leader and 200 to its right.
+maneuver "Wingman (Right)"
+	let right = vec(-target_facing.y, target_facing.x)
+	let station = target_position - target_facing * 250 + right * 200
+	let offset = station - position
+	# Close in faster the farther off station, up to half top speed.
+	let approach = unit(offset) * min(max_velocity * .5, length(offset) * .02)
+	let change = target_velocity + approach - velocity
+	# Face the change to make, or once it is small, the way the leader faces.
+	let goal = length(change) > acceleration * 2 ? change : target_facing
+	let angle = heading(goal) - facing_degrees
+	if abs(angle) > 180
+		angle = angle + (angle < 0 ? 360 : -360)
+	turn = clamp(angle / turn_rate, -1, 1)
+	if length(change) > acceleration * 2 && dot(facing, unit(change)) > .9
+		forward = true
+
+# Fly 350 ahead of the leader.
+maneuver "Vanguard"
+	let station = target_position + target_facing * 350
+	let offset = station - position
+	let approach = unit(offset) * min(max_velocity * .5, length(offset) * .02)
+	let change = target_velocity + approach - velocity
+	let goal = length(change) > acceleration * 2 ? change : target_facing
+	let angle = heading(goal) - facing_degrees
+	if abs(angle) > 180
+		angle = angle + (angle < 0 ? 360 : -360)
+	turn = clamp(angle / turn_rate, -1, 1)
+	if length(change) > acceleration * 2 && dot(facing, unit(change)) > .9
+		forward = true
+
+# Tuck in 120 behind the leader.
+maneuver "Close Guard"
+	let station = target_position - target_facing * 120
+	let offset = station - position
+	let approach = unit(offset) * min(max_velocity * .5, length(offset) * .03)
+	let change = target_velocity + approach - velocity
+	let goal = length(change) > acceleration * 2 ? change : target_facing
+	let angle = heading(goal) - facing_degrees
+	if abs(angle) > 180
+		angle = angle + (angle < 0 ? 360 : -360)
+	turn = clamp(angle / turn_rate, -1, 1)
+	if length(change) > acceleration * 2 && dot(facing, unit(change)) > .9
+		forward = true

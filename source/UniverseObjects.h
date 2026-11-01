@@ -27,6 +27,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Confusion.h"
 #include "Conversation.h"
 #include "Effect.h"
+#include "Firmware.h"
 #include "Fleet.h"
 #include "FormationPattern.h"
 #include "Galaxy.h"
@@ -147,6 +148,7 @@ private:
 	Set<MissileGuidance> guidance;
 	Set<ShipManeuver> maneuvers;
 	Set<CodeStyle> codeStyles;
+	Set<Firmware> firmwares;
 	Set<TurretScript> turretScripts;
 	Set<ChoiceScript> rateScripts;
 	Set<ChoiceScript> chooseScripts;

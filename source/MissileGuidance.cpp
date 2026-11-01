@@ -31,10 +31,27 @@ using namespace std;
 
 namespace {
 	// The guidance programs the player has written, by weapon, and their text.
-	map<const Weapon *, MissileGuidance> &PlayerPrograms()
+	map<const Weapon *, shared_ptr<const MissileGuidance>> &PlayerPrograms()
 	{
-		static map<const Weapon *, MissileGuidance> programs;
+		static map<const Weapon *, shared_ptr<const MissileGuidance>> programs;
 		return programs;
+	}
+
+	bool useFactionGuidance = false;
+
+	// Compile the first guidance node in the given text.
+	shared_ptr<MissileGuidance> Compile(const string &text)
+	{
+		istringstream in(text);
+		DataFile file(in);
+		for(const DataNode &node : file)
+			if(node.Token(0) == "guidance" && node.Size() >= 2)
+			{
+				auto guidance = make_shared<MissileGuidance>();
+				guidance->Load(node, node.Token(1), false);
+				return guidance;
+			}
+		return nullptr;
 	}
 
 	map<const Weapon *, string> &PlayerProgramTexts()
@@ -202,34 +219,48 @@ const MissileGuidance *MissileGuidance::Default(const Weapon &weapon)
 
 bool MissileGuidance::SetPlayerProgram(const Weapon *weapon, const string &text)
 {
-	map<const Weapon *, MissileGuidance> &programs = PlayerPrograms();
+	auto &programs = PlayerPrograms();
 	programs.erase(weapon);
 	PlayerProgramTexts().erase(weapon);
 	if(!weapon || text.empty())
 		return false;
-	istringstream in(text);
-	DataFile file(in);
-	for(const DataNode &node : file)
-		if(node.Token(0) == "guidance" && node.Size() >= 2)
-		{
-			MissileGuidance guidance;
-			guidance.Load(node, node.Token(1), false);
-			if(!guidance.IsValid() || !guidance.MissingCapability(*weapon).empty())
-				return false;
-			programs[weapon] = std::move(guidance);
-			PlayerProgramTexts()[weapon] = text;
-			return true;
-		}
-	return false;
+	shared_ptr<MissileGuidance> guidance = Compile(text);
+	if(!guidance || !guidance->IsValid() || !guidance->MissingCapability(*weapon).empty())
+		return false;
+	programs[weapon] = std::move(guidance);
+	PlayerProgramTexts()[weapon] = text;
+	return true;
 }
 
 
 
-const MissileGuidance *MissileGuidance::PlayerProgram(const Weapon *weapon)
+shared_ptr<const MissileGuidance> MissileGuidance::PlayerProgram(const Weapon *weapon)
 {
-	const map<const Weapon *, MissileGuidance> &programs = PlayerPrograms();
+	const auto &programs = PlayerPrograms();
 	auto it = programs.find(weapon);
-	return it == programs.end() ? nullptr : &it->second;
+	return it == programs.end() ? nullptr : it->second;
+}
+
+
+
+bool MissileGuidance::CanRun(const string &text, const Weapon &weapon)
+{
+	shared_ptr<MissileGuidance> guidance = Compile(text);
+	return guidance && guidance->IsValid() && guidance->MissingCapability(weapon).empty();
+}
+
+
+
+void MissileGuidance::SetFactionGuidance(bool use)
+{
+	useFactionGuidance = use;
+}
+
+
+
+bool MissileGuidance::FactionGuidance()
+{
+	return useFactionGuidance;
 }
 
 
@@ -237,7 +268,7 @@ const MissileGuidance *MissileGuidance::PlayerProgram(const Weapon *weapon)
 string MissileGuidance::PlayerProgramText(const string &name)
 {
 	for(const auto &[weapon, guidance] : PlayerPrograms())
-		if(guidance.Name() == name)
+		if(guidance->Name() == name)
 			return PlayerProgramTexts()[weapon];
 	return "";
 }

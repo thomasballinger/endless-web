@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Effect.h"
 #include "Entity.h"
 #include "FighterHitHelper.h"
+#include "Firmware.h"
 #include "GameData.h"
 #include "Logger.h"
 #include "Minable.h"
@@ -88,7 +89,17 @@ Projectile::Projectile(const Ship &parent, Point position, Angle angle, const We
 	hitsRemaining = weapon->PenetrationCount();
 	// The player's own missiles fly the guidance the player programmed.
 	if(parent.IsYours() && weapon->Homing())
-		playerGuidance = MissileGuidance::PlayerProgram(weapon);
+		programGuidance = MissileGuidance::PlayerProgram(weapon);
+	// Others' missiles fly their faction's own firmware, if it has any that
+	// this weapon can run.
+	else if(weapon->Homing() && MissileGuidance::FactionGuidance())
+	{
+		const Firmware *firmware = Firmware::GuidanceFor(government, *weapon);
+		// Game data outlives every projectile, so this needs no owner.
+		if(firmware)
+			programGuidance = shared_ptr<const MissileGuidance>(shared_ptr<const MissileGuidance>(),
+				GameData::Guidance().Find(firmware->Name()));
+	}
 
 	// If you are boarding your target, do not fire on it.
 	if(parent.IsBoarding() || parent.Commands().Has(Command::BOARD))
@@ -358,7 +369,7 @@ void Projectile::Steer(const Entity *currentTarget, double &turn, double &accel)
 		return;
 	}
 
-	const MissileGuidance *guidance = playerGuidance ? playerGuidance : weapon->Guidance();
+	const MissileGuidance *guidance = programGuidance ? programGuidance.get() : weapon->Guidance();
 	if(guidance && guidance->IsValid())
 	{
 		string missing = guidance->MissingCapability(*weapon);

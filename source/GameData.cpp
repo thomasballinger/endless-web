@@ -716,6 +716,13 @@ const Set<CodeStyle> &GameData::CodeStyles()
 
 
 
+const Set<Firmware> &GameData::Firmwares()
+{
+	return objects.firmwares;
+}
+
+
+
 const Set<ShipManeuver> &GameData::Maneuvers()
 {
 	return objects.maneuvers;

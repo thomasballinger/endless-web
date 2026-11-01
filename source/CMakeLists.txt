@@ -139,6 +139,8 @@ target_sources(EndlessSkyLib PRIVATE
 	Files.h
 	FireCommand.cpp
 	FireCommand.h
+	Firmware.cpp
+	Firmware.h
 	Fleet.cpp
 	Fleet.h
 	FleetCargo.cpp

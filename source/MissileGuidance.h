@@ -19,6 +19,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "script/Script.h"
 
 #include <map>
+#include <memory>
 #include <string>
 
 class DataNode;
@@ -160,7 +161,16 @@ public:
 	// Setting a program that doesn't compile, or an empty one, clears it.
 	// Returns whether the weapon now has a program.
 	static bool SetPlayerProgram(const Weapon *weapon, const std::string &text);
-	static const MissileGuidance *PlayerProgram(const Weapon *weapon);
+	// Projectiles keep the program they were fired with, even if the player
+	// installs another while they are in flight.
+	static std::shared_ptr<const MissileGuidance> PlayerProgram(const Weapon *weapon);
+	// Whether the given text is a guidance program that compiles, and that
+	// this weapon's hardware can run.
+	static bool CanRun(const std::string &text, const Weapon &weapon);
+	// Whether other ships' missiles fly their factions' own firmware (see
+	// Firmware), rather than the game's classic guidance.
+	static void SetFactionGuidance(bool use);
+	static bool FactionGuidance();
 	// The text of the player's program with the given name, or empty.
 	static std::string PlayerProgramText(const std::string &name);
 	static void ClearPlayerPrograms();

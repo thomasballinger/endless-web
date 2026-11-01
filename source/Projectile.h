@@ -221,8 +221,8 @@ private:
 	std::vector<MissileGuidance::Record> *guidanceRecords = nullptr;
 	const Ship *watchedBy = nullptr;
 	// The guidance the player programmed for this weapon, if this is one of
-	// the player's projectiles.
-	const MissileGuidance *playerGuidance = nullptr;
+	// the player's projectiles, or the firmware its faction flies, if any.
+	std::shared_ptr<const MissileGuidance> programGuidance;
 	int hackedSteps = 0;
 	// A positive value means this projectile will turn to the right;
 	// a negative value means this projectile will turn left.

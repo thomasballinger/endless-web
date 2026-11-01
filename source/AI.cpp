@@ -35,6 +35,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "image/Mask.h"
 #include "Messages.h"
 #include "Minable.h"
+#include "MissileGuidance.h"
 #include "pi.h"
 #include "Planet.h"
 #include "PlayerInfo.h"
@@ -1025,6 +1026,7 @@ void AI::Step(Command &activeCommands)
 	state.npcMaxMiningTime = GameData::GetGamerules().NPCMaxMiningTime();
 	static const bool forceFactionManeuvers = getenv("ES_FACTION_MANEUVERS");
 	useFactionManeuvers = forceFactionManeuvers || !Preferences::Has("Classic AI scripts");
+	MissileGuidance::SetFactionGuidance(useFactionManeuvers);
 	state.defaultRules = GameData::AIRuleSets().Find("default");
 	state.escortRules = GameData::AIRuleSets().Find("player escorts");
 	if(!state.defaultRules || !state.defaultRules->HasTurnRules())

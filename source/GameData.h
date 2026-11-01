@@ -41,6 +41,7 @@ class DataNode;
 class DataWriter;
 class Date;
 class Effect;
+class Firmware;
 class Fleet;
 class FormationPattern;
 class Galaxy;
@@ -165,6 +166,8 @@ public:
 	static const Set<MissileGuidance> &Guidance();
 	static const Set<ShipManeuver> &Maneuvers();
 	static const Set<CodeStyle> &CodeStyles();
+	// Programs written by the galaxy's factions, which the player can buy.
+	static const Set<Firmware> &Firmwares();
 	static const Set<TurretScript> &TurretScripts();
 	// Scripts that rate one candidate, and that choose from a list of them.
 	static const Set<ChoiceScript> &RateScripts();

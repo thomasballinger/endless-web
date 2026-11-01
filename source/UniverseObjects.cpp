@@ -473,6 +473,8 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 		}
 		else if(key == "code style" && hasValue)
 			codeStyles.Get(node.Token(1))->Load(node);
+		else if(key == "program" && hasValue)
+			firmwares.Get(node.Token(1))->Load(node);
 		else if(key == "maneuver" && hasValue)
 		{
 			maneuvers.Get(node.Token(1))->Load(node);
