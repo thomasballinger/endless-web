@@ -1,0 +1,119 @@
+# Copyright (c) 2026 by Thomas Ballinger
+#
+# Endless Sky is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# Endless Sky is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Roles for the player's escorts (see source/EscortRole.h). The player gives
+# each escort a role in the workshop; every step, its script chooses what
+# the escort does, usually as a list of "gambits": the first "if" that
+# applies decides. It can:
+#   keep_station          fly to "station", relative to the leader: x to its
+#                         right, y ahead of it (vec(0, -250), behind it, if
+#                         not set)
+#   attack_threat         attack the hostile ship nearest the leader
+#   attack_leader_target  attack what the leader is targeting
+#   attack_target         attack its own target
+#   retreat               fall back well behind the leader
+#   independent           do what escorts usually do (as if it had no role)
+# Escorts fire at enemies in range whatever their role says to do.
+#
+# These three come with the game. Factions write others, which are sold at
+# the program exchange (see data/programs.txt).
+
+# Stay close, and deal with anything that comes near the leader.
+role "Bodyguard"
+	# Once engaged, stay engaged until the threat is well away from the
+	# leader, rather than turning back and forth at the edge.
+	memory engaged = false
+	if threat
+		engaged = threat.distance < (engaged ? 1800 : 1200)
+	else
+		engaged = false
+	if hull < .3
+		retreat
+	elif engaged
+		attack_threat
+	else
+		# Line abreast, just behind the leader.
+		station = vec((escort_index - (escort_count - 1) / 2) * 180, -150)
+		keep_station
+
+# Go after whatever the leader is shooting at.
+role "Striker"
+	if hull < .2
+		retreat
+	elif leader_target
+		attack_leader_target
+	elif threat && threat.targeting_leader
+		attack_threat
+	else
+		station = vec((escort_index - (escort_count - 1) / 2) * 250, 300)
+		keep_station
+
+# Scout far ahead; fight only what comes close, and come home when hurt.
+role "Picket"
+	if hull < .5
+		retreat
+	elif target && target.distance < 600
+		attack_target
+	elif threat && length(threat.position - position) < 700
+		attack_threat
+	else
+		station = vec((escort_index - (escort_count - 1) / 2) * 600, 1000)
+		keep_station
+
+# Navy doctrine: put yourself between the leader and whatever threatens it.
+role "Shieldwall"
+	if hull < .25
+		retreat
+	elif threat && threat.distance < 2500
+		let toward = unit(threat.position - leader.position)
+		let right = vec(-leader.facing.y, leader.facing.x)
+		# In the leader's frame: across, then ahead.
+		let across = vec(-toward.y, toward.x) * ((escort_index - (escort_count - 1) / 2) * 120)
+		let spot = toward * 280 + across
+		station = vec(dot(spot, right), dot(spot, leader.facing))
+		keep_station
+	else
+		station = vec((escort_index - (escort_count - 1) / 2) * 160, 200)
+		keep_station
+
+# Pirate habit: everyone piles onto whatever is already hurt.
+role "Wolf Pack"
+	if leader_target && leader_target.hull < .6
+		attack_leader_target
+	elif threat && threat.hull < .6
+		attack_threat
+	elif target && target.hull < .6
+		attack_target
+	elif hull < .4
+		retreat
+	else
+		independent
+
+# A linear role: wait by the leader until something comes close, then strike
+# for ten seconds and fall back for five, whatever happens meanwhile.
+role "Hit and Run"
+	loop
+		while !(threat && threat.distance < 2000)
+			station = vec((escort_index - (escort_count - 1) / 2) * 200, -250)
+			keep_station
+			wait
+		let strike = 600
+		while strike > 0
+			attack_threat
+			strike = strike - 1
+			wait
+		let rest = 300
+		while rest > 0
+			retreat
+			rest = rest - 1
+			wait

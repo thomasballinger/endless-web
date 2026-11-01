@@ -94,6 +94,24 @@ program "Hunter-Seeker"
 	price 30000
 	description "A plan in three parts: sweep from side to side until the seeker finds a target; close in, re-aiming every few seconds; then home in, every step, for the strike. Cheap on the seeker, slow to react while closing."
 
+program "Shieldwall"
+	role
+	author "Republic"
+	price 35000
+	description "Navy escort doctrine: each escort puts itself between the leader and whatever threatens it, spread out in a wall, and fights from there."
+
+program "Wolf Pack"
+	role
+	author "Pirate"
+	price 15000
+	description "Pirate escorts pile onto whatever is already hurt: the leader's target, a threat, or their own target, whichever is below 60%. Otherwise they do as they please."
+
+program "Hit and Run"
+	role
+	author "Syndicate"
+	price 45000
+	description "A linear role: the escort waits by its leader until something comes close, then strikes for ten seconds and falls back for five, whatever happens meanwhile."
+
 program "Wingman (Right)"
 	maneuver "keep station"
 	author "Republic"

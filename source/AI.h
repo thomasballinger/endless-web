@@ -210,6 +210,9 @@ private:
 	static void CircleAround(const Ship &ship, Command &command, const Body &target);
 	static void Swarm(const Ship &ship, Command &command, const Body &target);
 	static void KeepStation(const Ship &ship, Command &command, const Body &target);
+	// Do what the role the player gave this escort says. Returns false if it
+	// has none, or it leaves the decision to the usual rules.
+	bool RunRole(Ship &ship, Command &command, const Ship &parent);
 	static void Attack(const Ship &ship, Command &command, const Ship &target, FireCommand &targeting);
 	static void AimToAttack(const Ship &ship, Command &command, const Body &target, FireCommand &targeting);
 	static void MoveToAttack(const Ship &ship, Command &command, const Body &target, FireCommand &targeting);

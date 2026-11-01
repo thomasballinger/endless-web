@@ -723,6 +723,13 @@ const Set<Firmware> &GameData::Firmwares()
 
 
 
+const Set<EscortRole> &GameData::Roles()
+{
+	return objects.roles;
+}
+
+
+
 const Set<DefenseDaemon> &GameData::Daemons()
 {
 	return objects.daemons;

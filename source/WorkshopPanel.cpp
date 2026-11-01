@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Color.h"
 #include "Command.h"
 #include "DefenseDaemon.h"
+#include "EscortRole.h"
 #include "EscortWorkshopPanel.h"
 #include "shader/FillShader.h"
 #include "Firmware.h"
@@ -122,11 +123,12 @@ void WorkshopPanel::Draw()
 	DrawBackdrop();
 	// Weapons may have been programmed since this was last drawn.
 	FindWeapons();
+	FindEscorts();
 
 	const Font &font = FontSet::Get(14);
 	const Font &bigFont = FontSet::Get(18);
 	const size_t lines = showExchange ? GameData::Firmwares().size() + 4
-		: max<size_t>(1, rows.size()) + 3;
+		: max<size_t>(1, rows.size()) + 4 + roleRows.size();
 	const double height = min(Screen::Height() - 20., 190. + lines * (showExchange ? OFFER_HEIGHT : ROW_HEIGHT)
 		+ (showExchange ? 60. : 0.));
 	const Rectangle box(Point(), Point(WIDTH, height));
@@ -202,6 +204,8 @@ bool WorkshopPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command,
 	}
 	else if(!showExchange && key == 'h')
 		Cycle(daemonRow, 1);
+	else if(!showExchange && key == 'r' && !roleRows.empty())
+		Cycle(roleRows.front(), (mod & KMOD_SHIFT) ? -1 : 1);
 	else
 		return false;
 	return true;
@@ -244,13 +248,15 @@ bool WorkshopPanel::Click(int x, int y, MouseButton button, int clicks)
 		all.push_back(&row);
 	all.push_back(&escortRow);
 	all.push_back(&daemonRow);
+	for(Row &row : roleRows)
+		all.push_back(&row);
 	for(Row *row : all)
 	{
 		if(row->previous.Contains(point))
 			Cycle(*row, -1);
 		else if(row->next.Contains(point))
 			Cycle(*row, 1);
-		else if(row->kind == "daemon" && row->box.Contains(point))
+		else if((row->kind == "daemon" || row->kind == "role") && row->box.Contains(point))
 			Cycle(*row, 1);
 		else if(row->box.Contains(point))
 		{
@@ -309,7 +315,20 @@ void WorkshopPanel::DrawFleet(const Rectangle &box, double y)
 	const bool hasDaemon = flagship && flagship->Attributes().Get("defense daemon") > 0.;
 	DrawRow(daemonRow, "h.  Defense daemon", hasDaemon ? "which incoming missile your code injector hacks"
 		: "needs a Defense Daemon outfit on your flagship");
-	y += ROW_HEIGHT + 6.;
+	y += ROW_HEIGHT + 10.;
+	// Roles: one for all escorts, and each escort's own, if it has one.
+	font.Draw("Escort roles: what each escort does in a fight (r changes the role for all).",
+		Point(box.Left() + 24., y), TEXT);
+	y += 22.;
+	for(Row &row : roleRows)
+	{
+		row.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + ROW_HEIGHT - 6.));
+		const bool all = (row.uuid == "*");
+		DrawRow(row, all ? "r.  All escorts" : "     " + row.name, all
+			? "the role of every escort without one of its own" : "this escort's own role");
+		y += ROW_HEIGHT;
+	}
+	y += 6.;
 	const size_t library = player.ProgramLibrary().size();
 	const size_t owned = player.OwnedFirmware().size();
 	font.Draw("Your library: " + to_string(library) + (library == 1 ? " program" : " programs") + " you wrote, "
@@ -484,6 +503,42 @@ void WorkshopPanel::FindWeapons()
 
 
 
+void WorkshopPanel::FindEscorts()
+{
+	// A row for all escorts, then one for each escort here (as many as fit).
+	vector<Row> found;
+	Row all;
+	all.kind = "role";
+	all.uuid = "*";
+	found.push_back(all);
+	const Ship *flagship = player.Flagship();
+	for(const shared_ptr<Ship> &ship : player.Ships())
+	{
+		if(found.size() > 6)
+			break;
+		if(ship.get() == flagship || ship->IsDestroyed() || ship->IsParked() || ship->CanBeCarried())
+			continue;
+		Row row;
+		row.kind = "role";
+		row.uuid = ship->UUID().ToString();
+		row.name = ship->GivenName().empty() ? ship->DisplayModelName() : ship->GivenName();
+		row.name += " (" + ship->DisplayModelName() + ")";
+		found.push_back(row);
+	}
+	// Keep where the rows were drawn, for clicks.
+	for(Row &row : found)
+		for(const Row &old : roleRows)
+			if(old.uuid == row.uuid)
+			{
+				row.box = old.box;
+				row.previous = old.previous;
+				row.next = old.next;
+			}
+	roleRows = std::move(found);
+}
+
+
+
 vector<WorkshopPanel::Choice> WorkshopPanel::Choices(const Row &row) const
 {
 	// The factory's program first, then the ones the player bought, then the
@@ -498,6 +553,14 @@ vector<WorkshopPanel::Choice> WorkshopPanel::Choices(const Row &row) const
 	}
 	else if(row.kind == "maneuver")
 		choices.push_back({KEEP_STATION, ""});
+	else if(row.kind == "role")
+	{
+		// No role, then the roles that come with the game.
+		choices.push_back({row.uuid == "*" ? "no role" : "as all escorts", ""});
+		for(const auto &[name, role] : GameData::Roles())
+			if(role.IsValid() && !GameData::Firmwares().Has(name))
+				choices.push_back({name, GameData::ScriptText("role", name)});
+	}
 	else
 	{
 		const DefenseDaemon *factory = DefenseDaemon::Factory();
@@ -539,6 +602,11 @@ string WorkshopPanel::Installed(const Row &row) const
 		auto it = player.ManeuverPrograms().find(KEEP_STATION);
 		return it == player.ManeuverPrograms().end() ? string() : it->second;
 	}
+	if(row.kind == "role")
+	{
+		auto it = player.EscortRoles().find(row.uuid);
+		return it == player.EscortRoles().end() ? string() : it->second;
+	}
 	return player.DaemonProgram();
 }
 
@@ -550,6 +618,8 @@ bool WorkshopPanel::Install(const Row &row, const string &text)
 		return player.SetGuidanceProgram(row.outfit, text);
 	if(row.kind == "maneuver")
 		return player.SetManeuverProgram(KEEP_STATION, text);
+	if(row.kind == "role")
+		return player.SetEscortRole(row.uuid, text);
 	return player.SetDaemonProgram(text);
 }
 
@@ -595,6 +665,12 @@ void WorkshopPanel::Cycle(const Row &row, int direction)
 		status = "Your " + row.outfit->DisplayName() + "s now fly " + choice.name + ".";
 	else if(row.kind == "maneuver")
 		status = "Your escorts now keep station with " + choice.name + ".";
+	else if(row.kind == "role" && row.uuid == "*")
+		status = choice.text.empty() ? "Your escorts have no role: they fight as escorts usually do."
+			: "Your escorts (those without a role of their own) now play " + choice.name + ".";
+	else if(row.kind == "role")
+		status = row.name + (choice.text.empty() ? " now plays the role all your escorts do."
+			: " now plays " + choice.name + ".");
 	else
 		status = "Your defense daemon now runs " + choice.name + ".";
 	statusTime = 300;

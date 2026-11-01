@@ -66,6 +66,7 @@ namespace {
 		{"jump with parent", AIRules::MovementAction::JUMP_WITH_PARENT},
 		{"approach landing target", AIRules::MovementAction::APPROACH_LANDING_TARGET},
 		{"keep station", AIRules::MovementAction::KEEP_STATION},
+		{"role", AIRules::MovementAction::ROLE},
 		{"land with parent", AIRules::MovementAction::LAND_WITH_PARENT},
 		{"hold for boarding", AIRules::MovementAction::HOLD_FOR_BOARDING},
 		{"move with parent", AIRules::MovementAction::MOVE_WITH_PARENT},

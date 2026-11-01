@@ -42,6 +42,7 @@ class DataWriter;
 class Date;
 class DefenseDaemon;
 class Effect;
+class EscortRole;
 class Firmware;
 class Fleet;
 class FormationPattern;
@@ -171,6 +172,8 @@ public:
 	static const Set<Firmware> &Firmwares();
 	// Scripts that choose which incoming missile a ship's code injector hacks.
 	static const Set<DefenseDaemon> &Daemons();
+	// Roles for the player's escorts.
+	static const Set<EscortRole> &Roles();
 	static const Set<TurretScript> &TurretScripts();
 	// Scripts that rate one candidate, and that choose from a list of them.
 	static const Set<ChoiceScript> &RateScripts();

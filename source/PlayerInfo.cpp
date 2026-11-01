@@ -29,6 +29,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DialogPanel.h"
 #include "DistanceMap.h"
 #include "Endpoint.h"
+#include "EscortRole.h"
 #include "Files.h"
 #include "Firmware.h"
 #include "Fleet.h"
@@ -252,6 +253,7 @@ void PlayerInfo::Clear()
 	MissileGuidance::ClearPlayerPrograms();
 	ShipManeuver::ClearPlayerPrograms();
 	DefenseDaemon::SetPlayerProgram("");
+	EscortRole::ClearPlayerRoles();
 
 	Random::Seed(time(nullptr));
 	GameData::Revert();
@@ -400,6 +402,14 @@ void PlayerInfo::Load(const filesystem::path &path, const shared_ptr<PilotProfil
 				if(grand.Token(0) == "line")
 					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
 			SetManeuverProgram(child.Token(1), text);
+		}
+		else if(key == "escort role" && hasValue)
+		{
+			string text;
+			for(const DataNode &grand : child)
+				if(grand.Token(0) == "line")
+					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
+			SetEscortRole(child.Token(1), text);
 		}
 		else if(key == "daemon program")
 		{
@@ -5158,6 +5168,35 @@ bool PlayerInfo::SetDaemonProgram(const string &text)
 
 
 
+const map<string, string> &PlayerInfo::EscortRoles() const
+{
+	return escortRoles;
+}
+
+
+
+bool PlayerInfo::SetEscortRole(const string &uuid, const string &text)
+{
+	if(text.empty())
+	{
+		escortRoles.erase(uuid);
+		EscortRole::SetPlayerRole(uuid, "");
+		return true;
+	}
+	if(!EscortRole::SetPlayerRole(uuid, text))
+	{
+		// Keep the role it had, if any.
+		auto it = escortRoles.find(uuid);
+		if(it != escortRoles.end())
+			EscortRole::SetPlayerRole(uuid, it->second);
+		return false;
+	}
+	escortRoles[uuid] = text;
+	return true;
+}
+
+
+
 const set<string> &PlayerInfo::OwnedFirmware() const
 {
 	return ownedFirmware;
@@ -5296,6 +5335,17 @@ void PlayerInfo::Save(DataWriter &out) const
 	}
 	for(const string &name : ownedFirmware)
 		out.Write("firmware", name);
+	for(const auto &[uuid, text] : escortRoles)
+	{
+		out.Write("escort role", uuid);
+		out.BeginChild();
+		{
+			istringstream in(text);
+			for(string line; getline(in, line); )
+				out.Write("line", line);
+		}
+		out.EndChild();
+	}
 	if(!daemonProgram.empty())
 	{
 		out.Write("daemon program");

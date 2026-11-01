@@ -475,6 +475,11 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 			codeStyles.Get(node.Token(1))->Load(node);
 		else if(key == "program" && hasValue)
 			firmwares.Get(node.Token(1))->Load(node);
+		else if(key == "role" && hasValue)
+		{
+			roles.Get(node.Token(1))->Load(node);
+			RecordScriptSource(scriptFiles, scriptSources, path, "role " + node.Token(1));
+		}
 		else if(key == "daemon" && hasValue)
 		{
 			daemons.Get(node.Token(1))->Load(node);

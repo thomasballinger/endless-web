@@ -123,6 +123,11 @@ void MainPanel::Step()
 	// Display any relevant help/tutorial messages.
 	if(isActive)
 		isActive = !ShowHelp(false);
+	// The game waits while the player edits a role (and Escape ends the
+	// editing, rather than bringing up the menu).
+	SetInterruptible(!engine.IsEditingScript());
+	if(engine.IsEditingScript())
+		isActive = false;
 
 	engine.Step(isActive);
 
@@ -206,11 +211,22 @@ Engine &MainPanel::GetEngine()
 
 
 
+bool MainPanel::TextInput(const string &text)
+{
+	return engine.IsEditingScript() && engine.ScriptTextInput(text);
+}
+
+
+
 // Only override the ones you need; the default action is to return false.
 bool MainPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command, bool isNewPress)
 {
 	if(player.IsDead())
 		return true;
+	// While the player edits an escort's role in the scripts pane, keys go to
+	// the pane (Escape ends editing).
+	if(engine.IsEditingScript())
+		return engine.ScriptKey(key, mod);
 
 	if(command.Has(Command::MAP | Command::INFO | Command::MESSAGE_LOG | Command::HAIL | Command::HELP))
 		show = command;

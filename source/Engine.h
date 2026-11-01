@@ -15,6 +15,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "SDL.h"
+
 #include "AI.h"
 #include "AlertLabel.h"
 #include "AmmoDisplay.h"
@@ -106,6 +108,11 @@ public:
 	// Clicks and scrolling on the display of the scripts the player is
 	// watching. Each returns false if the point isn't on it.
 	bool ScriptClick(const Point &point);
+	// While the player edits an escort's role in the scripts pane, the game is
+	// paused, and keys and text go to the pane.
+	bool IsEditingScript() const;
+	bool ScriptKey(SDL_Keycode key, Uint16 mod);
+	bool ScriptTextInput(const std::string &text);
 	bool ScriptScroll(const Point &point, double dy);
 	// Open or close the display of scripts ("Show scripts"), and hack the
 	// scripts it shows, or the target's ("Hack selected ship's scripts").
@@ -244,6 +251,8 @@ private:
 	void CarryOutHack(WatchedScripts &watched);
 	// Let the ships that run defense daemons hack the missiles chasing them.
 	void RunDaemons(const WatchedScripts &watched);
+	// Give an escort (or all of them) a role the player edited in the pane.
+	void ApplyRoleEdit(const std::string &text, const std::string &uuid);
 
 	void CreateStatusOverlays();
 	void EmplaceStatusOverlay(const std::shared_ptr<Ship> &ship, Preferences::OverlayState overlaySetting,

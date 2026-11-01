@@ -83,7 +83,10 @@ public:
 		KEEP_STATION,
 		LAND_WITH_PARENT,
 		HOLD_FOR_BOARDING,
-		MOVE_WITH_PARENT
+		MOVE_WITH_PARENT,
+		// For the player's escorts: do what the role the player gave the
+		// escort says (see EscortRole), if it has one.
+		ROLE
 	};
 
 	// Facts about the ship and its situation that conditions can test.

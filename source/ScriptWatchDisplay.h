@@ -63,6 +63,9 @@ public:
 		// How its faction's code looks, or null for the usual way.
 		const CodeStyle *style = nullptr;
 		script::Activity activity;
+		// For one of the player's own ships, its UUID (whose role the player
+		// can edit in the pane).
+		std::string uuid;
 	};
 
 	// What the player's code injector can do at the moment.
@@ -104,6 +107,17 @@ public:
 	// the code they copied (the text of a "guidance" or "maneuver" node), and
 	// whose it was.
 	bool TakeCopy(std::string &text, std::string &from);
+
+	// Editing one of the player's escorts' roles, in the pane, while the game
+	// is paused: whether the player is, and the keys and text they type.
+	bool IsEditing() const;
+	bool EditKey(SDL_Keycode key, Uint16 mod);
+	bool EditText(const std::string &text);
+	// Once the player pauses typing, the edited role's text, and the UUID of
+	// the escort whose role it is. Then, what became of it: mistakes to mark,
+	// by line, and a note to show.
+	bool TakeEdit(std::string &text, std::string &uuid);
+	void SetEditResult(const std::map<size_t, std::string> &errors, const std::string &note);
 
 
 private:
@@ -168,6 +182,17 @@ private:
 	Rectangle closeBox;
 	Rectangle hackBox;
 	Rectangle copyBox;
+	Rectangle editBox;
+	// Editing a role: whether the player is, which escort's, the version of
+	// the code last handed over, how long since the last keystroke, and the
+	// text waiting to be handed over.
+	bool editing = false;
+	std::string editUuid;
+	uint64_t seenVersion = 0;
+	uint64_t submittedVersion = 0;
+	int quietFrames = 0;
+	std::string pendingEdit;
+	std::string editNote;
 	// Code the player copied, until the engine takes it.
 	std::string copiedText;
 	std::string copiedFrom;

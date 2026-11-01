@@ -53,9 +53,12 @@ private:
 	// player's escorts keep station, or the flagship's defense daemon.
 	class Row {
 	public:
-		// "guidance", "maneuver" or "daemon".
+		// "guidance", "maneuver", "daemon" or "role".
 		std::string kind = "guidance";
 		const Outfit *outfit = nullptr;
+		// For a role: the escort's UUID ("*" for all escorts), and its name.
+		std::string uuid;
+		std::string name;
 		int count = 0;
 		Rectangle box;
 		Rectangle previous;
@@ -78,6 +81,7 @@ private:
 
 private:
 	void FindWeapons();
+	void FindEscorts();
 	std::vector<Choice> Choices(const Row &row) const;
 	// The program the row's weapon (or escorts, or daemon) runs, if it isn't
 	// the factory's.
@@ -103,6 +107,8 @@ private:
 	std::vector<Row> rows;
 	Row escortRow;
 	Row daemonRow;
+	// A role for all escorts, then each escort's own.
+	std::vector<Row> roleRows;
 	std::vector<Offer> offers;
 	bool showExchange = false;
 	Rectangle closeBox;

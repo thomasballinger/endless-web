@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataFile.h"
 #include "DataNode.h"
 #include "DefenseDaemon.h"
+#include "EscortRole.h"
 #include "GameData.h"
 #include "Government.h"
 #include "MissileGuidance.h"
@@ -51,7 +52,7 @@ void Firmware::Load(const DataNode &node)
 	for(const DataNode &child : node)
 	{
 		const string &key = child.Token(0);
-		if(key == "guidance" || key == "daemon")
+		if(key == "guidance" || key == "daemon" || key == "role")
 			kind = key;
 		else if(key == "maneuver" && child.Size() >= 2)
 		{
@@ -205,7 +206,8 @@ string Firmware::KindOf(const string &text)
 	for(const DataNode &node : file)
 	{
 		const string &key = node.Token(0);
-		return (key == "guidance" || key == "maneuver" || key == "daemon") && node.Size() >= 2 ? key : string();
+		return (key == "guidance" || key == "maneuver" || key == "daemon" || key == "role") && node.Size() >= 2
+			? key : string();
 	}
 	return "";
 }
@@ -254,5 +256,7 @@ bool Firmware::IsGameScript(const string &kind, const string &name)
 		return GameData::Maneuvers().Has(name);
 	if(kind == "daemon")
 		return GameData::Daemons().Has(name);
+	if(kind == "role")
+		return GameData::Roles().Has(name);
 	return false;
 }

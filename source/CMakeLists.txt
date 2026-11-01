@@ -125,6 +125,8 @@ target_sources(EndlessSkyLib PRIVATE
 	Effect.h
 	Engine.cpp
 	Engine.h
+	EscortRole.cpp
+	EscortRole.h
 	Entity.cpp
 	Entity.h
 	EsUuid.cpp

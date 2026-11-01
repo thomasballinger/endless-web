@@ -17,6 +17,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "CodeStyle.h"
 #include "Color.h"
+#include "EscortRole.h"
 #include "shader/FillShader.h"
 #include "text/Font.h"
 #include "text/FontSet.h"
@@ -163,6 +164,63 @@ void ScriptWatchDisplay::Toggle()
 
 
 
+bool ScriptWatchDisplay::IsEditing() const
+{
+	return editing && !shown.empty();
+}
+
+
+
+bool ScriptWatchDisplay::EditKey(SDL_Keycode key, Uint16 mod)
+{
+	if(key == SDLK_ESCAPE)
+	{
+		// Hand over the last edit, and fly on.
+		if(document.Version() != submittedVersion)
+		{
+			pendingEdit = document.Text();
+			submittedVersion = document.Version();
+		}
+		editing = false;
+		editor.SetFocus(false);
+		editNote.clear();
+		return true;
+	}
+	editor.KeyDown(key, mod);
+	return true;
+}
+
+
+
+bool ScriptWatchDisplay::EditText(const string &text)
+{
+	editor.TextInput(text);
+	return true;
+}
+
+
+
+bool ScriptWatchDisplay::TakeEdit(string &text, string &uuid)
+{
+	if(pendingEdit.empty())
+		return false;
+	text = std::move(pendingEdit);
+	pendingEdit.clear();
+	uuid = editUuid;
+	return true;
+}
+
+
+
+void ScriptWatchDisplay::SetEditResult(const map<size_t, string> &errors, const string &note)
+{
+	editor.SetErrors(errors);
+	editNote = note;
+	resultFrames = 0;
+}
+
+
+
 bool ScriptWatchDisplay::TakeCopy(string &text, string &from)
 {
 	if(copiedText.empty())
@@ -182,6 +240,20 @@ bool ScriptWatchDisplay::Click(const Point &point, string &hack)
 	{
 		if(closeBox.Contains(point))
 			shown.clear();
+		else if(editBox.Contains(point) && !editing && Find(shown) && !Find(shown)->uuid.empty()
+				&& selectedKind == "role")
+		{
+			// Edit this escort's role, with the game paused.
+			editing = true;
+			editUuid = Find(shown)->uuid;
+			seenVersion = submittedVersion = document.Version();
+			quietFrames = 0;
+			editNote = "EDITING: the game is paused; esc to fly on";
+			editor.SetFocus(true);
+			return true;
+		}
+		else if(editing && editor.Area().Contains(point))
+			return editor.Click(point, 1);
 		else if(hackBox.Contains(point) && injector.isReady)
 			Arm();
 		else if(copyBox.Contains(point))
@@ -275,6 +347,20 @@ void ScriptWatchDisplay::Step()
 	}
 	if(resultFrames)
 		--resultFrames;
+	// Once the player stops typing for a moment, hand the edit over.
+	if(editing)
+	{
+		if(document.Version() != seenVersion)
+		{
+			seenVersion = document.Version();
+			quietFrames = 0;
+		}
+		else if(++quietFrames == 20 && document.Version() != submittedVersion)
+		{
+			pendingEdit = document.Text();
+			submittedVersion = document.Version();
+		}
+	}
 }
 
 
@@ -300,7 +386,8 @@ const ScriptWatchDisplay::Source &ScriptWatchDisplay::GetSource(const string &ki
 {
 	// The player's own missile programs aren't in any data file.
 	const string key = kind + " " + name;
-	const string playerText = (kind == "guidance") ? MissileGuidance::PlayerProgramText(name) : string();
+	const string playerText = (kind == "guidance") ? MissileGuidance::PlayerProgramText(name)
+		: (kind == "role") ? EscortRole::PlayerRoleText(name) : string();
 	auto it = sources.find(key);
 	if(it != sources.end() && (playerText.empty() || it->second.text == playerText))
 		return it->second;
@@ -448,6 +535,8 @@ void ScriptWatchDisplay::Layout()
 		Point(pane.Right() - 32., pane.Top() + 24.));
 	copyBox = Rectangle::WithCorners(Point(hackBox.Left() - 78., pane.Top() + 4.),
 		Point(hackBox.Left() - 8., pane.Top() + 24.));
+	editBox = Rectangle::WithCorners(Point(pane.Right() - 150., pane.Top() + 4.),
+		Point(pane.Right() - 32., pane.Top() + 24.));
 	editor.SetArea(Rectangle::WithCorners(Point(pane.Left(), pane.Top() + HEADER_HEIGHT), pane.BottomRight()));
 
 	// A button for everything being watched, and under them, a tab for each
@@ -591,6 +680,14 @@ void ScriptWatchDisplay::DrawPane() const
 		font.Draw(text, hackBox.Center() - Point(font.Width(text) / 2., 8.), injector.isReady ? HACK : LABEL);
 	}
 
+	// An escort's role can be edited.
+	if(entry && !entry->uuid.empty() && selectedKind == "role")
+	{
+		FillShader::Fill(editBox.Center(), editBox.Dimensions(), editing ? HACK_BUTTON : BUTTON);
+		const string label = editing ? "EDITING" : "EDIT";
+		font.Draw(label, editBox.Center() - Point(font.Width(label) / 2., 8.), TITLE);
+	}
+
 	// With a code scanner, someone else's code can be copied.
 	if(entry && !entry->isOwn && entry->unreadable.empty() && (selectedKind == "guidance" || selectedKind == "maneuver"))
 	{
@@ -633,6 +730,15 @@ void ScriptWatchDisplay::DrawPane() const
 		font.Draw(Fit(font, rules, pane.Width() - 20.), pane.TopLeft() + Point(10., 72.), LABEL);
 
 	editor.Draw();
+	// While editing a role, say so, and how the last edit went.
+	if(!editNote.empty())
+	{
+		const double height = 26.;
+		const Point center(pane.Center().X(), pane.Bottom() - height / 2. - 8.);
+		FillShader::Fill(center, Point(pane.Width() - 8., height), Color(.05f, .12f, .2f, .95f));
+		const string text = Fit(font, editNote, pane.Width() - 20.);
+		font.Draw(text, Point(center.X() - font.Width(text) / 2., center.Y() - 8.), TITLE);
+	}
 	// While the injector is armed, say how to aim it; afterward, how it went.
 	if(armedFrames || resultFrames)
 	{

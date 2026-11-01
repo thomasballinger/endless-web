@@ -25,8 +25,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "CoreStartData.h"
 #include "DamageDealt.h"
 #include "DamageProfile.h"
+#include "DataFile.h"
+#include "DataNode.h"
 #include "DefenseDaemon.h"
 #include "Effect.h"
+#include "EscortRole.h"
 #include "FighterHitHelper.h"
 #include "shader/FillShader.h"
 #include "Firmware.h"
@@ -86,6 +89,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstring>
 #include <limits>
 #include <set>
+#include <sstream>
 #include <string>
 
 using namespace std;
@@ -471,6 +475,12 @@ void Engine::Step(bool isActive)
 	if(watched.isFresh)
 		scriptDisplay.Update(watched.entries, watched.injector);
 	scriptDisplay.Step();
+	// A role the player edited in the pane goes to the escort now, while no
+	// other thread is running scripts.
+	string editText;
+	string editUuid;
+	if(scriptDisplay.TakeEdit(editText, editUuid))
+		ApplyRoleEdit(editText, editUuid);
 	// (It waits for a step that time moves on, which carries it out.)
 	if(!scriptHackNextStep.empty())
 		scriptHack = scriptHackNextStep;
@@ -1464,6 +1474,60 @@ void Engine::ReleaseDrag(const Point &from, const Point &to)
 
 
 
+bool Engine::IsEditingScript() const
+{
+	return scriptDisplay.IsEditing();
+}
+
+
+
+bool Engine::ScriptKey(SDL_Keycode key, Uint16 mod)
+{
+	return scriptDisplay.EditKey(key, mod);
+}
+
+
+
+bool Engine::ScriptTextInput(const string &text)
+{
+	return scriptDisplay.EditText(text);
+}
+
+
+
+void Engine::ApplyRoleEdit(const string &text, const string &uuid)
+{
+	map<size_t, string> errors;
+	istringstream in(text);
+	DataFile file(in);
+	const DataNode *node = nullptr;
+	for(const DataNode &child : file)
+		if(!node && child.Token(0) == "role" && child.Size() >= 2)
+			node = &child;
+	if(!node)
+	{
+		errors[1] = "The first line should be: role \"<name>\"";
+		scriptDisplay.SetEditResult(errors, "NOT APPLIED: the first line should name the role");
+		return;
+	}
+	EscortRole candidate;
+	candidate.Load(*node, false);
+	for(const script::Program::Error &error : candidate.Program().Errors())
+		errors.emplace(error.line, error.message);
+	if(!candidate.IsValid())
+	{
+		scriptDisplay.SetEditResult(errors, "NOT APPLIED: fix the marked lines (the escort keeps its old role)");
+		return;
+	}
+	// An escort without a role of its own was playing the one for all.
+	const string target = player.EscortRoles().contains(uuid) ? uuid : "*";
+	player.SetEscortRole(target, text);
+	scriptDisplay.SetEditResult(errors, target == "*" ? "APPLIED to all your escorts without a role of their own"
+		: "APPLIED to this escort");
+}
+
+
+
 bool Engine::ScriptClick(const Point &point)
 {
 	const bool handled = scriptDisplay.Click(point, scriptHackNextStep);
@@ -2209,6 +2273,9 @@ void Engine::WatchScripts(WatchedScripts &watched)
 			else if(jamming > 0.)
 				entry.interference = "JAMMING: its code is being garbled";
 		}
+		// The player can edit their own escorts' roles.
+		if(isOwn && ship)
+			entry.uuid = ship->UUID().ToString();
 		// Other factions' code looks like theirs.
 		if(!isOwn)
 			entry.style = CodeStyle::ForGovernment(ship ? ship->GetGovernment()

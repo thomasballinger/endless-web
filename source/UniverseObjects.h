@@ -28,6 +28,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Conversation.h"
 #include "DefenseDaemon.h"
 #include "Effect.h"
+#include "EscortRole.h"
 #include "Firmware.h"
 #include "Fleet.h"
 #include "FormationPattern.h"
@@ -151,6 +152,7 @@ private:
 	Set<CodeStyle> codeStyles;
 	Set<Firmware> firmwares;
 	Set<DefenseDaemon> daemons;
+	Set<EscortRole> roles;
 	Set<TurretScript> turretScripts;
 	Set<ChoiceScript> rateScripts;
 	Set<ChoiceScript> chooseScripts;

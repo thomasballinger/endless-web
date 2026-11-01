@@ -251,6 +251,11 @@ public:
 	// empty for the factory's. Returns false if it doesn't compile.
 	const std::string &DaemonProgram() const;
 	bool SetDaemonProgram(const std::string &text);
+	// The roles the player has given their escorts (see EscortRole), by the
+	// escort's UUID, as the text of a "role" node. Empty text removes one;
+	// returns false if it doesn't compile.
+	const std::map<std::string, std::string> &EscortRoles() const;
+	bool SetEscortRole(const std::string &uuid, const std::string &text);
 	// Programs the player has bought (see Firmware), by name. Buying one
 	// costs its price, and fails if the player can't afford it.
 	const std::set<std::string> &OwnedFirmware() const;
@@ -636,6 +641,7 @@ private:
 	std::map<std::string, std::string> maneuverPrograms;
 	std::set<std::string> ownedFirmware;
 	std::string daemonProgram;
+	std::map<std::string, std::string> escortRoles;
 	std::map<std::string, std::string> programLibrary;
 
 	bool freshlyLoaded = true;

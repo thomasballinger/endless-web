@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Command.h"
 #include "ConditionsStore.h"
 #include "DistanceMap.h"
+#include "EscortRole.h"
 #include "FighterHitHelper.h"
 #include "Flotsam.h"
 #include "text/Format.h"
@@ -1801,6 +1802,10 @@ bool AI::DoMovementAction(AIRules::MovementAction action, ShipTurn &turn, const 
 			if(parent->IsEnteringHyperspace())
 				command |= Command::LAND;
 			return true;
+		case AIRules::MovementAction::ROLE:
+			if(!parent || !ship.IsYours() || parent->GetSystem() != ship.GetSystem())
+				return false;
+			return RunRole(ship, command, *parent);
 		case AIRules::MovementAction::KEEP_STATION:
 			// Protect the parent until it jumps away.
 			if(!parent)
@@ -3205,6 +3210,132 @@ void AI::KeepStation(const Ship &ship, Command &command, const Body &target)
 {
 	ShipManeuver::Output output;
 	RunManeuver(ship, "keep station", ManeuverInput(ship, target), command, output);
+}
+
+
+
+bool AI::RunRole(Ship &ship, Command &command, const Ship &parent)
+{
+	script::Memory *memory = nullptr;
+	const EscortRole *role = EscortRole::PlayerRole(ship.UUID().ToString(), &memory);
+	if(!role)
+		return false;
+
+	// What the escort knows: itself, its leader and the leader's target, the
+	// nearest hostile ship to the leader, and its own target.
+	EscortRole::Input input;
+	input.position = ship.Position();
+	input.velocity = ship.Velocity();
+	input.facing = ship.Facing().Unit();
+	input.hull = ship.HullFraction();
+	input.shields = ship.ShieldFraction();
+	input.energy = ship.EnergyFraction();
+	input.weaponRange = ship.GetAICache().LongestRange();
+	input.leaderPosition = parent.Position();
+	input.leaderVelocity = parent.Velocity();
+	input.leaderFacing = parent.Facing().Unit();
+	input.leaderHull = parent.HullFraction();
+	input.leaderShields = parent.ShieldFraction();
+	const System *here = ship.GetSystem();
+	auto usable = [here](const shared_ptr<Ship> &other) {
+		return other && other->GetSystem() == here && other->IsTargetable() && !other->IsDisabled();
+	};
+	const shared_ptr<Ship> leaderTarget = parent.GetTargetShip();
+	if(usable(leaderTarget))
+	{
+		input.leaderTarget = true;
+		input.leaderTargetPosition = leaderTarget->Position();
+		input.leaderTargetHull = leaderTarget->HullFraction();
+	}
+	shared_ptr<Ship> threat;
+	double closest = 4000.;
+	for(const shared_ptr<Ship> &other : ships)
+		if(usable(other) && other->GetGovernment()->IsEnemy(ship.GetGovernment()))
+		{
+			const double distance = other->Position().Distance(parent.Position());
+			if(distance < closest)
+			{
+				closest = distance;
+				threat = other;
+			}
+		}
+	if(threat)
+	{
+		input.threat = true;
+		input.threatPosition = threat->Position();
+		input.threatVelocity = threat->Velocity();
+		input.threatHull = threat->HullFraction();
+		input.threatTargetingLeader = (threat->GetTargetShip().get() == &parent);
+	}
+	const shared_ptr<Ship> target = ship.GetTargetShip();
+	if(usable(target))
+	{
+		input.target = true;
+		input.targetPosition = target->Position();
+		input.targetHull = target->HullFraction();
+	}
+	// Its place among the leader's escorts here.
+	input.escortCount = 0;
+	for(const shared_ptr<Ship> &escort : player.Ships())
+		if(escort.get() != &parent && escort->GetSystem() == here && !escort->IsParked() && !escort->IsDestroyed())
+		{
+			if(escort.get() == &ship)
+				input.escortIndex = input.escortCount;
+			++input.escortCount;
+		}
+
+	EscortRole::Output output;
+	const bool ran = role->Run(input, output, memory);
+	// For tests: note on the standard output each time an escort's role
+	// changes its mind.
+	static const bool logRoles = getenv("ES_LOG_ROLES");
+	if(logRoles)
+	{
+		static map<const Ship *, int> last;
+		static const char *const NAMES[] = {"keep station", "attack threat", "attack leader target",
+			"attack target", "retreat", "independent"};
+		const int behavior = !ran ? -1 : output.chose ? static_cast<int>(output.behavior) : -2;
+		auto it = last.find(&ship);
+		if(it == last.end() || it->second != behavior)
+		{
+			last[&ship] = behavior;
+			printf("ROLE %s %s: %s\n", role->Name().c_str(), ship.GivenName().c_str(),
+				behavior == -1 ? "failed" : behavior == -2 ? "nothing" : NAMES[behavior]);
+			fflush(stdout);
+		}
+	}
+	if(!ran || !output.chose || output.behavior == EscortRole::INDEPENDENT)
+		return false;
+	switch(output.behavior)
+	{
+		case EscortRole::KEEP_STATION:
+		case EscortRole::RETREAT:
+		{
+			// The station is relative to the leader: x to its right, y ahead.
+			const Point station = (output.behavior == EscortRole::RETREAT) ? Point(0., -600.) : output.station;
+			const Point forward = parent.Facing().Unit();
+			const Point right(-forward.Y(), forward.X());
+			ShipManeuver::Input maneuver = ManeuverInput(ship, parent);
+			maneuver.targetPosition = parent.Position() + right * station.X() + forward * station.Y();
+			ShipManeuver::Output result;
+			RunManeuver(ship, "keep station", maneuver, command, result);
+			return true;
+		}
+		case EscortRole::ATTACK_THREAT:
+		case EscortRole::ATTACK_LEADER_TARGET:
+		case EscortRole::ATTACK_TARGET:
+		{
+			const shared_ptr<Ship> &victim = (output.behavior == EscortRole::ATTACK_THREAT) ? threat
+				: (output.behavior == EscortRole::ATTACK_LEADER_TARGET) ? leaderTarget : target;
+			if(!usable(victim))
+				return false;
+			ship.SetTargetShip(victim);
+			MoveIndependent(ship, command);
+			return true;
+		}
+		default:
+			return false;
+	}
 }
 
 

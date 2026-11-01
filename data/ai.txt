@@ -158,6 +158,10 @@ ai "default"
 		escort
 			"parent jumping"
 			not "stranded with helper"
+		# The player's escorts do what the roles the player gave them say (see
+		# data/roles.txt), unless a role leaves it to the rules below.
+		role
+			yours
 		# Timid ships always stay near their parent. Injured player escorts
 		# stay nearby until they have repaired a bit.
 		escort
