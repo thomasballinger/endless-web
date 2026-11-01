@@ -60,6 +60,50 @@ namespace {
 		return texts;
 	}
 
+	// Routines any guidance script can run. Each takes some steps, waiting
+	// (see "wait") until it is done; a script that runs one becomes linear,
+	// carrying on from where it waited on each step, rather than deciding
+	// afresh every step. That is simple to write, but it can't react: a turn
+	// toward where the target is goes on toward where it was.
+	const char *const PRELUDE =
+		// Turn to face a direction, fixed when the turn starts.
+		"routine turn_to(goal)\n"
+		"\tlet aim = unit(goal)\n"
+		"\tlet tries = 360 / max_turn + 2\n"
+		"\twhile abs(bearing(aim)) > .5 && tries > 0\n"
+		"\t\tturn = turn_toward(aim)\n"
+		"\t\ttries = tries - 1\n"
+		"\t\twait\n"
+		"\tturn = 0\n"
+		// Turn by some degrees (positive is clockwise).
+		"routine turn_by(degrees)\n"
+		"\tlet a = degrees * to_rad\n"
+		"\tturn_to(vec(facing.x * cos(a) - facing.y * sin(a), facing.x * sin(a) + facing.y * cos(a)))\n"
+		// Fly straight for some steps.
+		"routine fly(steps)\n"
+		"\tturn = 0\n"
+		"\twait steps\n"
+		// Thrust at full power for some steps (needs throttle control).
+		"routine burn(steps)\n"
+		"\tthrust = acceleration\n"
+		"\twait steps\n"
+		// Cut the engine for some steps, then thrust again.
+		"routine coast(steps)\n"
+		"\tthrust = 0\n"
+		"\twait steps\n"
+		"\tthrust = acceleration\n"
+		// Home on the target, deciding afresh every step, for some steps.
+		"routine track(steps)\n"
+		"\tlet left = steps\n"
+		"\twhile left > 0\n"
+		"\t\tif target\n"
+		"\t\t\tturn = turn_toward(target.direction)\n"
+		"\t\telse\n"
+		"\t\t\tturn = 0\n"
+		"\t\tleft = left - 1\n"
+		"\t\twait\n"
+		"\tturn = 0\n";
+
 	// The input of the script running on this thread, for its functions.
 	const MissileGuidance::Input *&CurrentInput()
 	{
@@ -143,6 +187,9 @@ namespace {
 			result = script::Value(LimitTurn(Bearing(CurrentInput()->facing, toward), CurrentInput()->maxTurn));
 			return true;
 		});
+		// Routines for linear scripts: each one does something over several
+		// steps, deciding how when it starts (see PRELUDE).
+		interface.SetPrelude(PRELUDE);
 		return interface;
 	}
 }
@@ -190,7 +237,26 @@ const map<string, MissileGuidance::Doc> &MissileGuidance::Documentation()
 		{"turn_toward", {"turn_toward(direction): the degrees to turn this step toward a direction, no more than"
 			" max_turn.", "abs(bearing(d)) > max_turn ? copysign(max_turn, bearing(d)) : bearing(d)"}},
 		{"drop_target", {"Forget the target (the seeker may pick it up again).", ""}},
-		{"stop", {"End the script for this step.", ""}},
+		{"stop", {"End the script for this step (or, in a linear script, for good).", ""}},
+		{"wait", {"wait n: stop here for n steps (1 if not given), then carry on from the next line. A script that"
+			" waits is linear: each step it carries on from where it waited, keeping its variables, turn and"
+			" thrust, rather than starting over.", ""}},
+		{"while", {"while condition: run the lines below over and over, as long as it is true. Wait inside it, or"
+			" it must finish within the step.", ""}},
+		{"loop", {"loop: run the lines below over and over, forever. Wait inside it.", ""}},
+		{"routine", {"routine name(parameter, ...): like a function, but run on a line of its own, and it can set"
+			" turn and thrust and wait.", ""}},
+		{"turn_to", {"turn_to(direction): turn until facing a direction, decided when the turn starts (then turn"
+			" stops). Waits.", "while abs(bearing(aim)) > .5: turn = turn_toward(aim); wait"}},
+		{"turn_by", {"turn_by(degrees): turn by some degrees (positive is clockwise). Waits.",
+			"turn_to(facing rotated by degrees)"}},
+		{"fly", {"fly(steps): fly straight for some steps. Waits.", "turn = 0; wait steps"}},
+		{"burn", {"burn(steps): full thrust for some steps. Needs \"throttle control\". Waits.",
+			"thrust = acceleration; wait steps"}},
+		{"coast", {"coast(steps): no thrust for some steps, then full thrust again. Needs \"throttle"
+			" control\". Waits.", "thrust = 0; wait steps; thrust = acceleration"}},
+		{"track", {"track(steps): home on the target, steering every step, for some steps. Waits.",
+			"if target: turn = turn_toward(target.direction); wait (each step)"}},
 	};
 	return DOCS;
 }
@@ -422,7 +488,8 @@ bool MissileGuidance::Run(const Input &input, Output &output, script::Memory *me
 	variables.resize(program.SlotCount());
 	Variables(input, variables);
 	CurrentInput() = &input;
-	variables[TURN] = script::Value(input.maxTurn);
+	// (A linear script keeps its turn from step to step, starting with none.)
+	variables[TURN] = script::Value(program.IsLinear() ? 0. : input.maxTurn);
 	variables[THRUST] = script::Value(input.acceleration);
 
 	uint32_t effects = 0;

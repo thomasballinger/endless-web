@@ -42,6 +42,7 @@ target_sources(EndlessSkyTests PRIVATE
 	unit/src/test_firecommand.cpp
 	unit/src/test_firmware.cpp
 	unit/src/test_formationPattern.cpp
+	unit/src/test_linearScript.cpp
 	unit/src/test_guidance.cpp
 	unit/src/test_main.cpp
 	unit/src/test_maneuver.cpp

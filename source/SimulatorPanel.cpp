@@ -1376,8 +1376,14 @@ void SimulatorPanel::DrawReference(const GuidanceSimulation::Missile &missile, d
 	// The functions the game gives guidance scripts.
 	y += 4.;
 	double x = left;
-	for(const string function : {"turn_toward(", "bearing("})
+	for(const string function : {"turn_toward(", "bearing(", "turn_to(", "turn_by(", "fly(", "burn(", "coast(",
+			"track("})
 	{
+		if(x > left + 230.)
+		{
+			x = left;
+			y += LINE;
+		}
 		const string label = function + ")";
 		if(y < Screen::Bottom() - FOOTER_HEIGHT - LINE)
 		{

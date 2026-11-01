@@ -154,6 +154,11 @@ public:
 	int FindFunction(const std::string &name) const;
 	int FunctionArgumentCount(int function) const;
 	const Function &GetFunction(int function) const;
+	// Routines (in the infix language) that every program for this interface
+	// can call, as if it had defined them itself, e.g. "turn_to" for missiles.
+	// A program only takes on what a routine reads and sets if it calls it.
+	void SetPrelude(const std::string &text);
+	const std::string &Prelude() const;
 
 
 private:
@@ -168,6 +173,7 @@ private:
 	std::vector<std::string> functionNames;
 	std::vector<int> functionArgumentCounts;
 	std::vector<Function> functions;
+	std::string prelude;
 };
 
 
@@ -177,6 +183,8 @@ private:
 class Memory {
 public:
 	void Clear();
+	// For a linear program (one that waits): whether it has run to its end.
+	bool IsFinished() const;
 
 private:
 	friend class Program;
@@ -184,6 +192,15 @@ private:
 	std::vector<bool> isSet;
 	// Which compiled version of the program these values are for.
 	uint64_t version = 0;
+	// For a linear program: every variable it keeps from step to step, where
+	// it is waiting (the index of the statement at each level of nesting,
+	// and which branch of it), how many more steps to wait, and whether it
+	// has started or finished.
+	std::vector<Value> slots;
+	std::vector<std::pair<int, int>> resume;
+	int waitLeft = 0;
+	bool started = false;
+	bool finished = false;
 };
 
 
@@ -257,7 +274,12 @@ public:
 			// A function returned a value.
 			RETURN,
 			// A "for" loop moved on to the record in value (its index).
-			LOOP
+			LOOP,
+			// A "wait" paused the program; value is how many more steps it
+			// waits.
+			WAIT,
+			// A routine was called (name).
+			CALL
 		};
 
 		Kind kind = Kind::ASSIGN;
@@ -356,6 +378,10 @@ public:
 
 	// Number of variable slots Run() needs, including the interface's.
 	int SlotCount() const;
+	// Whether the program is linear: it waits ("wait", or a routine that
+	// does), so each run carries on from where the last one paused, rather
+	// than starting over (see Run()).
+	bool IsLinear() const;
 
 	// Whether the program reads or sets one of the interface's variables, or
 	// triggers one of its effects, anywhere in its code. A host can use these
@@ -368,6 +394,10 @@ public:
 	// variables hold inputs and outputs; effects receives one bit per effect
 	// that was triggered. The values of "memory" statements are kept in the
 	// given memory between runs; with none, they start over every run.
+	// A linear program keeps all of its variables and outputs in the memory,
+	// and each run picks up where the last one waited, running until it
+	// waits again (or reaches its end, after which runs do nothing, leaving
+	// the outputs as they were).
 	// Returns false, and stops, on a runtime error. With a trace, records each
 	// statement that ran (which is slower, so only for showing a player).
 	bool Run(std::vector<Value> &variables, uint32_t &effects, Memory *memory = nullptr,

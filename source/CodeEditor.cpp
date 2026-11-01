@@ -285,6 +285,12 @@ map<size_t, CodeEditor::LineNote> CodeEditor::RunNotes(const script::Trace &trac
 			case Kind::LOOP:
 				text = "#" + step.value.ToString();
 				break;
+			case Kind::WAIT:
+				text = "waiting " + step.value.ToString() + (step.value.Number() == 1. ? " step" : " steps");
+				break;
+			case Kind::CALL:
+				text = "running " + step.name;
+				break;
 		}
 		LineNote &note = notes[line(step.line)];
 		note = {text, false};

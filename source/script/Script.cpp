@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Script.h"
 
+#include "../DataFile.h"
 #include "../DataNode.h"
 #include "../Logger.h"
 #include "../pi.h"
@@ -29,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <sstream>
 
 using namespace std;
 
@@ -218,6 +220,20 @@ const Interface::Function &Interface::GetFunction(int function) const
 {
 	return functions.at(function);
 }
+
+void Interface::SetPrelude(const string &text)
+{
+	prelude = text;
+}
+
+
+
+const string &Interface::Prelude() const
+{
+	return prelude;
+}
+
+
 
 int Interface::VariableCount() const
 {
@@ -487,11 +503,19 @@ namespace {
 				if(!Expression(line))
 					return error;
 			}
-			else if(first == "if" || first == "elif")
+			else if(first == "if" || first == "elif" || first == "while")
 			{
 				keyword(first);
 				Take();
 				if(!Expression(line))
+					return error;
+			}
+			else if(first == "wait")
+			{
+				// "wait" or "wait <steps>"
+				keyword(first);
+				Take();
+				if(position < tokens.size() && !Expression(line))
 					return error;
 			}
 			else if(first == "else")
@@ -526,19 +550,20 @@ namespace {
 				if(!Name(line))
 					return Error("Expected \"for <name> in <list>\":");
 			}
-			else if(first == "function")
+			else if(first == "function" || first == "routine")
 			{
-				// "function <name>(<parameter>, ...)"
+				// "function <name>(<parameter>, ...)", or "routine ..."
+				const string expected = "Expected \"" + first + " <name>(<parameter>, ...)\":";
 				keyword(first);
 				Take();
 				if(!Name(line) || !Expect("("))
-					return Error("Expected \"function <name>(<parameter>, ...)\":");
+					return Error(expected);
 				while(!At(")"))
 				{
 					if(!Name(line))
-						return Error("Expected \"function <name>(<parameter>, ...)\":");
+						return Error(expected);
 					if(!At(")") && !Expect(","))
-						return Error("Expected \"function <name>(<parameter>, ...)\":");
+						return Error(expected);
 				}
 				Take();
 			}
@@ -552,9 +577,16 @@ namespace {
 				if(!Expression(line))
 					return error;
 			}
+			else if(tokens.size() >= 3 && IsName(tokens[0]) && tokens[1].text == "(")
+			{
+				// "<routine>(<argument>, ...)" runs a routine.
+				keyword("call");
+				if(!Expression(line))
+					return error;
+			}
 			else if(tokens.size() == 1 && IsName(tokens[0]))
 			{
-				// A statement that is a single word, like "stop".
+				// A statement that is a single word, like "stop" or "loop".
 				if(!Name(line))
 					return error;
 			}
@@ -876,6 +908,23 @@ namespace {
 	thread_local int traceDepth = 0;
 	thread_local size_t currentLine = 0;
 
+	// While a linear program runs on this thread: where it last waited (the
+	// statement at each level of nesting, and its branch), how deep the run
+	// is in carrying on from there, how many steps are left to wait, and
+	// where it waits next, collected from the innermost level out.
+	class LinearRun {
+	public:
+		const vector<pair<int, int>> *path = nullptr;
+		size_t depth = 0;
+		bool resuming = false;
+		int *waitLeft = nullptr;
+		vector<pair<int, int>> next;
+		// The line of the script's own code that is running, for statements
+		// in the interface's prelude, which have no line of their own.
+		size_t visibleLine = 0;
+	};
+	thread_local LinearRun *currentLinear = nullptr;
+
 	void Record(Trace::Step::Kind kind, size_t line, const string &name, const Value &value)
 	{
 		currentTrace->steps.push_back({kind, line, name, value, traceDepth});
@@ -903,9 +952,13 @@ public:
 	class Block;
 	class Statement {
 	public:
-		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY, RETURN, FOR };
+		enum class Kind { ASSIGN, IF, EFFECT, STOP, MEMORY, RETURN, FOR, WAIT, WHILE, CALL };
 		Kind kind = Kind::STOP;
 		int slot = -1;
+		// For CALL: which routine (with its arguments in "conditions"). For
+		// WAIT, "expression" is how many steps; for WHILE, the condition and
+		// block are the first of "conditions" and "blocks".
+		int routine = -1;
 		Expression expression;
 		int effect = -1;
 		// For MEMORY: which of the program's memory values this is.
@@ -944,6 +997,20 @@ public:
 		Block body;
 	};
 
+	// A routine: like a function, but run as a statement, and able to set
+	// outputs, trigger effects and wait. What it reads, sets and triggers
+	// only counts for a program that calls it.
+	class Routine {
+	public:
+		string name;
+		vector<int> parameterSlots;
+		Block body;
+		vector<bool> reads;
+		vector<bool> writes;
+		vector<bool> triggers;
+		bool waits = false;
+	};
+
 
 public:
 	bool Compile(const DataNode &node, const Interface &interface);
@@ -953,6 +1020,10 @@ public:
 private:
 	bool CompileBlock(const DataNode &node, Block &block);
 	bool CompileFunction(const DataNode &node, const SExpression &line);
+	bool CompileRoutine(const DataNode &node, const SExpression &line);
+	// A call of a routine: the routine's name, then its arguments.
+	bool CompileCall(const DataNode &node, const SExpression &call, Statement &statement);
+	int FindRoutine(const string &name) const;
 	bool CompileExpression(const SExpression &source, const DataNode &node, Expression &expression);
 	int Lookup(const string &name) const;
 	bool IsTaken(const string &name) const;
@@ -965,10 +1036,19 @@ private:
 	// The variables an "if" or "elif" condition being true guarantees.
 	static void Guarantees(const Expression &condition, vector<int> &slots);
 
-	enum class Result { CONTINUE, STOP, RETURN, ERROR };
+	enum class Result { CONTINUE, STOP, RETURN, ERROR, WAIT };
 	Result RunBlock(const Block &block, vector<Value> &variables, uint32_t &effects, Memory *memory,
 		int &steps) const;
 	bool Evaluate(const Expression &expression, vector<Value> &variables, int &steps, Value &result) const;
+	// Carry on running a statement that a linear program was waiting in.
+	Result Resume(const Statement &statement, int branch, vector<Value> &variables, uint32_t &effects,
+		Memory *memory, int &steps) const;
+	// Run a "while" loop, from checking its condition.
+	Result RunWhile(const Statement &statement, vector<Value> &variables, uint32_t &effects, Memory *memory,
+		int &steps) const;
+	// Run a routine (carrying on where it waited, if resuming).
+	Result RunCall(const Statement &statement, vector<Value> &variables, uint32_t &effects, Memory *memory,
+		int &steps, bool resuming) const;
 	bool Fail(const string &message) const;
 	void CountStatement(const Statement &statement) const;
 	// Report a mistake that keeps the program from compiling.
@@ -988,6 +1068,10 @@ public:
 	vector<int> memorySlots;
 	// The functions the script defines.
 	vector<Function> functions;
+	// The routines it defines, after those of the interface's prelude.
+	vector<Routine> routines;
+	// Whether it waits, so that each run picks up where the last one paused.
+	bool linear = false;
 	// The mistakes found while compiling, and whether to log them.
 	vector<Program::Error> errors;
 	bool logErrors = true;
@@ -1003,6 +1087,13 @@ private:
 	vector<map<string, int>> scopes;
 	// The function being compiled, if any.
 	const Function *compilingFunction = nullptr;
+	// The routine being compiled, if any.
+	Routine *compilingRoutine = nullptr;
+	// How many "for" loops deep the code being compiled is.
+	int forDepth = 0;
+	// Whether the interface's prelude is being compiled (whose lines aren't
+	// in the script's data file, so they get no line numbers).
+	bool inPrelude = false;
 	// The loop variables in scope, which hold records, and the list input
 	// each one loops over.
 	map<int, int> recordSlots;
@@ -1033,6 +1124,28 @@ bool Program::Implementation::Compile(const DataNode &node, const Interface &int
 	recordSlots.clear();
 	scopes.assign(1, {});
 	known.clear();
+	routines.clear();
+	compilingRoutine = nullptr;
+	forDepth = 0;
+	linear = false;
+	// The interface's routines come first, as if the script began with them.
+	if(!interface.Prelude().empty())
+	{
+		istringstream in(interface.Prelude());
+		DataFile file(in);
+		infix = true;
+		inPrelude = true;
+		for(const DataNode &child : file)
+		{
+			SExpression line;
+			if(!ReadStatement(child, line).empty() || line.items.front().atom != "routine")
+				Report(child, "The interface's prelude can only define routines:");
+			else
+				CompileRoutine(child, line);
+		}
+		inPrelude = false;
+		errors.clear();
+	}
 	infix = IsInfix(node);
 	body = Block();
 	valid = CompileBlock(node, body);
@@ -1094,16 +1207,18 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 		Statement statement;
 		statement.description = Describe(child);
 		statement.index = statementCount++;
-		statement.line = child.LineNumber();
-		if(keyword == "function")
+		statement.line = inPrelude ? 0 : child.LineNumber();
+		if(keyword == "function" || keyword == "routine")
 		{
-			if(compilingFunction || scopes.size() != 2)
+			if(compilingFunction || compilingRoutine || scopes.size() != 2)
 			{
-				Report(child, "\"function\" can only be used outside of any block:");
+				Report(child, "\"" + keyword + "\" can only be used outside of any block:");
 				ok = false;
 			}
-			else
+			else if(keyword == "function")
 				ok &= CompileFunction(child, line);
+			else
+				ok &= CompileRoutine(child, line);
 			continue;
 		}
 		if(keyword == "return")
@@ -1163,17 +1278,102 @@ bool Program::Implementation::CompileBlock(const DataNode &node, Block &block)
 			scopes.back()[variable] = statement.slot;
 			recordSlots[statement.slot] = statement.list;
 			statement.blocks.emplace_back();
+			++forDepth;
 			ok &= CompileBlock(child, statement.blocks.back());
+			--forDepth;
 			recordSlots.erase(statement.slot);
 			scopes.pop_back();
 			block.statements.push_back(std::move(statement));
 			continue;
 		}
 		if(compilingFunction && keyword != "let" && keyword != "set" && keyword != "if"
-				&& keyword != "elif" && keyword != "else")
+				&& keyword != "elif" && keyword != "else" && keyword != "while" && keyword != "loop")
 		{
-			Report(child, "A function can only use \"let\", \"set\", \"if\", \"for\" and \"return\":");
+			Report(child, "A function can only use \"let\", \"set\", \"if\", \"while\", \"for\" and \"return\""
+				" (it can't wait, or run a routine):");
 			ok = false;
+			continue;
+		}
+		if(keyword == "wait")
+		{
+			if(argumentCount > 1 || child.HasChildren())
+			{
+				Report(child, "Expected \"wait\" or \"wait <steps>\":");
+				ok = false;
+				continue;
+			}
+			if(forDepth)
+			{
+				Report(child, "A \"for\" loop can't wait:");
+				ok = false;
+				continue;
+			}
+			statement.kind = Statement::Kind::WAIT;
+			statement.expression.kind = Expression::Kind::CONSTANT;
+			statement.expression.constant = Value(1.);
+			if(argumentCount && !CompileExpression(line.items[1], child, statement.expression))
+			{
+				ok = false;
+				continue;
+			}
+			if(compilingRoutine)
+				compilingRoutine->waits = true;
+			else
+				linear = true;
+			block.statements.push_back(std::move(statement));
+			continue;
+		}
+		if(keyword == "while" || keyword == "loop")
+		{
+			// "while <condition>" or "loop" (forever), with statements below.
+			const bool isLoop = (keyword == "loop");
+			if(argumentCount != (isLoop ? 0 : 1) || !child.HasChildren())
+			{
+				Report(child, isLoop ? "Expected \"loop\" alone, with statements below it:"
+					: "Expected \"while <condition>\" with statements below it:");
+				ok = false;
+				continue;
+			}
+			statement.kind = Statement::Kind::WHILE;
+			statement.conditions.emplace_back();
+			vector<int> guaranteed;
+			if(isLoop)
+			{
+				statement.conditions.back().kind = Expression::Kind::CONSTANT;
+				statement.conditions.back().constant = Value(true);
+			}
+			else if(!CompileExpression(line.items[1], child, statement.conditions.back()))
+			{
+				ok = false;
+				continue;
+			}
+			else
+				Guarantees(statement.conditions.back(), guaranteed);
+			statement.branchLines.push_back(statement.line);
+			known.push_back(guaranteed);
+			statement.blocks.emplace_back();
+			ok &= CompileBlock(child, statement.blocks.back());
+			known.pop_back();
+			block.statements.push_back(std::move(statement));
+			continue;
+		}
+		if(keyword == "call" || (FindRoutine(keyword) >= 0 && line.items.front().IsAtom()))
+		{
+			// In infix, "call" and then the routine and its arguments, as a
+			// list; in prefix, the routine's name and its arguments.
+			const SExpression &call = (keyword == "call" && argumentCount == 1) ? line.items[1] : line;
+			if(child.HasChildren() || (keyword == "call" && (argumentCount != 1 || !line.items[1].isList)))
+			{
+				Report(child, "Expected \"<routine>(<argument>, ...)\":");
+				ok = false;
+				continue;
+			}
+			if(!CompileCall(child, call, statement))
+			{
+				ok = false;
+				continue;
+			}
+			block.statements.push_back(std::move(statement));
 			continue;
 		}
 		if(keyword == "let" || keyword == "set" || keyword == "memory")
@@ -1399,6 +1599,137 @@ bool Program::Implementation::CompileFunction(const DataNode &node, const SExpre
 	// Only now can later code call the function, so it can't call itself.
 	functions.push_back(std::move(function));
 	return ok;
+}
+
+
+
+// "routine <name> <parameter>...", with the routine's statements below it.
+bool Program::Implementation::CompileRoutine(const DataNode &node, const SExpression &line)
+{
+	if(line.items.size() < 2 || !node.HasChildren())
+	{
+		Report(node, "Expected \"routine <name> <parameter>...\" with statements below it:");
+		return false;
+	}
+	Routine routine;
+	routine.name = line.items[1].atom;
+	if(!line.items[1].IsAtom() || BUILTINS.contains(routine.name) || interface->FindFunction(routine.name) >= 0
+			|| FindRoutine(routine.name) >= 0 || interface->FindEffect(routine.name) >= 0
+			|| any_of(functions.begin(), functions.end(),
+				[&routine](const Function &other) { return other.name == routine.name; }))
+	{
+		Report(node, "A function or routine named \"" + routine.name + "\" already exists:");
+		return false;
+	}
+
+	// Like a function, a routine sees only its parameters and its own
+	// variables, along with the inputs and outputs, constants, and the
+	// functions and routines defined above it. What it reads and sets is
+	// noted separately, for the programs that call it.
+	vector<map<string, int>> outerScopes = std::move(scopes);
+	vector<vector<int>> outerKnown = std::move(known);
+	vector<bool> outerReads = std::move(reads);
+	vector<bool> outerWrites = std::move(writes);
+	vector<bool> outerTriggers = std::move(triggers);
+	reads.assign(interface->VariableCount(), false);
+	writes.assign(interface->VariableCount(), false);
+	triggers.assign(interface->EffectCount(), false);
+	scopes.assign(1, {});
+	known.clear();
+	bool ok = true;
+	for(size_t i = 2; i < line.items.size(); ++i)
+	{
+		const string &parameter = line.items[i].atom;
+		if(!line.items[i].IsAtom() || IsTaken(parameter))
+		{
+			Report(node, "\"" + parameter + "\" can't be the name of a parameter:");
+			ok = false;
+			continue;
+		}
+		routine.parameterSlots.push_back(slotCount);
+		scopes.back()[parameter] = slotCount++;
+	}
+	compilingRoutine = &routine;
+	ok &= CompileBlock(node, routine.body);
+	compilingRoutine = nullptr;
+	routine.reads = std::move(reads);
+	routine.writes = std::move(writes);
+	routine.triggers = std::move(triggers);
+	reads = std::move(outerReads);
+	writes = std::move(outerWrites);
+	triggers = std::move(outerTriggers);
+	scopes = std::move(outerScopes);
+	known = std::move(outerKnown);
+	// Only now can later code call the routine, so it can't call itself.
+	routines.push_back(std::move(routine));
+	return ok;
+}
+
+
+
+bool Program::Implementation::CompileCall(const DataNode &node, const SExpression &call, Statement &statement)
+{
+	if(call.items.empty() || !call.items.front().IsAtom())
+	{
+		Report(node, "Expected \"<routine>(<argument>, ...)\":");
+		return false;
+	}
+	const string &name = call.items.front().atom;
+	statement.routine = FindRoutine(name);
+	if(statement.routine < 0)
+	{
+		Report(node, "Unknown routine \"" + call.items.front().Name() + "\":");
+		return false;
+	}
+	const Routine &routine = routines[statement.routine];
+	if(call.items.size() - 1 != routine.parameterSlots.size())
+	{
+		Report(node, "\"" + call.items.front().Name() + "\" takes " + to_string(routine.parameterSlots.size())
+			+ (routine.parameterSlots.size() == 1 ? " argument:" : " arguments:"));
+		return false;
+	}
+	if(routine.waits && forDepth)
+	{
+		Report(node, "A \"for\" loop can't wait, so it can't run \"" + call.items.front().Name() + "\":");
+		return false;
+	}
+	bool ok = true;
+	for(size_t i = 1; i < call.items.size(); ++i)
+	{
+		statement.conditions.emplace_back();
+		ok &= CompileExpression(call.items[i], node, statement.conditions.back());
+	}
+	statement.kind = Statement::Kind::CALL;
+	statement.name = call.items.front().Name();
+	// The program now does whatever the routine does.
+	for(size_t i = 0; i < routine.reads.size(); ++i)
+	{
+		if(routine.reads[i])
+			reads[i] = true;
+		if(routine.writes[i])
+			writes[i] = true;
+	}
+	for(size_t i = 0; i < routine.triggers.size(); ++i)
+		if(routine.triggers[i])
+			triggers[i] = true;
+	if(routine.waits)
+	{
+		if(compilingRoutine)
+			compilingRoutine->waits = true;
+		else
+			linear = true;
+	}
+	return ok;
+}
+
+
+
+int Program::Implementation::FindRoutine(const string &name) const
+{
+	for(size_t i = 0; i < routines.size(); ++i)
+		if(routines[i].name == name)
+			return static_cast<int>(i);
+	return -1;
 }
 
 
@@ -1651,17 +1982,53 @@ bool Program::Implementation::Run(vector<Value> &variables, uint32_t &effects, M
 		}
 		memory->values.resize(memorySlots.size());
 		memory->isSet.resize(memorySlots.size(), false);
-		for(size_t i = 0; i < memorySlots.size(); ++i)
-			if(memory->isSet[i])
-				variables[memorySlots[i]] = memory->values[i];
+		if(!linear)
+			for(size_t i = 0; i < memorySlots.size(); ++i)
+				if(memory->isSet[i])
+					variables[memorySlots[i]] = memory->values[i];
 	}
 	int steps = 0;
-	if(RunBlock(body, variables, effects, memory, steps) == Result::ERROR)
+	if(!linear || !memory)
+	{
+		Result result = RunBlock(body, variables, effects, memory, steps);
+		if(result == Result::ERROR)
+			return false;
+		if(memory)
+			for(size_t i = 0; i < memorySlots.size(); ++i)
+				if(memory->isSet[i])
+					memory->values[i] = variables[memorySlots[i]];
+		return true;
+	}
+
+	// A linear program keeps every variable and output it had when it last
+	// waited, and carries on from there (or, once it has finished, just
+	// keeps its outputs as they were).
+	const int inputs = interface->VariableCount();
+	if(memory->started)
+		for(int slot = 0; slot < slotCount && slot < static_cast<int>(memory->slots.size()); ++slot)
+			if(slot >= inputs || interface->IsOutput(slot))
+				variables[slot] = memory->slots[slot];
+	if(memory->finished)
+		return true;
+	LinearRun run;
+	run.path = &memory->resume;
+	run.resuming = memory->started && !memory->resume.empty();
+	run.waitLeft = &memory->waitLeft;
+	LinearRun *previous = currentLinear;
+	currentLinear = &run;
+	Result result = RunBlock(body, variables, effects, memory, steps);
+	currentLinear = previous;
+	if(result == Result::ERROR)
 		return false;
-	if(memory)
-		for(size_t i = 0; i < memorySlots.size(); ++i)
-			if(memory->isSet[i])
-				memory->values[i] = variables[memorySlots[i]];
+	memory->started = true;
+	if(result == Result::WAIT)
+		memory->resume.assign(run.next.rbegin(), run.next.rend());
+	else
+	{
+		memory->finished = true;
+		memory->resume.clear();
+	}
+	memory->slots.assign(variables.begin(), variables.begin() + slotCount);
 	return true;
 }
 
@@ -1670,10 +2037,26 @@ bool Program::Implementation::Run(vector<Value> &variables, uint32_t &effects, M
 Program::Implementation::Result Program::Implementation::RunBlock(const Block &block, vector<Value> &variables,
 	uint32_t &effects, Memory *memory, int &steps) const
 {
-	for(const Statement &statement : block.statements)
+	LinearRun *run = currentLinear;
+	size_t first = 0;
+	if(run && run->resuming)
+		first = static_cast<size_t>((*run->path)[run->depth].first);
+	for(size_t index = first; index < block.statements.size(); ++index)
 	{
+		const Statement &statement = block.statements[index];
 		CountStatement(statement);
 		currentLine = statement.line;
+		// Carry on from where a linear program waited.
+		if(run && run->resuming)
+		{
+			const int branch = (*run->path)[run->depth].second;
+			Result result = Resume(statement, branch, variables, effects, memory, steps);
+			if(result == Result::WAIT)
+				run->next.emplace_back(static_cast<int>(index), branch);
+			if(result != Result::CONTINUE)
+				return result;
+			continue;
+		}
 		switch(statement.kind)
 		{
 			case Statement::Kind::ASSIGN:
@@ -1714,6 +2097,8 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 				if(chosen < statement.blocks.size())
 				{
 					Result result = RunBlock(statement.blocks[chosen], variables, effects, memory, steps);
+					if(result == Result::WAIT && run)
+						run->next.emplace_back(static_cast<int>(index), static_cast<int>(chosen));
 					if(result != Result::CONTINUE)
 						return result;
 				}
@@ -1759,6 +2144,39 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 				}
 				break;
 			}
+			case Statement::Kind::WAIT:
+			{
+				Value count;
+				if(!Evaluate(statement.expression, variables, steps, count))
+					return Result::ERROR;
+				if(count.GetType() != Value::Type::NUMBER)
+				{
+					Fail("\"wait\" takes a number of steps, not a " + string(Value::TypeName(count.GetType())));
+					return Result::ERROR;
+				}
+				const int wait = max(1, static_cast<int>(round(min(1e6, count.Number()))));
+				if(currentTrace)
+					Record(Trace::Step::Kind::WAIT, statement.line ? statement.line : (run ? run->visibleLine : 0), "",
+						Value(static_cast<double>(wait)));
+				if(run)
+				{
+					*run->waitLeft = wait;
+					run->next.emplace_back(static_cast<int>(index), 0);
+				}
+				return Result::WAIT;
+			}
+			case Statement::Kind::WHILE:
+			case Statement::Kind::CALL:
+			{
+				Result result = (statement.kind == Statement::Kind::WHILE)
+					? RunWhile(statement, variables, effects, memory, steps)
+					: RunCall(statement, variables, effects, memory, steps, false);
+				if(result == Result::WAIT && run)
+					run->next.emplace_back(static_cast<int>(index), 0);
+				if(result != Result::CONTINUE)
+					return result;
+				break;
+			}
 			case Statement::Kind::MEMORY:
 			{
 				// The initial value is only used on the first run.
@@ -1778,6 +2196,128 @@ Program::Implementation::Result Program::Implementation::RunBlock(const Block &b
 		}
 	}
 	return Result::CONTINUE;
+}
+
+
+
+Program::Implementation::Result Program::Implementation::Resume(const Statement &statement, int branch,
+	vector<Value> &variables, uint32_t &effects, Memory *memory, int &steps) const
+{
+	LinearRun &run = *currentLinear;
+	switch(statement.kind)
+	{
+		case Statement::Kind::WAIT:
+			// This is where the program waited: wait some more, or move on.
+			run.resuming = false;
+			if(--*run.waitLeft > 0)
+			{
+				if(currentTrace)
+					Record(Trace::Step::Kind::WAIT, statement.line ? statement.line : run.visibleLine, "",
+						Value(static_cast<double>(*run.waitLeft)));
+				return Result::WAIT;
+			}
+			return Result::CONTINUE;
+		case Statement::Kind::IF:
+		{
+			if(branch < 0 || branch >= static_cast<int>(statement.blocks.size()))
+			{
+				Fail("lost its place in the script");
+				return Result::ERROR;
+			}
+			++run.depth;
+			Result result = RunBlock(statement.blocks[branch], variables, effects, memory, steps);
+			--run.depth;
+			return result;
+		}
+		case Statement::Kind::WHILE:
+		{
+			// Finish the pass through the loop it was waiting in, then loop.
+			++run.depth;
+			Result result = RunBlock(statement.blocks.front(), variables, effects, memory, steps);
+			--run.depth;
+			if(result != Result::CONTINUE)
+				return result;
+			return RunWhile(statement, variables, effects, memory, steps);
+		}
+		case Statement::Kind::CALL:
+			return RunCall(statement, variables, effects, memory, steps, true);
+		default:
+			// The program changed since it waited here (which shouldn't happen,
+			// since its memory is cleared when it is recompiled).
+			Fail("lost its place in the script");
+			return Result::ERROR;
+	}
+}
+
+
+
+Program::Implementation::Result Program::Implementation::RunWhile(const Statement &statement,
+	vector<Value> &variables, uint32_t &effects, Memory *memory, int &steps) const
+{
+	while(true)
+	{
+		if(++steps > MAX_STEPS)
+		{
+			Fail("looped too many times without waiting");
+			return Result::ERROR;
+		}
+		Value condition;
+		if(!Evaluate(statement.conditions.front(), variables, steps, condition))
+			return Result::ERROR;
+		if(condition.GetType() != Value::Type::BOOLEAN)
+		{
+			Fail("a condition must be true or false, not a " + string(Value::TypeName(condition.GetType())));
+			return Result::ERROR;
+		}
+		if(currentTrace)
+			Record(Trace::Step::Kind::CONDITION, statement.line, "", condition);
+		if(!condition.Boolean())
+			return Result::CONTINUE;
+		Result result = RunBlock(statement.blocks.front(), variables, effects, memory, steps);
+		if(result != Result::CONTINUE)
+			return result;
+	}
+}
+
+
+
+Program::Implementation::Result Program::Implementation::RunCall(const Statement &statement,
+	vector<Value> &variables, uint32_t &effects, Memory *memory, int &steps, bool resuming) const
+{
+	const Routine &routine = routines[statement.routine];
+	LinearRun *run = currentLinear;
+	if(!resuming)
+	{
+		// Evaluate every argument before setting any parameter.
+		vector<Value> values(statement.conditions.size());
+		for(size_t i = 0; i < values.size(); ++i)
+			if(!Evaluate(statement.conditions[i], variables, steps, values[i]))
+				return Result::ERROR;
+		for(size_t i = 0; i < values.size(); ++i)
+			variables[routine.parameterSlots[i]] = values[i];
+	}
+	if(currentTrace && statement.line)
+		Record(Trace::Step::Kind::CALL, statement.line, statement.name, Value());
+	// Statements of the prelude's routines show on the line that called them.
+	size_t outerLine = 0;
+	if(run)
+	{
+		outerLine = run->visibleLine;
+		if(statement.line)
+			run->visibleLine = statement.line;
+		if(resuming)
+			++run->depth;
+	}
+	++traceDepth;
+	Result result = RunBlock(routine.body, variables, effects, memory, steps);
+	--traceDepth;
+	if(run)
+	{
+		if(resuming)
+			--run->depth;
+		run->visibleLine = outerLine;
+	}
+	return result;
 }
 
 
@@ -2204,6 +2744,13 @@ int Program::SlotCount() const
 
 
 
+bool Program::IsLinear() const
+{
+	return implementation->linear;
+}
+
+
+
 bool Program::Reads(int variable) const
 {
 	const auto &reads = implementation->reads;
@@ -2364,6 +2911,18 @@ void Memory::Clear()
 {
 	values.clear();
 	isSet.clear();
+	slots.clear();
+	resume.clear();
+	waitLeft = 0;
+	started = false;
+	finished = false;
+}
+
+
+
+bool Memory::IsFinished() const
+{
+	return finished;
 }
 
 } // namespace script
