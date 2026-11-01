@@ -17,6 +17,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Color.h"
 #include "Command.h"
+#include "DefenseDaemon.h"
 #include "EscortWorkshopPanel.h"
 #include "shader/FillShader.h"
 #include "Firmware.h"
@@ -45,7 +46,7 @@ using namespace std;
 namespace {
 	const double WIDTH = 760.;
 	const double ROW_HEIGHT = 46.;
-	const double OFFER_HEIGHT = 40.;
+	const double OFFER_HEIGHT = 36.;
 	const double CHOOSER_WIDTH = 250.;
 
 	const Color BACKGROUND(.01f, .04f, .025f, .97f);
@@ -99,6 +100,8 @@ WorkshopPanel::WorkshopPanel(PlayerInfo &player)
 	: player(player)
 {
 	SetInterruptible(false);
+	escortRow.kind = "maneuver";
+	daemonRow.kind = "daemon";
 	FindWeapons();
 }
 
@@ -123,7 +126,7 @@ void WorkshopPanel::Draw()
 	const Font &font = FontSet::Get(14);
 	const Font &bigFont = FontSet::Get(18);
 	const size_t lines = showExchange ? GameData::Firmwares().size() + 4
-		: max<size_t>(1, rows.size()) + 2;
+		: max<size_t>(1, rows.size()) + 3;
 	const double height = min(Screen::Height() - 20., 190. + lines * (showExchange ? OFFER_HEIGHT : ROW_HEIGHT)
 		+ (showExchange ? 60. : 0.));
 	const Rectangle box(Point(), Point(WIDTH, height));
@@ -186,17 +189,19 @@ bool WorkshopPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command,
 		// Shift and a number chooses the weapon's next program; a number alone
 		// opens it in the simulator.
 		if(mod & KMOD_SHIFT)
-			Cycle(rows[key - '1'].outfit, 1);
+			Cycle(rows[key - '1'], 1);
 		else
 			Open(*rows[key - '1'].outfit);
 	}
 	else if(!showExchange && key == 'e')
 	{
 		if(mod & KMOD_SHIFT)
-			Cycle(nullptr, 1);
+			Cycle(escortRow, 1);
 		else
 			OpenEscorts();
 	}
+	else if(!showExchange && key == 'h')
+		Cycle(daemonRow, 1);
 	else
 		return false;
 	return true;
@@ -238,12 +243,15 @@ bool WorkshopPanel::Click(int x, int y, MouseButton button, int clicks)
 	for(Row &row : rows)
 		all.push_back(&row);
 	all.push_back(&escortRow);
+	all.push_back(&daemonRow);
 	for(Row *row : all)
 	{
 		if(row->previous.Contains(point))
-			Cycle(row->outfit, -1);
+			Cycle(*row, -1);
 		else if(row->next.Contains(point))
-			Cycle(row->outfit, 1);
+			Cycle(*row, 1);
+		else if(row->kind == "daemon" && row->box.Contains(point))
+			Cycle(*row, 1);
 		else if(row->box.Contains(point))
 		{
 			if(row->outfit)
@@ -295,6 +303,12 @@ void WorkshopPanel::DrawFleet(const Rectangle &box, double y)
 	y += 20.;
 	escortRow.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + ROW_HEIGHT - 6.));
 	DrawRow(escortRow, "e.  Escort flight: keeping station", "how your escorts hold position near your ship");
+	y += ROW_HEIGHT;
+	daemonRow.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + ROW_HEIGHT - 6.));
+	const Ship *flagship = player.Flagship();
+	const bool hasDaemon = flagship && flagship->Attributes().Get("defense daemon") > 0.;
+	DrawRow(daemonRow, "h.  Defense daemon", hasDaemon ? "which incoming missile your code injector hacks"
+		: "needs a Defense Daemon outfit on your flagship");
 	y += ROW_HEIGHT + 6.;
 	const size_t library = player.ProgramLibrary().size();
 	const size_t owned = player.OwnedFirmware().size();
@@ -314,8 +328,8 @@ void WorkshopPanel::DrawRow(Row &row, const string &title, const string &subtitl
 	font.Draw(subtitle, row.box.TopLeft() + Point(10., 21.), DIM);
 
 	// The program chooser: < name >.
-	const vector<Choice> choices = Choices(row.outfit);
-	const int current = Current(row.outfit, choices);
+	const vector<Choice> choices = Choices(row);
+	const int current = Current(row, choices);
 	const double right = row.box.Right() - 8.;
 	const double left = right - CHOOSER_WIDTH;
 	const double top = row.box.Top() + 6.;
@@ -336,8 +350,7 @@ void WorkshopPanel::DrawRow(Row &row, const string &title, const string &subtitl
 	Color color = DIM;
 	if(current < 0)
 	{
-		name = Firmware::NameOf(row.outfit ? player.GuidancePrograms().at(row.outfit)
-			: player.ManeuverPrograms().at(KEEP_STATION));
+		name = Firmware::NameOf(Installed(row));
 		kind = "installed";
 		color = PROGRAMMED;
 	}
@@ -389,7 +402,7 @@ void WorkshopPanel::DrawExchange(const Rectangle &box, double y)
 	{
 		Offer offer;
 		offer.firmware = &firmware;
-		offer.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + OFFER_HEIGHT - 4.));
+		offer.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + OFFER_HEIGHT - 2.));
 		const bool hover = offer.box.Contains(mouse);
 		if(hover)
 			hovered = &firmware;
@@ -397,16 +410,18 @@ void WorkshopPanel::DrawExchange(const Rectangle &box, double y)
 		const bool owned = player.OwnsFirmware(name);
 		const bool sold = IsSoldHere(firmware);
 		const string label = (offers.size() < 9 ? to_string(offers.size() + 1) + ".  " : string()) + name;
-		font.Draw(label, offer.box.TopLeft() + Point(10., 3.), owned ? BOUGHT : sold ? TITLE : DIM);
+		font.Draw(label, offer.box.TopLeft() + Point(10., 1.), owned ? BOUGHT : sold ? TITLE : DIM);
 		string about = "by " + firmware.Author() + "  -  ";
-		if(firmware.IsGuidance())
+		if(firmware.IsDaemon())
+			about += "defense daemon";
+		else if(firmware.IsGuidance())
 		{
 			const MissileGuidance *guidance = GameData::Guidance().Find(name);
 			about += "missile guidance, " + (guidance ? Needs(*guidance) : string("missing its script"));
 		}
 		else
 			about += "escort flight (replaces " + firmware.Replaces() + ")";
-		font.Draw(about, offer.box.TopLeft() + Point(10., 19.), DIM);
+		font.Draw(about, offer.box.TopLeft() + Point(10., 17.), DIM);
 		const string price = owned ? "owned" : sold ? Format::CreditString(firmware.Price()) : "not sold here";
 		const bool affordable = player.Accounts().Credits() >= firmware.Price();
 		font.Draw(price, Point(offer.box.Right() - 10. - font.Width(price), offer.box.Top() + 11.),
@@ -469,33 +484,38 @@ void WorkshopPanel::FindWeapons()
 
 
 
-vector<WorkshopPanel::Choice> WorkshopPanel::Choices(const Outfit *outfit) const
+vector<WorkshopPanel::Choice> WorkshopPanel::Choices(const Row &row) const
 {
 	// The factory's program first, then the ones the player bought, then the
 	// ones they wrote: those that can run on this weapon.
 	vector<Choice> choices;
-	const string kind = outfit ? "guidance" : "maneuver";
+	const Outfit *outfit = row.outfit;
 	if(outfit)
 	{
 		const Weapon &weapon = *outfit->GetWeapon();
 		const MissileGuidance *factory = weapon.Guidance() ? weapon.Guidance() : MissileGuidance::Default(weapon);
 		choices.push_back({factory ? factory->Name() : string("factory"), ""});
 	}
-	else
+	else if(row.kind == "maneuver")
 		choices.push_back({KEEP_STATION, ""});
+	else
+	{
+		const DefenseDaemon *factory = DefenseDaemon::Factory();
+		choices.push_back({factory ? factory->Name() : string("factory"), ""});
+	}
 	auto fits = [&](const string &text) {
-		if(Firmware::KindOf(text) != kind)
+		if(Firmware::KindOf(text) != row.kind)
 			return false;
 		return !outfit || MissileGuidance::CanRun(text, *outfit->GetWeapon());
 	};
 	for(const string &name : player.OwnedFirmware())
 	{
 		const Firmware *firmware = GameData::Firmwares().Find(name);
-		if(!firmware || firmware->IsGuidance() != static_cast<bool>(outfit))
+		if(!firmware || firmware->Kind() != row.kind)
 			continue;
-		if(!outfit && firmware->Replaces() != KEEP_STATION)
+		if(row.kind == "maneuver" && firmware->Replaces() != KEEP_STATION)
 			continue;
-		const string text = GameData::ScriptText(kind, name);
+		const string text = GameData::ScriptText(row.kind, name);
 		if(fits(text))
 			choices.push_back({name, text});
 	}
@@ -507,21 +527,37 @@ vector<WorkshopPanel::Choice> WorkshopPanel::Choices(const Outfit *outfit) const
 
 
 
-int WorkshopPanel::Current(const Outfit *outfit, const vector<Choice> &choices) const
+string WorkshopPanel::Installed(const Row &row) const
 {
-	string installed;
-	if(outfit)
+	if(row.outfit)
 	{
-		auto it = player.GuidancePrograms().find(outfit);
-		if(it != player.GuidancePrograms().end())
-			installed = it->second;
+		auto it = player.GuidancePrograms().find(row.outfit);
+		return it == player.GuidancePrograms().end() ? string() : it->second;
 	}
-	else
+	if(row.kind == "maneuver")
 	{
 		auto it = player.ManeuverPrograms().find(KEEP_STATION);
-		if(it != player.ManeuverPrograms().end())
-			installed = it->second;
+		return it == player.ManeuverPrograms().end() ? string() : it->second;
 	}
+	return player.DaemonProgram();
+}
+
+
+
+bool WorkshopPanel::Install(const Row &row, const string &text)
+{
+	if(row.outfit)
+		return player.SetGuidanceProgram(row.outfit, text);
+	if(row.kind == "maneuver")
+		return player.SetManeuverProgram(KEEP_STATION, text);
+	return player.SetDaemonProgram(text);
+}
+
+
+
+int WorkshopPanel::Current(const Row &row, const vector<Choice> &choices) const
+{
+	const string installed = Installed(row);
 	for(size_t i = 0; i < choices.size(); ++i)
 		if(choices[i].text == installed)
 			return i;
@@ -530,21 +566,21 @@ int WorkshopPanel::Current(const Outfit *outfit, const vector<Choice> &choices) 
 
 
 
-void WorkshopPanel::Cycle(const Outfit *outfit, int direction)
+void WorkshopPanel::Cycle(const Row &row, int direction)
 {
-	const vector<Choice> choices = Choices(outfit);
+	const vector<Choice> choices = Choices(row);
 	if(choices.size() < 2)
 	{
 		status = "You have no other programs for this. Buy some at the program exchange (x), or write one.";
 		statusTime = 300;
 		return;
 	}
-	int current = Current(outfit, choices);
+	int current = Current(row, choices);
 	// A program that isn't among the choices (edited, not yet in the library)
 	// is kept there before it is replaced, so it can't be lost.
 	if(current < 0)
 	{
-		const string &text = outfit ? player.GuidancePrograms().at(outfit) : player.ManeuverPrograms().at(KEEP_STATION);
+		const string text = Installed(row);
 		string name = Firmware::NameOf(text);
 		if(name.empty())
 			name = "Unnamed program";
@@ -553,14 +589,14 @@ void WorkshopPanel::Cycle(const Outfit *outfit, int direction)
 	}
 	const int count = choices.size();
 	const Choice &choice = choices[((current + direction) % count + count) % count];
-	const bool installed = outfit ? player.SetGuidanceProgram(outfit, choice.text)
-		: player.SetManeuverProgram(KEEP_STATION, choice.text);
-	if(!installed)
+	if(!Install(row, choice.text))
 		status = "That program doesn't run on this.";
-	else if(outfit)
-		status = "Your " + outfit->DisplayName() + "s now fly " + choice.name + ".";
-	else
+	else if(row.outfit)
+		status = "Your " + row.outfit->DisplayName() + "s now fly " + choice.name + ".";
+	else if(row.kind == "maneuver")
 		status = "Your escorts now keep station with " + choice.name + ".";
+	else
+		status = "Your defense daemon now runs " + choice.name + ".";
 	statusTime = 300;
 }
 
@@ -596,8 +632,8 @@ void WorkshopPanel::Buy(const Firmware &firmware)
 		statusTime = 300;
 		return;
 	}
-	status = "Bought " + firmware.Name() + ". Choose it for "
-		+ (firmware.IsGuidance() ? string("a weapon") : string("your escorts")) + " in your fleet (f).";
+	status = "Bought " + firmware.Name() + ". Choose it for " + (firmware.IsGuidance() ? string("a weapon")
+		: firmware.IsDaemon() ? string("your defense daemon") : string("your escorts")) + " in your fleet (f).";
 	statusTime = 360;
 }
 

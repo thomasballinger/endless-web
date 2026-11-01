@@ -25,9 +25,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "CoreStartData.h"
 #include "DamageDealt.h"
 #include "DamageProfile.h"
+#include "DefenseDaemon.h"
 #include "Effect.h"
 #include "FighterHitHelper.h"
 #include "shader/FillShader.h"
+#include "Firmware.h"
 #include "Fleet.h"
 #include "Flotsam.h"
 #include "text/Font.h"
@@ -43,6 +45,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "image/Mask.h"
 #include "Messages.h"
 #include "Minable.h"
+#include "MissileGuidance.h"
 #include "Mission.h"
 #include "NPC.h"
 #include "shader/OutlineShader.h"
@@ -1943,6 +1946,7 @@ void Engine::CalculateUnpaused(const Ship *flagship, const System *playerSystem)
 	WatchedScripts &watched = watchedScripts[currentCalcBuffer];
 	WatchScripts(watched);
 	CarryOutHack(watched);
+	RunDaemons(watched);
 
 	// Now, all the ships must decide what they are doing next.
 	ai.Step(activeCommands);
@@ -2320,6 +2324,101 @@ void Engine::CarryOutHack(WatchedScripts &watched)
 		projectile->Hack(steps);
 	message("Your code injector hacked " + (ship ? entry.name : string("the incoming missile")) + ": its scripts are down"
 		" for " + to_string((steps + 30) / 60) + " seconds.");
+}
+
+
+
+void Engine::RunDaemons(const WatchedScripts &watched)
+{
+	// The homing missiles chasing each ship.
+	map<const Entity *, vector<Projectile *>> chasing;
+	for(Projectile &projectile : projectiles)
+		if(projectile.GetWeapon().Homing() && projectile.Target() && !projectile.IsDead())
+			chasing[projectile.Target()].push_back(&projectile);
+
+	auto message = [](const string &text) {
+		Messages::Add({text, GameData::MessageCategories().Get("normal")});
+	};
+	// What to call a missile.
+	auto missileName = [](const Projectile &missile) {
+		const Outfit *ammo = missile.GetWeapon().Ammo();
+		return ammo ? ammo->DisplayName() : string("missile");
+	};
+	// For tests: note each hack on the standard output.
+	static const bool logHacks = getenv("ES_LOG_DAEMONS");
+	// How long a hack of the given power keeps a missile's seeker.
+	auto hackSteps = [](double power) { return min(600, static_cast<int>(round(60. * power))); };
+
+	// The player's flagship, with a Defense Daemon, hacks with its own code
+	// injector, as soon as it is ready, any missile its scanner can read that
+	// is chasing it or another of the player's ships.
+	const shared_ptr<Ship> &flagship = player.FlagshipPtr();
+	if(flagship && flagship->Attributes().Get("defense daemon") > 0. && watched.injector.isReady)
+	{
+		const double scanRange = 100. * sqrt(flagship->Attributes().Get("code scan power"));
+		vector<pair<const Ship *, Projectile *>> readable;
+		for(const shared_ptr<Ship> &ship : player.Ships())
+		{
+			auto it = chasing.find(ship.get());
+			if(it == chasing.end() || ship->GetSystem() != flagship->GetSystem())
+				continue;
+			for(Projectile *missile : it->second)
+				if(missile->Position().Distance(flagship->Position()) <= scanRange)
+					readable.emplace_back(ship.get(), missile);
+		}
+		const DefenseDaemon *daemon = DefenseDaemon::PlayerProgram();
+		auto [target, chosen] = daemon ? daemon->Choose(readable, flagship.get()) : pair<const Ship *, Projectile *>();
+		if(chosen)
+		{
+			const int steps = hackSteps(flagship->Attributes().Get("code hacking"));
+			chosen->Hack(steps);
+			flagship->TransferEnergy(flagship->Attributes().Get("code hack energy"), nullptr);
+			scriptHackCooldown = 600;
+			if(logHacks)
+				printf("DAEMON %d flagship %s hacked %s\n", step, daemon->Name().c_str(), missileName(*chosen).c_str());
+			const string whose = (target == flagship.get()) ? string("")
+				: " chasing " + (target->GivenName().empty() ? target->DisplayModelName() : target->GivenName());
+			message("Your defense daemon (" + daemon->Name() + ") hacked a " + missileName(*chosen) + whose
+				+ ": its seeker is down for " + to_string((steps + 30) / 60) + " seconds.");
+		}
+	}
+
+	// Other ships run their faction's daemon, if it writes one, unless the
+	// classic scripts are on. They hack with the strength of a code injector,
+	// as often as one recharges.
+	map<const Ship *, int> cooldowns;
+	if(MissileGuidance::FactionGuidance())
+		for(const shared_ptr<Ship> &ship : ships)
+		{
+			if(ship == flagship || ship->IsYours() || !ship->GetSystem() || ship->IsDisabled())
+				continue;
+			auto old = daemonCooldowns.find(ship.get());
+			int cooldown = (old == daemonCooldowns.end() ? 0 : max(0, old->second - 1));
+			auto it = chasing.find(ship.get());
+			const Firmware *firmware = (it == chasing.end() || cooldown) ? nullptr
+				: Firmware::DaemonFor(ship->GetGovernment());
+			const DefenseDaemon *daemon = firmware ? GameData::Daemons().Find(firmware->Name()) : nullptr;
+			vector<pair<const Ship *, Projectile *>> missiles;
+			if(daemon)
+				for(Projectile *missile : it->second)
+					missiles.emplace_back(ship.get(), missile);
+			Projectile *chosen = daemon ? daemon->Choose(missiles, ship.get()).second : nullptr;
+			if(chosen)
+			{
+				const double power = max(4., ship->Attributes().Get("code hacking"));
+				chosen->Hack(hackSteps(power));
+				cooldown = 600;
+				if(logHacks)
+					printf("DAEMON %d %s %s hacked %s\n", step, ship->GetGovernment()->TrueName().c_str(),
+						daemon->Name().c_str(), missileName(*chosen).c_str());
+				if(chosen->GetGovernment() && chosen->GetGovernment()->IsPlayer())
+					message("The " + ship->DisplayModelName() + "'s defense daemon hacked your "
+						+ missileName(*chosen) + ".");
+			}
+			if(cooldown)
+				cooldowns[ship.get()] = cooldown;
+		}
+	daemonCooldowns = std::move(cooldowns);
 }
 
 

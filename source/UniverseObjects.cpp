@@ -475,6 +475,11 @@ void UniverseObjects::LoadFile(const filesystem::path &path, const PlayerInfo &p
 			codeStyles.Get(node.Token(1))->Load(node);
 		else if(key == "program" && hasValue)
 			firmwares.Get(node.Token(1))->Load(node);
+		else if(key == "daemon" && hasValue)
+		{
+			daemons.Get(node.Token(1))->Load(node);
+			RecordScriptSource(scriptFiles, scriptSources, path, "daemon " + node.Token(1));
+		}
 		else if(key == "maneuver" && hasValue)
 		{
 			maneuvers.Get(node.Token(1))->Load(node);
@@ -838,6 +843,18 @@ vector<string> UniverseObjects::ReloadChangedScripts()
 						reloaded.push_back(name);
 					}
 				}
+			else if(key == "daemon" && isFromHere("daemon " + node.Token(1)))
+			{
+				DefenseDaemon script;
+				script.Load(node);
+				if(!script.IsValid())
+					failed.push_back(node.Token(1));
+				else
+				{
+					*daemons.Get(node.Token(1)) = std::move(script);
+					reloaded.push_back(node.Token(1));
+				}
+			}
 			else if(key == "maneuver" && isFromHere("maneuver " + node.Token(1)))
 			{
 				ShipManeuver script;

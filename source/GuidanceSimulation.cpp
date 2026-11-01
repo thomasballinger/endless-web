@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "GuidanceSimulation.h"
 
+#include "DefenseDaemon.h"
 #include "GameData.h"
 #include "Government.h"
 #include "image/Mask.h"
@@ -131,6 +132,20 @@ int GuidanceSimulation::Drill() const
 
 
 
+void GuidanceSimulation::SetTargetDaemon(const DefenseDaemon *daemon)
+{
+	this->daemon = daemon;
+}
+
+
+
+const DefenseDaemon *GuidanceSimulation::TargetDaemon() const
+{
+	return daemon;
+}
+
+
+
 void GuidanceSimulation::SetDrill(int index)
 {
 	if(index < 0 || index >= static_cast<int>(drills.size()))
@@ -151,6 +166,7 @@ void GuidanceSimulation::Reset()
 	hits = 0;
 	records.clear();
 	traces.clear();
+	daemonCooldown = 0;
 
 	target = make_shared<Ship>(*targetModel);
 	target->Recharge();
@@ -201,6 +217,33 @@ void GuidanceSimulation::Step()
 	}
 	if((step - 1) % LAUNCH_INTERVAL == 0)
 		Fire();
+
+	// The target's defense daemon hacks a missile, when its injector is ready
+	// (as a ship's does in the game, with a Code Injector's strength).
+	if(daemonCooldown > 0)
+		--daemonCooldown;
+	else if(daemon)
+	{
+		vector<pair<const Ship *, Projectile *>> chasing;
+		for(Missile &missile : missiles)
+			if(missile.endStep < 0 && !missile.projectile.IsDead())
+				chasing.emplace_back(target.get(), &missile.projectile);
+		if(Projectile *chosen = daemon->Choose(chasing, target.get()).second)
+		{
+			chosen->Hack(240);
+			daemonCooldown = 600;
+			for(Missile &missile : missiles)
+				if(&missile.projectile == chosen)
+				{
+					Missile::LockEvent event;
+					event.step = step;
+					event.position = chosen->Position();
+					event.kind = Missile::LockEvent::Kind::HACKED;
+					event.reason = "the target's defense daemon (" + daemon->Name() + ") hacked it";
+					missile.lockEvents.push_back(std::move(event));
+				}
+		}
+	}
 
 	vector<Visual> visuals;
 	vector<Projectile> spawned;

@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Command.h"
 #include "DataFile.h"
 #include "DataNode.h"
+#include "DefenseDaemon.h"
 #include "shader/DrawList.h"
 #include "Files.h"
 #include "shader/FillShader.h"
@@ -75,6 +76,7 @@ namespace {
 	const Color FOLLOWED = SELECTED;
 	const Color MATTERED(.55f, .80f, 1.f, 1.f);
 	const Color CONFUSED(.95f, .40f, .95f, 1.f);
+	const Color HACKED_COLOR(.70f, 1.f, .35f, 1.f);
 	const Color PANEL(0.f, .03f, .015f, .85f);
 	// Values, as the editor shows them.
 	const Color NOTE_COLOR(.95f, .82f, .40f, 1.f);
@@ -368,6 +370,30 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	}
 	else if(key == SDLK_t)
 		NextTarget();
+	else if(key == SDLK_h)
+	{
+		// The target runs each defense daemon in turn, then none: as a ship
+		// with a code injector would, it hacks the missiles chasing it.
+		const DefenseDaemon *current = simulation->TargetDaemon();
+		const DefenseDaemon *next = nullptr;
+		bool passed = !current;
+		for(const auto &[name, daemon] : GameData::Daemons())
+		{
+			if(!daemon.IsValid())
+				continue;
+			if(passed)
+			{
+				next = &daemon;
+				break;
+			}
+			passed = (&daemon == current);
+		}
+		simulation->SetTargetDaemon(next);
+		Restart();
+		status = next ? "The target hacks your missiles with the \"" + next->Name() + "\" defense daemon."
+			: "The target has no defense daemon.";
+		statusTime = 240;
+	}
 	else if(key == SDLK_LEFTBRACKET || key == SDLK_RIGHTBRACKET)
 		CycleMissile(key == SDLK_RIGHTBRACKET ? 1 : -1);
 	else if(key == SDLK_EQUALS || key == SDLK_PLUS || key == SDLK_KP_PLUS)
@@ -776,7 +802,9 @@ void SimulatorPanel::NextTarget()
 		if(!model)
 			continue;
 		const int drill = simulation->Drill();
+		const DefenseDaemon *daemon = simulation->TargetDaemon();
 		simulation = make_unique<GuidanceSimulation>(outfit, *model);
+		simulation->SetTargetDaemon(daemon);
 		simulation->SetDrill(drill);
 		Restart();
 		status = "Firing at a " + model->DisplayModelName() + ".";
@@ -880,6 +908,13 @@ void SimulatorPanel::DrawTrails() const
 			}
 			else if(event.kind == Kind::REGAINED)
 				RingShader::Draw(at, 5.f, 3.5f, HIT);
+			else if(event.kind == Kind::HACKED)
+			{
+				// A lightning bolt, for the daemon's hack.
+				const Point points[] = {at + Point(3., -8.), at + Point(-3., 0.), at + Point(3., 0.), at + Point(-3., 8.)};
+				for(int k = 0; k < 3; ++k)
+					LineShader::Draw(points[k], points[k + 1], 2.f, HACKED_COLOR, false);
+			}
 			else if(event.kind == Kind::CONFUSED)
 				for(int k = 0; k < 4; ++k)
 				{
@@ -1219,11 +1254,15 @@ void SimulatorPanel::DrawInspector() const
 	{
 		if(it->kind == Kind::KEPT)
 			continue;
-		static const char *WHAT[] = {"kept", "lost lock", "got lock back", "no lock", "confused"};
+		static const char *WHAT[] = {"kept", "lost lock", "got lock back", "no lock", "confused", "HACKED"};
 		char text[64];
-		snprintf(text, sizeof(text), "step %d: %s (%.0f%% odds)", it->step, WHAT[static_cast<int>(it->kind)],
-			100. * it->chance);
-		line(text, it->kind == Kind::LOST || it->kind == Kind::CONFUSED ? MISS : it->kind == Kind::REGAINED ? HIT : DIM);
+		if(it->kind == Kind::HACKED)
+			snprintf(text, sizeof(text), "step %d: HACKED by the target", it->step);
+		else
+			snprintf(text, sizeof(text), "step %d: %s (%.0f%% odds)", it->step, WHAT[static_cast<int>(it->kind)],
+				100. * it->chance);
+		line(text, it->kind == Kind::HACKED ? HACKED_COLOR : it->kind == Kind::LOST || it->kind == Kind::CONFUSED
+			? MISS : it->kind == Kind::REGAINED ? HIT : DIM);
 		++shown;
 	}
 	const int total = max(1, input.age + input.lifetimeLeft);
@@ -1458,6 +1497,7 @@ void SimulatorPanel::DrawStatus() const
 	FillShader::Fill(Point(0., Screen::Top() + STATUS_HEIGHT / 2.), Point(Screen::Width(), STATUS_HEIGHT), PANEL);
 	string line = string(player ? "WORKSHOP   " : "SIMULATOR   ") + outfit.DisplayName() + " vs. "
 		+ simulation->Target().DisplayModelName()
+		+ (simulation->TargetDaemon() ? " (daemon: " + simulation->TargetDaemon()->Name() + ")" : string())
 		+ "   guidance \"" + guidanceName + "\"   step " + to_string(simulation->CurrentStep())
 		+ (paused ? "  (paused)" : "  " + FormatSpeed(SPEEDS[speedIndex]));
 	font.Draw(line, Point(Screen::Left() + 14., Screen::Top() + 11.), TEXT);
@@ -1469,7 +1509,7 @@ void SimulatorPanel::DrawStatus() const
 	const string save = player ? "ctrl+s install   ctrl+d factory" : "ctrl+s save";
 	const string help = editor.HasFocus()
 		? "editing: esc stop editing   " + save + "   ctrl+space pause   ctrl+r restart   ctrl+z undo"
-		: "e edit   arrows fly   space pause   , . step   - + speed   d drill   t target   r restart   [ ] missile   "
-			+ save + "   esc exit";
+		: "e edit   arrows fly   space pause   , . step   - + speed   d drill   t target   h target's daemon   "
+			"r restart   [ ] missile   " + save + "   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }

@@ -26,6 +26,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Color.h"
 #include "Confusion.h"
 #include "Conversation.h"
+#include "DefenseDaemon.h"
 #include "Effect.h"
 #include "Firmware.h"
 #include "Fleet.h"
@@ -149,6 +150,7 @@ private:
 	Set<ShipManeuver> maneuvers;
 	Set<CodeStyle> codeStyles;
 	Set<Firmware> firmwares;
+	Set<DefenseDaemon> daemons;
 	Set<TurretScript> turretScripts;
 	Set<ChoiceScript> rateScripts;
 	Set<ChoiceScript> chooseScripts;

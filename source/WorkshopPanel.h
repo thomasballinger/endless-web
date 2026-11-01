@@ -49,10 +49,12 @@ protected:
 
 
 private:
-	// One kind of homing weapon in the fleet (or, with no outfit, how the
-	// player's escorts keep station).
+	// One kind of homing weapon in the fleet, or (with no outfit) how the
+	// player's escorts keep station, or the flagship's defense daemon.
 	class Row {
 	public:
+		// "guidance", "maneuver" or "daemon".
+		std::string kind = "guidance";
 		const Outfit *outfit = nullptr;
 		int count = 0;
 		Rectangle box;
@@ -76,11 +78,15 @@ private:
 
 private:
 	void FindWeapons();
-	std::vector<Choice> Choices(const Outfit *outfit) const;
+	std::vector<Choice> Choices(const Row &row) const;
+	// The program the row's weapon (or escorts, or daemon) runs, if it isn't
+	// the factory's.
+	std::string Installed(const Row &row) const;
+	bool Install(const Row &row, const std::string &text);
 	// The index of the row's program among its choices, or -1 if it is one
 	// that is not among them.
-	int Current(const Outfit *outfit, const std::vector<Choice> &choices) const;
-	void Cycle(const Outfit *outfit, int direction);
+	int Current(const Row &row, const std::vector<Choice> &choices) const;
+	void Cycle(const Row &row, int direction);
 	void Open(const Outfit &outfit);
 	// Open the escort workshop, for how the player's escorts keep station.
 	void OpenEscorts();
@@ -96,6 +102,7 @@ private:
 	PlayerInfo &player;
 	std::vector<Row> rows;
 	Row escortRow;
+	Row daemonRow;
 	std::vector<Offer> offers;
 	bool showExchange = false;
 	Rectangle closeBox;

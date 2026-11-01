@@ -56,6 +56,9 @@ public:
 		// GuidanceSimulation::FirstDifference() finds must be the first on
 		// which replaying with the script changes anything.
 		bool editCheck = false;
+		// Instead of firing shots, have the target run each of these defense
+		// daemons in the simulator, and count how many missiles still hit.
+		std::vector<std::string> daemons;
 	};
 
 

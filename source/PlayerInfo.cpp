@@ -25,6 +25,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "ConversationPanel.h"
 #include "DataFile.h"
 #include "DataWriter.h"
+#include "DefenseDaemon.h"
 #include "DialogPanel.h"
 #include "DistanceMap.h"
 #include "Endpoint.h"
@@ -250,6 +251,7 @@ void PlayerInfo::Clear()
 	*this = PlayerInfo();
 	MissileGuidance::ClearPlayerPrograms();
 	ShipManeuver::ClearPlayerPrograms();
+	DefenseDaemon::SetPlayerProgram("");
 
 	Random::Seed(time(nullptr));
 	GameData::Revert();
@@ -398,6 +400,14 @@ void PlayerInfo::Load(const filesystem::path &path, const shared_ptr<PilotProfil
 				if(grand.Token(0) == "line")
 					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
 			SetManeuverProgram(child.Token(1), text);
+		}
+		else if(key == "daemon program")
+		{
+			string text;
+			for(const DataNode &grand : child)
+				if(grand.Token(0) == "line")
+					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
+			SetDaemonProgram(text);
 		}
 		else if(key == "firmware" && hasValue)
 			ownedFirmware.insert(child.Token(1));
@@ -5125,6 +5135,29 @@ bool PlayerInfo::SetGuidanceProgram(const Outfit *outfit, const string &text)
 
 
 
+const string &PlayerInfo::DaemonProgram() const
+{
+	return daemonProgram;
+}
+
+
+
+bool PlayerInfo::SetDaemonProgram(const string &text)
+{
+	if(!text.empty() && !DefenseDaemon::SetPlayerProgram(text))
+	{
+		// Keep the one that was installed before.
+		DefenseDaemon::SetPlayerProgram(daemonProgram);
+		return false;
+	}
+	if(text.empty())
+		DefenseDaemon::SetPlayerProgram("");
+	daemonProgram = text;
+	return true;
+}
+
+
+
 const set<string> &PlayerInfo::OwnedFirmware() const
 {
 	return ownedFirmware;
@@ -5263,6 +5296,17 @@ void PlayerInfo::Save(DataWriter &out) const
 	}
 	for(const string &name : ownedFirmware)
 		out.Write("firmware", name);
+	if(!daemonProgram.empty())
+	{
+		out.Write("daemon program");
+		out.BeginChild();
+		{
+			istringstream in(daemonProgram);
+			for(string line; getline(in, line); )
+				out.Write("line", line);
+		}
+		out.EndChild();
+	}
 	for(const auto &[name, text] : programLibrary)
 	{
 		out.Write("library program", name);

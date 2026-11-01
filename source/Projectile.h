@@ -119,6 +119,10 @@ public:
 	// A code injector can take over a projectile's seeker for a while: it
 	// steers as if confused.
 	void Hack(int steps);
+	// How many more steps a hack has its seeker for, and how many steps it
+	// has left to live.
+	int HackedSteps() const;
+	int StepsLeft() const;
 	// Add a record of each run of the guidance script to the given list (or
 	// stop, with null), so that another script can be checked against them.
 	void SetGuidanceRecords(std::vector<MissileGuidance::Record> *records);

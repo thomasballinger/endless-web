@@ -489,6 +489,20 @@ void Projectile::Hack(int steps)
 
 
 
+int Projectile::HackedSteps() const
+{
+	return hackedSteps;
+}
+
+
+
+int Projectile::StepsLeft() const
+{
+	return lifetime;
+}
+
+
+
 bool Projectile::HasLock() const
 {
 	return hasLock && weapon->Homing() && TargetPtr();

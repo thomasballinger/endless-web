@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Angle.h"
 #include "DataFile.h"
 #include "DataNode.h"
+#include "DefenseDaemon.h"
 #include "GameData.h"
 #include "Government.h"
 #include "GuidanceDrill.h"
@@ -290,6 +291,37 @@ bool GuidanceBench::Run(const Options &options)
 	{
 		fprintf(stderr, "\"%s\" is not a homing weapon.\n", options.outfit.c_str());
 		return false;
+	}
+	if(!options.daemons.empty())
+	{
+		// For each drill: how many missiles hit a target that runs no daemon,
+		// and one that runs each of these.
+		const Ship *model = GameData::Ships().Find(options.target);
+		if(!model)
+			return false;
+		const int STEPS = 3000;
+		printf("Defense daemons: %s at %s, %d steps of each drill\n\n", outfit->TrueName().c_str(),
+			options.target.c_str(), STEPS);
+		printf("%-28s %-20s %8s %8s\n", "drill", "daemon", "fired", "hit");
+		GuidanceSimulation simulation(*outfit, *model);
+		vector<string> names = {""};
+		names.insert(names.end(), options.daemons.begin(), options.daemons.end());
+		for(size_t drill = 0; drill < simulation.Drills().size(); ++drill)
+			for(const string &name : names)
+			{
+				const DefenseDaemon *daemon = name.empty() ? nullptr : GameData::Daemons().Find(name);
+				if(!name.empty() && (!daemon || !daemon->IsValid()))
+				{
+					fprintf(stderr, "No valid daemon \"%s\".\n", name.c_str());
+					return false;
+				}
+				simulation.SetTargetDaemon(daemon);
+				simulation.SetDrill(drill);
+				simulation.ReplayTo(STEPS);
+				printf("%-28s %-20s %8d %8d\n", simulation.Drills()[drill].name.c_str(),
+					name.empty() ? "(none)" : name.c_str(), simulation.Launches(), simulation.Hits());
+			}
+		return true;
 	}
 	Weapon original = *outfit->GetWeapon();
 	if(options.seekerNoise >= 0.)

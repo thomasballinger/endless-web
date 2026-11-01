@@ -185,6 +185,8 @@ int main(int argc, char *argv[])
 			benchOptions.trials = max(1, stoi(*it));
 		else if(arg == "--bench-replay" && *++it)
 			benchOptions.replayPath = *it;
+		else if(arg == "--bench-daemon" && *++it)
+			benchOptions.daemons.push_back(*it);
 		else if(arg == "--bench-edit-check")
 			benchOptions.editCheck = true;
 	}
@@ -752,6 +754,8 @@ void PrintHelp()
 		" (one file per script when comparing)." << endl;
 	cerr << "        --bench-edit-check: instead, check that the simulator finds the first step on which"
 		" each script would have steered differently than the weapon's own." << endl;
+	cerr << "        --bench-daemon <name>: instead, count how many missiles hit in the simulator when the"
+		" target runs this defense daemon (give it more than once to compare)." << endl;
 	cerr << "    --test <name>: run given test from resources directory." << endl;
 	cerr << "    --nomute: don't mute the game while running tests." << endl;
 	cerr << "    --rng-seed <seed>: every time the pseudo-random number generator is seeded,"

@@ -246,6 +246,11 @@ public:
 	// it (with empty text). Returns false, and installs nothing, if it doesn't
 	// compile or needs more than the weapon has.
 	bool SetGuidanceProgram(const Outfit *outfit, const std::string &text);
+	// The defense daemon the player's flagship runs, if it has a Defense
+	// Daemon outfit (see DefenseDaemon), as the text of a "daemon" node, or
+	// empty for the factory's. Returns false if it doesn't compile.
+	const std::string &DaemonProgram() const;
+	bool SetDaemonProgram(const std::string &text);
 	// Programs the player has bought (see Firmware), by name. Buying one
 	// costs its price, and fails if the player can't afford it.
 	const std::set<std::string> &OwnedFirmware() const;
@@ -630,6 +635,7 @@ private:
 	std::map<const Outfit *, std::string> guidancePrograms;
 	std::map<std::string, std::string> maneuverPrograms;
 	std::set<std::string> ownedFirmware;
+	std::string daemonProgram;
 	std::map<std::string, std::string> programLibrary;
 
 	bool freshlyLoaded = true;

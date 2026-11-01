@@ -242,6 +242,8 @@ private:
 	class WatchedScripts;
 	void WatchScripts(WatchedScripts &watched);
 	void CarryOutHack(WatchedScripts &watched);
+	// Let the ships that run defense daemons hack the missiles chasing them.
+	void RunDaemons(const WatchedScripts &watched);
 
 	void CreateStatusOverlays();
 	void EmplaceStatusOverlay(const std::shared_ptr<Ship> &ship, Preferences::OverlayState overlaySetting,
@@ -327,6 +329,8 @@ private:
 	std::string scriptHack;
 	// Steps until the code injector can hack again.
 	int scriptHackCooldown = 0;
+	// How long until each other ship's code injector can hack again.
+	std::map<const Ship *, int> daemonCooldowns;
 	std::vector<Outline> outlines;
 	std::vector<Status> statuses;
 	std::vector<PlanetLabel> labels;

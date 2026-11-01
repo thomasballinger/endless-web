@@ -31,7 +31,8 @@ class Weapon;
 // itself is a "guidance" or "maneuver" node of the same name elsewhere:
 //
 //   program "Corkscrew"
-//   	guidance                     (or maneuver "keep station", for what it replaces)
+//   	guidance                     (or maneuver "keep station", for what it
+//   	                              replaces, or daemon)
 //   	author "Pirate"
 //   	"flown by" "Pirate" "Marauder"
 //   	price 30000
@@ -45,6 +46,10 @@ public:
 
 	const std::string &Name() const;
 	bool IsGuidance() const;
+	// A defense daemon (see DefenseDaemon), rather than guidance or a maneuver.
+	bool IsDaemon() const;
+	// "guidance", "maneuver" or "daemon": the kind of script node it names.
+	const std::string &Kind() const;
 	// For a maneuver, the maneuver it replaces (e.g. "keep station").
 	const std::string &Replaces() const;
 	const std::string &Author() const;
@@ -59,6 +64,8 @@ public:
 	// game's for the given weapon, if any (and if it can run on the weapon's
 	// hardware).
 	static const Firmware *GuidanceFor(const Government *government, const Weapon &weapon);
+	// The defense daemon the given government's ships run, if any.
+	static const Firmware *DaemonFor(const Government *government);
 
 	// For the text of a program: its kind ("guidance" or "maneuver", from its
 	// first node) and its name, or empty strings if it isn't one.
@@ -73,7 +80,7 @@ public:
 
 private:
 	std::string name;
-	bool isGuidance = true;
+	std::string kind = "guidance";
 	std::string replaces;
 	std::string author;
 	std::vector<std::string> flownBy;

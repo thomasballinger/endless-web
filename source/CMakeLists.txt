@@ -97,6 +97,8 @@ target_sources(EndlessSkyLib PRIVATE
 	DataWriter.h
 	Date.cpp
 	Date.h
+	DefenseDaemon.cpp
+	DefenseDaemon.h
 	Depreciation.cpp
 	Depreciation.h
 	DialogPanel.cpp

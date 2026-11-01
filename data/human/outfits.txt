@@ -204,6 +204,17 @@ outfit "Code Injector"
 	description "Working through your code scanner, this device feeds a ship's flight computer (or a missile's) garbage until its scripts crash, leaving the ship drifting without firing, or the missile spinning, until they recover a few seconds later (four, against a ship without a code jammer). It needs ten seconds and a burst of energy to recharge, and a code jammer shortens or blocks its attacks."
 
 
+outfit "Defense Daemon"
+	category "Systems"
+	series "Scanners"
+	index 01065
+	cost 120000
+	thumbnail "outfit/outfit scanner"
+	"mass" 2
+	"outfit space" -2
+	"defense daemon" 1
+	description "A flight computer module that runs a small program, a defense daemon, to use your code injector for you: whenever the injector is ready, the daemon looks at every missile chasing you that your code scanner can read, and hacks the one it rates the highest. Its factory program hacks whichever missile will hit first; you can buy others, or write your own, in the missile workshop. It needs a code scanner and a code injector to work."
+
 outfit "Cognition Accelerator"
 	category "Systems"
 	series "Scanners"

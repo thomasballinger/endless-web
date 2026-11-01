@@ -30,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+class DefenseDaemon;
 class Outfit;
 
 
@@ -60,7 +61,7 @@ public:
 		// confused: where, with what odds, and why.
 		class LockEvent {
 		public:
-			enum class Kind { KEPT, LOST, REGAINED, MISSED, CONFUSED };
+			enum class Kind { KEPT, LOST, REGAINED, MISSED, CONFUSED, HACKED };
 			int step = 0;
 			Point position;
 			Kind kind = Kind::KEPT;
@@ -97,6 +98,11 @@ public:
 	// projectiles fired after the next Reset().
 	void SetGuidance(const MissileGuidance *guidance);
 	const Weapon &GetWeapon() const;
+	// Have the target run a defense daemon (or none, with null): it hacks the
+	// missiles chasing it, as a ship with a code injector would. Takes
+	// effect from the next Reset().
+	void SetTargetDaemon(const DefenseDaemon *daemon);
+	const DefenseDaemon *TargetDaemon() const;
 
 	const std::vector<GuidanceDrill> &Drills() const;
 	int Drill() const;
@@ -182,4 +188,9 @@ private:
 	// keeps a pointer to its own, so these are kept in a map, not a vector.)
 	std::map<int, script::Trace> traces;
 	int selected = -1;
+
+	// The target's defense daemon, if it runs one, and how long until its
+	// injector can hack again.
+	const DefenseDaemon *daemon = nullptr;
+	int daemonCooldown = 0;
 };

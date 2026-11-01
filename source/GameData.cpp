@@ -723,6 +723,13 @@ const Set<Firmware> &GameData::Firmwares()
 
 
 
+const Set<DefenseDaemon> &GameData::Daemons()
+{
+	return objects.daemons;
+}
+
+
+
 const Set<ShipManeuver> &GameData::Maneuvers()
 {
 	return objects.maneuvers;

@@ -78,6 +78,49 @@ program "Close Guard"
 	price 20000
 	description "The escort tucks in 120 behind its leader, close enough to hide behind."
 
+program "Triage"
+	daemon
+	author "Syndicate"
+	price 50000
+	description "A defense daemon from the Syndicate: of the missiles that still have a lock on you, it hacks the one that would do the most damage soonest, counting hull damage once your shields are low."
+
+program "Last Instant"
+	daemon
+	author "Korath"
+	"flown by" "Korath" "Kor Efret" "Kor Mereti" "Kor Sestor"
+	price 90000
+	description "Korath ships hack the missiles chasing them at the last instant, when a missile is too close to reacquire its target once its seeker recovers. Running it yourself means letting missiles get very close."
+
+program "Swarm Breaker"
+	daemon
+	author "Hai"
+	"flown by" "Hai"
+	price 40000
+	description "A Hai daemon that hacks the farthest missile it can read, while there's time for it to fly off and run out of fuel before its seeker recovers."
+
+
+
+# The factory's defense daemon: hack whichever missile will hit first.
+daemon "nearest first"
+	if hacked == 0 && !confused && steps_away < 240
+		score = 1000 - steps_away
+
+# The missile that would do the most damage soonest, while it still sees you.
+daemon "Triage"
+	if hacked == 0 && locked && steps_away < 300
+		let damage = shields > .2 ? shield_damage : hull_damage
+		score = damage * 100 / max(steps_away, 10)
+
+# Wait until a missile is nearly here.
+daemon "Last Instant"
+	if hacked == 0 && !confused && steps_away < 75
+		score = 100 - steps_away
+
+# The farthest missile, if its fuel runs out before its seeker recovers.
+daemon "Swarm Breaker"
+	if hacked == 0 && steps_left < 400
+		score = missile_distance
+
 
 
 # Weave from side to side on the way in, and straighten out at the end.

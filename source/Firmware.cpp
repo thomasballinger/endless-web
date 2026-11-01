@@ -17,6 +17,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "DataFile.h"
 #include "DataNode.h"
+#include "DefenseDaemon.h"
 #include "GameData.h"
 #include "Government.h"
 #include "MissileGuidance.h"
@@ -50,11 +51,11 @@ void Firmware::Load(const DataNode &node)
 	for(const DataNode &child : node)
 	{
 		const string &key = child.Token(0);
-		if(key == "guidance")
-			isGuidance = true;
+		if(key == "guidance" || key == "daemon")
+			kind = key;
 		else if(key == "maneuver" && child.Size() >= 2)
 		{
-			isGuidance = false;
+			kind = key;
 			replaces = child.Token(1);
 		}
 		else if(key == "author" && child.Size() >= 2)
@@ -82,7 +83,21 @@ const string &Firmware::Name() const
 
 bool Firmware::IsGuidance() const
 {
-	return isGuidance;
+	return kind == "guidance";
+}
+
+
+
+bool Firmware::IsDaemon() const
+{
+	return kind == "daemon";
+}
+
+
+
+const string &Firmware::Kind() const
+{
+	return kind;
 }
 
 
@@ -158,6 +173,31 @@ const Firmware *Firmware::GuidanceFor(const Government *government, const Weapon
 
 
 
+const Firmware *Firmware::DaemonFor(const Government *government)
+{
+	if(!government)
+		return nullptr;
+	static map<const Government *, const Firmware *> cache;
+	auto it = cache.find(government);
+	if(it != cache.end())
+		return it->second;
+	const Firmware *found = nullptr;
+	for(const auto &[name, firmware] : GameData::Firmwares())
+		if(firmware.IsDaemon() && firmware.IsFlownBy(government))
+		{
+			const DefenseDaemon *daemon = GameData::Daemons().Find(name);
+			if(daemon && daemon->IsValid())
+			{
+				found = &firmware;
+				break;
+			}
+		}
+	cache[government] = found;
+	return found;
+}
+
+
+
 string Firmware::KindOf(const string &text)
 {
 	istringstream in(text);
@@ -165,7 +205,7 @@ string Firmware::KindOf(const string &text)
 	for(const DataNode &node : file)
 	{
 		const string &key = node.Token(0);
-		return (key == "guidance" || key == "maneuver") && node.Size() >= 2 ? key : string();
+		return (key == "guidance" || key == "maneuver" || key == "daemon") && node.Size() >= 2 ? key : string();
 	}
 	return "";
 }
@@ -200,5 +240,7 @@ bool Firmware::IsGameScript(const string &kind, const string &name)
 		return GameData::Guidance().Has(name);
 	if(kind == "maneuver")
 		return GameData::Maneuvers().Has(name);
+	if(kind == "daemon")
+		return GameData::Daemons().Has(name);
 	return false;
 }
