@@ -65,11 +65,13 @@ Build as usual, then start a new pilot (or load one). Things to look for:
     **[** and **]** (or clicking) follow another. Beside the range, a
     close-up shows its thrust, drag, turn, life, lock and the odds of
     keeping it. Hover over a vector's value to see it drawn from the
-    missile.
+    missile. The missiles do the damage they do in the game: the target's
+    shields and hull are shown, and a light target can be destroyed (the
+    drill then starts over); its anti-missile can shoot missiles down.
   - **Arrow keys** fly your own ship, or with **P**, the target, to dodge
     (your flying is recorded, so replays repeat it); **D** changes the drill
     (the first two are flown by the game's own AI: a pirate that comes at
-    you, and a ship that runs; the next three by a simple pilot: evading,
+    you, firing, and a ship that runs; the next three by a simple pilot: evading,
     cruising, breaking away; **1** to **9** and **0** pick one), **T** the target ship (one has
     radar jammers that confuse seekers), **Space** pauses, **,** and **.**
     step back and forward, and dragging on the timeline goes to any step.
@@ -168,12 +170,16 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   ten seconds, fall back for five). See `data/roles.txt`.
 - **Trying roles against a raider.** Click an escort's role in the workshop
   to open it in the escort workshop: the escort plays the role while a
-  raider attacks, flown by the game's own AI (it goes after you or the
-  escort, as it would in the game).
-  Ships hurt what they're close to and facing, so health bars fall, raiders
-  get destroyed (another comes from elsewhere), and "retreat when hurt"
-  gambits get tried. Every edit replays the fight; **Ctrl+S** gives the role
-  to the escort (or all of them).
+  raider attacks: a pirate in the same kind of ship as the escort, flown by
+  the game's own AI (it goes after you or the escort, as it would in the
+  game). The fight is the game's: ships fire as the AI decides (you fire
+  only if your "Automatic firing" preference is on), shots fly and hit, and
+  damage takes shields, then hull, so the bars (shields above, hull below)
+  fall for real. A raider is beaten once it is disabled (another comes from
+  elsewhere), and "retreat when hurt" gambits get tried. When the role says
+  attack, the game's AI flies the escort in, as it would in the game; when
+  the role chooses nothing, the usual AI flies it. Every edit replays the
+  fight; **Ctrl+S** gives the role to the escort (or all of them).
 - **Editing roles in flight.** Select an escort (click it in the escort list,
   bottom left) and open the scripts pane (**K**): its role runs there with
   its values. **EDIT** pauses the game; change the code, and once you stop
@@ -197,8 +203,10 @@ scanner.
   every ship (yours, the target, the escort, the raider) moves exactly as
   ships move in the game, with the game's own code (drag only while
   thrusting, so a ship that stops thrusting coasts; energy and heat count),
-  but no ship fires; the escort workshop's damage is made up (ships hurt
-  what they face, nearby).
+  and fights as in the game: missiles and shots hit and do the game's
+  damage, anti-missile shoots missiles down, and ships are disabled and
+  destroyed (the drill starts over soon after). Carriers don't launch their
+  fighters, though, and there are no asteroids.
 - A role's "threat" is simply the nearest hostile ship to the leader; there
   is no list of all of them, or of incoming missiles, to choose from yet.
 - A copied maneuver (say, a pirate's "fight") shows up as a choice for how

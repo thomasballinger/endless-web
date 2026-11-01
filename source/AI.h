@@ -89,6 +89,9 @@ public:
 	void ClearWatches();
 	// Process commands for the player only, called by Step in non-paused mode.
 	void MovePlayer(Ship &ship, Command &activeCommands);
+	// Fly a ship this step as a ship attacking its target on its own does (as
+	// an escort does when its role says to attack): for the simulators.
+	void FlyIndependent(Ship &ship, Command &command);
 	void DisengageAutopilot(bool sendMessage = true);
 
 	// Set the mouse position for turning the player's flagship.

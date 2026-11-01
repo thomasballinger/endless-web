@@ -25,9 +25,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "text/Font.h"
 #include "text/FontSet.h"
 #include "GameData.h"
+#include "Government.h"
 #include "shader/LineShader.h"
 #include "MouseButton.h"
 #include "PlayerInfo.h"
+#include "Projectile.h"
 #include "shader/RingShader.h"
 #include "Screen.h"
 #include "Ship.h"
@@ -47,7 +49,7 @@ namespace {
 	const double STATUS_HEIGHT = 36.;
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often.
-	const int LOOP_STEPS = 1800;
+	const int LOOP_STEPS = 3600;
 	// How long typing must pause before the program is compiled and run.
 	const int QUIET_FRAMES = 20;
 	// The distance within which "keep station" stops trying to adjust its
@@ -66,6 +68,7 @@ namespace {
 	const Color PANEL(0.f, .02f, .04f, .85f);
 	const Color GHOST(.98f * .3f, .75f * .3f, .30f * .3f, .3f);
 	const Color RAIDER(.95f, .35f, .30f, 1.f);
+	const Color SHIELDS(.45f, .65f, 1.f, 1.f);
 	// The role to start from, for an escort without one.
 	const string FIRST_ROLE = "Bodyguard";
 
@@ -137,7 +140,9 @@ void EscortWorkshopPanel::Step()
 		if(flying || wasFlying)
 			simulation->SetLeaderControl(control);
 		wasFlying = flying;
-		if(simulation->CurrentStep() >= LOOP_STEPS)
+		// Start over at the end, or a little while after a ship is destroyed.
+		const int lost = simulation->DestroyedStep();
+		if(simulation->CurrentStep() >= LOOP_STEPS || (lost >= 0 && simulation->CurrentStep() >= lost + 180))
 			simulation->Reset();
 		const int destroyed = simulation->RaidersDestroyed();
 		simulation->Step();
@@ -232,11 +237,25 @@ void EscortWorkshopPanel::Draw()
 		ships.push_back(&simulation->Raider());
 	for(const Ship *ship : ships)
 	{
+		// (A destroyed ship is not drawn, once it is gone.)
+		if(ship->IsDestroyed() && ship->ShouldBeRemoved())
+			continue;
 		DrawList draw;
 		draw.Clear(simulation->CurrentStep(), shipZoom);
 		draw.SetCenter(ship->Position() - ToScreen(ship->Position()) / shipZoom);
 		draw.AddUnblurred(*ship);
 		draw.Draw();
+	}
+	// The shots in flight: the raider's, and yours and the escort's.
+	for(const Projectile &shot : simulation->Shots())
+	{
+		const bool hostile = shot.GetGovernment() && shot.GetGovernment()->IsEnemy();
+		// (Along its next movement, which is where it can hit: for a beam,
+		// all of it.)
+		const Point at = ToScreen(shot.Position());
+		const Point ahead = ToScreen(shot.Position() + shot.Velocity());
+		LineShader::Draw(at, ahead.Distance(at) < 3. ? at + shot.Velocity().Unit() * 3. : ahead, 1.5f,
+			hostile ? RAIDER : ESCORT, false);
 	}
 	const Font &font = FontSet::Get(14);
 	font.Draw("you", ToScreen(leader) + Point(18., -20.), LEADER);
@@ -630,21 +649,31 @@ void EscortWorkshopPanel::DrawInspector() const
 	if(IsRole())
 	{
 		// The fight: how each ship is doing, and what the role decided.
-		auto bar = [&](const string &label, double fraction, const Color &color) {
-			font.Draw(label, Point(left + 12., y), DIM);
-			const double x = left + 90.;
-			const double width = INSPECTOR_WIDTH - 110.;
-			FillShader::Fill(Point(x + width / 2., y + 7.), Point(width, 8.), GRID_MAJOR);
-			FillShader::Fill(Point(x + width * fraction / 2., y + 7.), Point(width * fraction, 8.), color);
-			y += 18.;
+		// Each ship's shields (above) and hull (below), with a mark where the
+		// hull is low enough that the ship is disabled.
+		auto bar = [&](const string &label, const Ship &ship, const Color &color) {
+			const string state = ship.IsDestroyed() ? " (destroyed)" : ship.IsDisabled() ? " (disabled)" : "";
+			font.Draw(label + state, Point(left + 12., y), ship.IsDisabled() ? BAD : DIM);
+			const double x = left + 150.;
+			const double width = INSPECTOR_WIDTH - 170.;
+			const double shields = max(0., min(1., ship.ShieldFraction()));
+			const double hull = max(0., min(1., ship.HullFraction()));
+			FillShader::Fill(Point(x + width / 2., y + 4.), Point(width, 5.), GRID_MAJOR);
+			FillShader::Fill(Point(x + width * shields / 2., y + 4.), Point(width * shields, 5.), SHIELDS);
+			FillShader::Fill(Point(x + width / 2., y + 11.), Point(width, 5.), GRID_MAJOR);
+			FillShader::Fill(Point(x + width * hull / 2., y + 11.), Point(width * hull, 5.), color);
+			const double disabled = x + width * ship.DisabledHullFraction();
+			FillShader::Fill(Point(disabled, y + 11.), Point(1.5, 9.), TEXT);
+			y += 20.;
 		};
-		bar("you", simulation->LeaderHull(), LEADER);
-		bar("escort", simulation->EscortHull(), ESCORT);
+		bar("you", simulation->Leader(), LEADER);
+		bar("escort", simulation->Escort(), ESCORT);
 		if(simulation->HasRaider())
-			bar("raider", simulation->RaiderHull(), RAIDER);
+			bar("raider", simulation->Raider(), RAIDER);
 		else
 			line("no raider (yet)", DIM);
-		snprintf(text, sizeof(text), "raiders destroyed: %d", simulation->RaidersDestroyed());
+		line("shields above, hull below", DIM);
+		snprintf(text, sizeof(text), "raiders beaten: %d", simulation->RaidersDestroyed());
 		line(text, DIM);
 		y += 10.;
 		static const char *const WHAT[] = {"keeping station", "attacking the threat", "attacking your target",

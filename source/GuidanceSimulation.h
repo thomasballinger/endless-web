@@ -71,7 +71,10 @@ public:
 		};
 		std::vector<LockEvent> lockEvents;
 		bool hit = false;
-		// The step it hit or expired on, or -1 while it is in flight.
+		// Whether the target's anti-missile shot it down.
+		bool shotDown = false;
+		// The step it hit, was shot down, or expired on, or -1 while it is in
+		// flight.
 		int endStep = -1;
 		// The last step its seeker lost its lock on, or -1.
 		int lostLockStep = -1;
@@ -134,11 +137,18 @@ public:
 	bool HasTargetControls() const;
 	int CurrentStep() const;
 
+	// The ships, which take damage as ships do in the game: the target from
+	// the missiles, and the launcher from the target, if it fights back.
 	const Ship &Launcher() const;
 	const Ship &Target() const;
 	const std::vector<Missile> &Missiles() const;
+	// The shots the ships themselves fired (the target's, at the launcher),
+	// still flying.
+	const std::vector<Projectile> &Shots() const;
 	int Launches() const;
 	int Hits() const;
+	// The step on which the target or the launcher was destroyed, or -1.
+	int DestroyedStep() const;
 
 	// The first step on which the given script would have steered any
 	// projectile differently than the one in use did. Nothing that happened
@@ -188,6 +198,7 @@ private:
 	int step = 0;
 	int nextId = 0;
 	int hits = 0;
+	int destroyedStep = -1;
 
 	// The simulation's own random numbers (see Random::Own).
 	Random::Saved random;

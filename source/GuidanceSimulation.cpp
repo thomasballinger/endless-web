@@ -158,6 +158,7 @@ void GuidanceSimulation::Reset()
 	step = 0;
 	nextId = 0;
 	hits = 0;
+	destroyedStep = -1;
 	records.clear();
 	traces.clear();
 	daemonCooldown = 0;
@@ -181,10 +182,16 @@ void GuidanceSimulation::Reset()
 	launcherShip = make_shared<Ship>(launcher);
 	launcherShip->SetGovernment(GameData::PlayerGovernment());
 	world->AddPlayerShip(launcherShip);
+	// The launcher fires only the weapon being tried; a target only fights
+	// back if the game's AI flies it.
+	world->HoldFire(launcherShip);
 	if(!current.ai.empty())
 		world->AddShip(target, AIWorld::Pilot::AI, current.ai);
 	else
+	{
 		world->AddShip(target, current.pilot ? AIWorld::Pilot::COMMANDS : AIWorld::Pilot::FIXED);
+		world->HoldFire(target);
+	}
 	target->SetTargetShip(launcherShip);
 }
 
@@ -235,7 +242,10 @@ void GuidanceSimulation::Step()
 	const Ship &moved = *launcherShip;
 	launcherMotion = GuidanceDrill::Motion{moved.Position(), moved.Velocity(), moved.Facing()};
 	launcher.SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
-	if((step - 1) % LAUNCH_INTERVAL == 0)
+	if(destroyedStep < 0 && (target->IsDestroyed() || launcherShip->IsDestroyed()))
+		destroyedStep = step;
+	// (A disabled launcher can't fire.)
+	if((step - 1) % LAUNCH_INTERVAL == 0 && !launcherShip->IsDisabled())
 		Fire();
 
 	// The target's defense daemon hacks a missile, when its injector is ready
@@ -324,13 +334,20 @@ void GuidanceSimulation::Step()
 			missile.confused.pop_front();
 			missile.locked.pop_front();
 		}
-		// Projectiles check for collisions along their next movement.
-		Point offset = projectile.Position() - target->Position();
-		if(target->GetMask(step).Collide(offset, projectile.Velocity(), target->Facing()) < 1.)
+		// Projectiles check for collisions along their next movement, and do
+		// the damage they do in the game, or the target's anti-missile shoots
+		// them down.
+		const AIWorld::Outcome outcome = world->Strike(projectile);
+		if(outcome == AIWorld::Outcome::HIT)
 		{
 			missile.hit = true;
 			missile.endStep = step;
 			++hits;
+		}
+		else if(outcome == AIWorld::Outcome::SHOT_DOWN)
+		{
+			missile.shotDown = true;
+			missile.endStep = step;
 		}
 	}
 	// Forget projectiles that have been gone for a while.
@@ -415,7 +432,7 @@ int GuidanceSimulation::CurrentStep() const
 
 const Ship &GuidanceSimulation::Launcher() const
 {
-	return launcher;
+	return *launcherShip;
 }
 
 
@@ -423,6 +440,13 @@ const Ship &GuidanceSimulation::Launcher() const
 const Ship &GuidanceSimulation::Target() const
 {
 	return *target;
+}
+
+
+
+const vector<Projectile> &GuidanceSimulation::Shots() const
+{
+	return world->Projectiles();
 }
 
 
@@ -479,6 +503,13 @@ int GuidanceSimulation::Launches() const
 int GuidanceSimulation::Hits() const
 {
 	return hits;
+}
+
+
+
+int GuidanceSimulation::DestroyedStep() const
+{
+	return destroyedStep;
 }
 
 

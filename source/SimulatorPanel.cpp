@@ -59,6 +59,8 @@ namespace {
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often, so replaying after an edit is quick.
 	const int LOOP_STEPS = 1200;
+	// How long to watch after a ship is destroyed, before starting over.
+	const int AFTER_DESTROYED = 180;
 	// How long typing must pause before the script is compiled and run.
 	const int QUIET_FRAMES = 20;
 
@@ -211,7 +213,10 @@ void SimulatorPanel::Step()
 		const int steps = speed < 1. ? (frame % static_cast<int>(round(1. / speed)) == 0) : static_cast<int>(speed);
 		for(int i = 0; i < steps; ++i)
 		{
-			if(simulation->CurrentStep() >= LOOP_STEPS)
+			// Start over at the end, or a little while after a ship is destroyed.
+			const int destroyed = simulation->DestroyedStep();
+			if(simulation->CurrentStep() >= LOOP_STEPS
+					|| (destroyed >= 0 && simulation->CurrentStep() >= destroyed + AFTER_DESTROYED))
 				Restart();
 			simulation->Step();
 		}
@@ -282,12 +287,21 @@ void SimulatorPanel::Draw()
 	DrawList draw;
 	draw.Clear(simulation->CurrentStep(), zoom);
 	draw.SetCenter(ToWorld(Point()));
-	draw.Add(simulation->Launcher());
-	draw.Add(simulation->Target());
+	// (A ship that was destroyed is gone once it finishes exploding.)
+	for(const Ship *ship : {&simulation->Launcher(), &simulation->Target()})
+		if(!ship->ShouldBeRemoved())
+			draw.Add(*ship);
 	for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
 		if(missile.endStep < 0)
 			draw.Add(missile.projectile);
 	draw.Draw();
+	// The shots the target fires back.
+	for(const Projectile &shot : simulation->Shots())
+	{
+		const Point at = ToScreen(shot.Position());
+		const Point ahead = ToScreen(shot.Position() + shot.Velocity());
+		LineShader::Draw(at, ahead.Distance(at) < 3. ? at + shot.Velocity().Unit() * 3. : ahead, 1.5f, MISS, false);
+	}
 
 	DrawSelection();
 	DrawTapeDeck();
@@ -731,7 +745,7 @@ void SimulatorPanel::UpdateRunNotes()
 	{
 		notes = CodeEditor::RunNotes(simulation->TraceOf(missile->id));
 		const string state = missile->endStep < 0 ? "" : missile->hit ? " (its last step: it hit)"
-			: " (its last step: it expired)";
+			: missile->shotDown ? " (its last step: it was shot down)" : " (its last step: it expired)";
 		editor.SetCaption("values from missile #" + to_string(missile->id + 1) + state, FOLLOWED);
 	}
 	else
@@ -1210,6 +1224,16 @@ void SimulatorPanel::DrawInspector() const
 	line("Drill " + to_string(simulation->Drill() + 1) + ": " + simulation->Drills()[simulation->Drill()].name
 		+ (simulation->HasTargetControls() ? " (you fly it)" : ""), TEXT);
 	line("hits " + to_string(simulation->Hits()) + " of " + to_string(simulation->Launches()) + " fired", DIM);
+	// How the ships are holding up, as they would in the game.
+	auto health = [](const string &name, const Ship &ship) {
+		char text[96];
+		snprintf(text, sizeof(text), "%s: shields %.0f%%, hull %.0f%%%s", name.c_str(),
+			100. * max(0., ship.ShieldFraction()), 100. * max(0., ship.HullFraction()),
+			ship.IsDestroyed() ? " (destroyed)" : ship.IsDisabled() ? " (disabled)" : "");
+		return string(text);
+	};
+	line(health("target", simulation->Target()), simulation->Target().IsDisabled() ? HIT : DIM);
+	line(health("you", simulation->Launcher()), simulation->Launcher().IsDisabled() ? MISS : DIM);
 	y += 10.;
 	const GuidanceSimulation::Missile *missile = simulation->Followed();
 	if(!missile)
@@ -1219,8 +1243,8 @@ void SimulatorPanel::DrawInspector() const
 	}
 	line("Missile #" + to_string(missile->id + 1) + ", fired at step " + to_string(missile->launchStep), FOLLOWED);
 	if(missile->endStep >= 0)
-		line(string(missile->hit ? "Hit" : "Expired") + " at step " + to_string(missile->endStep)
-			+ "; next one soon", missile->hit ? HIT : MISS);
+		line(string(missile->hit ? "Hit" : missile->shotDown ? "Shot down" : "Expired") + " at step "
+			+ to_string(missile->endStep) + "; next one soon", missile->hit ? HIT : MISS);
 	else
 		line("[ ] or click to follow another", DIM);
 	y += 6.;

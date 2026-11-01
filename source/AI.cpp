@@ -2576,6 +2576,13 @@ void AI::MoveInFormation(Ship &ship, Command &command)
 
 
 
+void AI::FlyIndependent(Ship &ship, Command &command)
+{
+	MoveIndependent(ship, command);
+}
+
+
+
 void AI::MoveIndependent(Ship &ship, Command &command)
 {
 	double invisibleFenceRadius = ship.GetSystem()->InvisibleFenceRadius();

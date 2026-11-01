@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "EscortRole.h"
 #include "GuidanceDrill.h"
 #include "Point.h"
+#include "Projectile.h"
 #include "Random.h"
 #include "script/Script.h"
 #include "Ship.h"
@@ -39,9 +40,9 @@ class AIWorld;
 // drill (or is flown by the player), and an escort keeps station on it with
 // a maneuver script. Given a role (see EscortRole), the escort does what the
 // role says instead, and a raider comes to attack, flown by the game's own AI
-// (which sees the leader and the escort as the player's ships), and is destroyed
-// if the escort fights it long enough, to come back later from somewhere
-// else. Ships hurt what they are close to and facing, and slowly recover.
+// (which sees the leader and the escort as the player's ships). Ships fire
+// and take damage as in the game. A raider is beaten once it is disabled, and
+// another comes later from somewhere else.
 // All three ships move in a small piece of the game (see AIWorld), exactly as
 // ships move in the game. The simulation has random numbers of its own, so
 // replaying to a step after the script changes shows exactly what the change
@@ -95,15 +96,16 @@ public:
 	const ShipManeuver::Output &LastOutput() const;
 	bool LastRan() const;
 
-	// The raider, if there is one now, and where it has been; how healthy each
-	// ship is (from 0 to 1); and how many raiders the escort has destroyed.
+	// The raider, if there is one now (even once it is beaten), and where it
+	// has been; how many raiders have been beaten (disabled or destroyed);
+	// and the shots that are flying.
 	bool HasRaider() const;
 	const Ship &Raider() const;
 	const std::deque<Point> &RaiderTrail() const;
-	double LeaderHull() const;
-	double EscortHull() const;
-	double RaiderHull() const;
 	int RaidersDestroyed() const;
+	// The step on which you or the escort was destroyed, or -1.
+	int DestroyedStep() const;
+	const std::vector<Projectile> &Shots() const;
 	// How the role ran on the latest step, and what it decided, and where the
 	// escort's station is (if it is keeping station).
 	const script::Trace &RoleTrace() const;
@@ -119,11 +121,12 @@ public:
 
 
 private:
-	// The escort's step: keep station at a point, or chase the raider.
+	// The escort keeps station at a point.
 	void KeepStationAt(const Point &point);
-	void ChaseRaider();
 	// A raider arrives, if one is due.
 	void ArriveRaider();
+	// Whether the raider is here and still a threat (not disabled).
+	bool RaiderIsThreat() const;
 	EscortRole::Input RoleInput() const;
 
 
@@ -158,17 +161,16 @@ private:
 	EscortRole::Output roleOutput;
 	bool roleRan = false;
 	Point stationPoint;
-	// The raider (flown by the game's AI), and the ships' health.
-	const Ship *raiderModel = nullptr;
+	// The raider: a pirate in a ship just like the escort's (so that the fight
+	// is a fair one), flown by the game's AI.
 	std::shared_ptr<Ship> raider;
 	bool raiderHere = false;
+	bool raiderBeaten = false;
+	int destroyedStep = -1;
 	GuidanceDrill::Motion raiderMotion;
 	std::deque<Point> raiderTrail;
 	int raiderReturns = 0;
 	int raids = 0;
 	int destroyed = 0;
-	double leaderHull = 1.;
-	double escortHull = 1.;
-	double raiderHull = 1.;
 	bool escortAttacking = false;
 };

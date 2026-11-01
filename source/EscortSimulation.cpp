@@ -20,6 +20,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Command.h"
 #include "GameData.h"
 #include "Government.h"
+#include "ship/ShipAICache.h"
 
 #include <algorithm>
 #include <cmath>
@@ -33,43 +34,12 @@ namespace {
 	// How many recent positions to keep for each ship's trail.
 	const size_t TRAIL_LENGTH = 600;
 	// When the first raider arrives, how far from the leader, how long until
-	// another comes after one is destroyed, and the ship it flies.
+	// another comes after one is beaten.
 	const int RAIDER_ARRIVES = 240;
 	const double RAIDER_DISTANCE = 2000.;
 	const int RAIDER_RETURNS = 300;
-	const string RAIDER_MODEL = "Headhunter";
-	// Within what range, and how close to facing it, a ship hurts another, and
-	// how much each step (as a fraction of the other's hull), and how fast
-	// ships recover.
-	const double GUN_RANGE = 500.;
-	const double GUN_ARC = 25.;
-	const double RAIDER_DAMAGE = .0012;
-	const double ESCORT_DAMAGE = .003;
-	const double REPAIR = .0002;
 	// The random seed everything starts from.
 	const uint64_t SEED = 1;
-
-	// Turn toward a direction, given in any vector, and thrust while facing
-	// roughly that way.
-	GuidanceDrill::Control Toward(const GuidanceDrill::Motion &motion, const Point &direction, double turnRate)
-	{
-		GuidanceDrill::Control control;
-		if(!direction)
-			return control;
-		const double off = (Angle(direction) - motion.facing).Degrees();
-		control.turn = max(-1., min(1., off / max(.001, turnRate)));
-		control.thrust = fabs(off) < 40. ? 1. : 0.;
-		return control;
-	}
-
-	// Whether one ship faces another closely enough, and is near enough, to hurt
-	// it.
-	bool CanHit(const GuidanceDrill::Motion &shooter, const Point &target)
-	{
-		const Point offset = target - shooter.position;
-		return offset.Length() < GUN_RANGE && offset
-			&& fabs((Angle(offset) - shooter.facing).Degrees()) < GUN_ARC;
-	}
 
 	// Turn toward a heading, as fast as the ship can but without overshooting,
 	// thrusting once it is facing roughly that way.
@@ -114,7 +84,6 @@ namespace {
 EscortSimulation::EscortSimulation(const Ship &leaderModel, const Ship &escortModel)
 	: drills(MakeDrills()), leaderModel(leaderModel), escortModel(escortModel)
 {
-	raiderModel = GameData::Ships().Find(RAIDER_MODEL);
 	Reset();
 }
 
@@ -182,7 +151,7 @@ void EscortSimulation::Reset()
 		ship->SetGovernment(GameData::PlayerGovernment());
 		world->AddPlayerShip(ship);
 	}
-	raider = make_shared<Ship>(raiderModel ? *raiderModel : escortModel);
+	raider = make_shared<Ship>(escortModel);
 	leaderTrail.clear();
 	escortTrail.clear();
 	distances.clear();
@@ -202,9 +171,8 @@ void EscortSimulation::Reset()
 	raiderReturns = RAIDER_ARRIVES;
 	raids = 0;
 	destroyed = 0;
-	leaderHull = 1.;
-	escortHull = 1.;
-	raiderHull = 1.;
+	raiderBeaten = false;
+	destroyedStep = -1;
 	escortAttacking = false;
 }
 
@@ -216,7 +184,7 @@ void EscortSimulation::Step()
 	++step;
 	// A raider arrives, if one is due. Then the game's AI decides what it
 	// does, seeing every ship where it is now.
-	if(role && raiderModel)
+	if(role)
 		ArriveRaider();
 	world->Think();
 
@@ -246,14 +214,27 @@ void EscortSimulation::Step()
 			: EscortRole::INDEPENDENT;
 		const bool attacks = (behavior == EscortRole::ATTACK_THREAT || behavior == EscortRole::ATTACK_LEADER_TARGET
 			|| behavior == EscortRole::ATTACK_TARGET);
-		escortAttacking = attacks && raiderHere;
+		escortAttacking = attacks && RaiderIsThreat();
 		if(escortAttacking)
-			ChaseRaider();
+		{
+			// As in the game, it targets the raider, and the game's AI flies it
+			// in to attack.
+			escort->SetTargetShip(raider);
+			world->FlyIndependent(escort);
+			lastTurn = escort->Commands().Turn();
+			stationPoint = raiderMotion.position;
+		}
+		else if(behavior == EscortRole::INDEPENDENT || (attacks && !RaiderIsThreat()))
+		{
+			// Left to the usual AI, the escort flies as the AI already decided
+			// (and an attack with nothing to attack is left to it too).
+			lastTurn = escort->Commands().Turn();
+			stationPoint = leaderMotion.position;
+		}
 		else
 		{
 			// The station is relative to the leader: x to its right, y ahead.
-			const Point station = (behavior == EscortRole::RETREAT) ? Point(0., -600.)
-				: (behavior == EscortRole::KEEP_STATION) ? roleOutput.station : Point(0., -250.);
+			const Point station = (behavior == EscortRole::RETREAT) ? Point(0., -600.) : roleOutput.station;
 			const Point forward = leaderMotion.facing.Unit();
 			const Point right(-forward.Y(), forward.X());
 			KeepStationAt(leaderMotion.position + right * station.X() + forward * station.Y());
@@ -272,33 +253,19 @@ void EscortSimulation::Step()
 	if(raiderHere)
 		raiderMotion = GuidanceDrill::Motion{raider->Position(), raider->Velocity(), raider->Facing()};
 
-	// Ships hurt what they face, and recover.
-	if(raiderHere)
+	// The ships fought, as ships fight in the game. A raider is beaten once it
+	// is disabled; it stays until it is destroyed, or the next one comes. One
+	// that has finished exploding is gone.
+	if(raiderHere && !raiderBeaten && raider->IsDisabled())
 	{
-		// The raider hurts whichever of them it is after.
-		const bool onEscort = (raider->GetTargetShip() == escort);
-		const Point victim = onEscort ? escortMotion.position : leaderMotion.position;
-		if(CanHit(raiderMotion, victim))
-		{
-			if(onEscort)
-				escortHull = max(0., escortHull - RAIDER_DAMAGE * 1.5);
-			else
-				leaderHull = max(0., leaderHull - RAIDER_DAMAGE);
-		}
-		if(CanHit(escortMotion, raiderMotion.position))
-		{
-			raiderHull -= ESCORT_DAMAGE;
-			if(raiderHull <= 0.)
-			{
-				raiderHere = false;
-				world->Remove(raider);
-				raiderReturns = step + RAIDER_RETURNS;
-				++destroyed;
-			}
-		}
+		raiderBeaten = true;
+		raiderReturns = step + RAIDER_RETURNS;
+		++destroyed;
 	}
-	leaderHull = min(1., leaderHull + REPAIR);
-	escortHull = min(1., escortHull + REPAIR);
+	if(raiderHere && raider->ShouldBeRemoved())
+		raiderHere = false;
+	if(destroyedStep < 0 && (leader->IsDestroyed() || escort->IsDestroyed()))
+		destroyedStep = step;
 
 	leaderTrail.push_back(leaderMotion.position);
 	escortTrail.push_back(escortMotion.position);
@@ -359,41 +326,34 @@ void EscortSimulation::KeepStationAt(const Point &point)
 
 
 
-void EscortSimulation::ChaseRaider()
-{
-	// Lead the raider while far off; close in, circle it once near.
-	const Point offset = raiderMotion.position - escortMotion.position;
-	const double distance = offset.Length();
-	Point aim = offset + raiderMotion.velocity * (distance / max(1., escort->MaxVelocity()));
-	if(distance < 250.)
-		aim = offset;
-	GuidanceDrill::Control control = Toward(escortMotion, aim, escort->TurnRate());
-	if(distance < 200.)
-		control.thrust = 0.;
-	lastTurn = control.turn;
-	escort->SetCommands(AIWorld::ToCommand(control));
-	stationPoint = raiderMotion.position;
-}
-
-
-
 void EscortSimulation::ArriveRaider()
 {
-	if(raiderHere || step < raiderReturns)
+	if((raiderHere && !raiderBeaten) || step < raiderReturns)
 		return;
+	if(raiderHere)
+		world->Remove(raider);
 	// Each raider comes from a different side: a pirate, flown by the game's
 	// AI, which sees the leader and the escort as the player's ships.
 	const Angle from(110. + 137. * raids);
-	raider = make_shared<Ship>(*raiderModel);
+	raider = make_shared<Ship>(escortModel);
 	raider->SetGovernment(GameData::Governments().Get("Pirate"));
 	raider->SetKinematics(leaderMotion.position + from.Unit() * RAIDER_DISTANCE, Point(), from + Angle(180.));
 	world->AddShip(raider, AIWorld::Pilot::AI, "heroic staying");
 	raider->SetTargetShip(leader);
+	// You target it, as a player would.
+	leader->SetTargetShip(raider);
 	raiderMotion = GuidanceDrill::Motion{raider->Position(), raider->Velocity(), raider->Facing()};
-	raiderHull = 1.;
+	raiderBeaten = false;
 	raiderHere = true;
 	raiderTrail.clear();
 	++raids;
+}
+
+
+
+bool EscortSimulation::RaiderIsThreat() const
+{
+	return raiderHere && !raiderBeaten && raider->IsTargetable() && !raider->IsDisabled();
 }
 
 
@@ -407,28 +367,28 @@ EscortRole::Input EscortSimulation::RoleInput() const
 	in.position = escortMotion.position;
 	in.velocity = escortMotion.velocity;
 	in.facing = escortMotion.facing.Unit();
-	in.hull = escortHull;
-	in.shields = escortHull;
-	in.energy = 1.;
-	in.weaponRange = GUN_RANGE;
+	in.hull = escort->HullFraction();
+	in.shields = escort->ShieldFraction();
+	in.energy = escort->EnergyFraction();
+	in.weaponRange = escort->GetAICache().LongestRange();
 	in.leaderPosition = leaderMotion.position;
 	in.leaderVelocity = leaderMotion.velocity;
 	in.leaderFacing = leaderMotion.facing.Unit();
-	in.leaderHull = leaderHull;
-	in.leaderShields = leaderHull;
-	if(raiderHere)
+	in.leaderHull = leader->HullFraction();
+	in.leaderShields = leader->ShieldFraction();
+	if(RaiderIsThreat())
 	{
 		in.leaderTarget = true;
 		in.leaderTargetPosition = raiderMotion.position;
-		in.leaderTargetHull = raiderHull;
+		in.leaderTargetHull = raider->HullFraction();
 		in.threat = true;
 		in.threatPosition = raiderMotion.position;
 		in.threatVelocity = raiderMotion.velocity;
-		in.threatHull = raiderHull;
-		in.threatTargetingLeader = (raider->GetTargetShip() != escort);
-		in.target = escortAttacking;
+		in.threatHull = raider->HullFraction();
+		in.threatTargetingLeader = (raider->GetTargetShip() == leader);
+		in.target = (escort->GetTargetShip() == raider);
 		in.targetPosition = raiderMotion.position;
-		in.targetHull = raiderHull;
+		in.targetHull = raider->HullFraction();
 	}
 	in.escortIndex = 0;
 	in.escortCount = 1;
@@ -518,23 +478,9 @@ const deque<Point> &EscortSimulation::RaiderTrail() const
 
 
 
-double EscortSimulation::LeaderHull() const
+const vector<Projectile> &EscortSimulation::Shots() const
 {
-	return leaderHull;
-}
-
-
-
-double EscortSimulation::EscortHull() const
-{
-	return escortHull;
-}
-
-
-
-double EscortSimulation::RaiderHull() const
-{
-	return raiderHull;
+	return world->Projectiles();
 }
 
 
@@ -542,6 +488,13 @@ double EscortSimulation::RaiderHull() const
 int EscortSimulation::RaidersDestroyed() const
 {
 	return destroyed;
+}
+
+
+
+int EscortSimulation::DestroyedStep() const
+{
+	return destroyedStep;
 }
 
 

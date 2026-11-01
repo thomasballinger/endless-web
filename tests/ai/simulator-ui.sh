@@ -174,23 +174,42 @@ wait $GAME 2> /dev/null
 cp -r "$ROOT/tests/integration/config" "$OUT/config-jammed"
 start "$OUT/config-jammed" Carrier
 xdotool key 0 equal equal
-WHERE=
-for i in $(seq 60); do
-	shot jammed
-	WHERE=$("$LOOK" confused "$OUT/jammed.png") && break
-	sleep 0.3
-done
-xdotool key space
-sleep 0.5
-shot jammed
-if WHERE=$("$LOOK" confused "$OUT/jammed.png"); then
-	echo "ok: a confused missile's trail is marked"
-	xdotool mousemove $WHERE click 1
+# A seeker can stop being confused between seeing it and pausing, so try a
+# few times: pause, and select it if its trail is still newly confused.
+MARKED=
+GLITCHED=
+for attempt in $(seq 8); do
+	for i in $(seq 60); do
+		shot jammed
+		"$LOOK" confused "$OUT/jammed.png" > /dev/null && break
+		sleep 0.3
+	done
+	xdotool key space
 	sleep 0.5
-	shot glitch
-	check "selecting a confused missile makes the code glitch" glitch "$OUT/glitch.png"
+	shot jammed
+	if WHERE=$("$LOOK" confused "$OUT/jammed.png"); then
+		MARKED=1
+		xdotool mousemove $WHERE click 1
+		sleep 0.5
+		shot glitch
+		if "$LOOK" glitch "$OUT/glitch.png"; then
+			GLITCHED=1
+			break
+		fi
+	fi
+	xdotool key space
+	sleep 1
+done
+if [ -n "$MARKED" ]; then
+	echo "ok: a confused missile's trail is marked"
 else
 	echo "FAILED: a confused missile's trail is marked"
+	FAILED=1
+fi
+if [ -n "$GLITCHED" ]; then
+	echo "ok: selecting a confused missile makes the code glitch"
+else
+	echo "FAILED: selecting a confused missile makes the code glitch"
 	FAILED=1
 fi
 
