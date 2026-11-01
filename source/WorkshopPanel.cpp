@@ -127,7 +127,7 @@ void WorkshopPanel::Draw()
 
 	const Font &font = FontSet::Get(14);
 	const Font &bigFont = FontSet::Get(18);
-	const size_t lines = showExchange ? GameData::Firmwares().size() + 4
+	const size_t lines = showExchange ? (GameData::Firmwares().size() + 1) / 2 + 3
 		: max<size_t>(1, rows.size()) + 4 + roleRows.size();
 	const double height = min(Screen::Height() - 20., 190. + lines * (showExchange ? OFFER_HEIGHT : ROW_HEIGHT)
 		+ (showExchange ? 60. : 0.));
@@ -417,22 +417,35 @@ void WorkshopPanel::DrawExchange(const Rectangle &box, double y)
 
 	offers.clear();
 	const Firmware *hovered = nullptr;
+	// A long list goes in two columns, read down each one.
+	const int count = GameData::Firmwares().size();
+	const int columns = count > 10 ? 2 : 1;
+	const int perColumn = (count + columns - 1) / columns;
+	const double columnWidth = (box.Width() - 32. - 8. * (columns - 1)) / columns;
+	const double top = y;
 	for(const auto &[name, firmware] : GameData::Firmwares())
 	{
 		Offer offer;
 		offer.firmware = &firmware;
-		offer.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + OFFER_HEIGHT - 2.));
+		const int index = offers.size();
+		const double left = box.Left() + 16. + (index / perColumn) * (columnWidth + 8.);
+		y = top + (index % perColumn) * OFFER_HEIGHT;
+		offer.box = Rectangle::WithCorners(Point(left, y), Point(left + columnWidth, y + OFFER_HEIGHT - 2.));
 		const bool hover = offer.box.Contains(mouse);
 		if(hover)
 			hovered = &firmware;
 		FillShader::Fill(offer.box.Center(), offer.box.Dimensions(), hover ? HOVER : ROW);
 		const bool owned = player.OwnsFirmware(name);
 		const bool sold = IsSoldHere(firmware);
+		const string price = owned ? "owned" : sold ? Format::CreditString(firmware.Price()) : "not sold here";
 		const string label = (offers.size() < 9 ? to_string(offers.size() + 1) + ".  " : string()) + name;
-		font.Draw(label, offer.box.TopLeft() + Point(10., 1.), owned ? BOUGHT : sold ? TITLE : DIM);
+		font.Draw(Fit(font, label, columnWidth - 30. - font.Width(price)), offer.box.TopLeft() + Point(10., 1.),
+			owned ? BOUGHT : sold ? TITLE : DIM);
 		string about = "by " + firmware.Author() + "  -  ";
 		if(firmware.IsDaemon())
 			about += "defense daemon";
+		else if(firmware.Kind() == "role")
+			about += "escort role";
 		else if(firmware.IsGuidance())
 		{
 			const MissileGuidance *guidance = GameData::Guidance().Find(name);
@@ -440,17 +453,15 @@ void WorkshopPanel::DrawExchange(const Rectangle &box, double y)
 		}
 		else
 			about += "escort flight (replaces " + firmware.Replaces() + ")";
-		font.Draw(about, offer.box.TopLeft() + Point(10., 17.), DIM);
-		const string price = owned ? "owned" : sold ? Format::CreditString(firmware.Price()) : "not sold here";
+		font.Draw(Fit(font, about, columnWidth - 20.), offer.box.TopLeft() + Point(10., 17.), DIM);
 		const bool affordable = player.Accounts().Credits() >= firmware.Price();
-		font.Draw(price, Point(offer.box.Right() - 10. - font.Width(price), offer.box.Top() + 11.),
+		font.Draw(price, Point(offer.box.Right() - 10. - font.Width(price), offer.box.Top() + 1.),
 			owned ? BOUGHT : sold && affordable ? TEXT : DIM);
 		offers.push_back(offer);
-		y += OFFER_HEIGHT;
 	}
 
 	// What the program under the mouse does.
-	y += 8.;
+	y = top + perColumn * OFFER_HEIGHT + 8.;
 	if(hovered)
 	{
 		WrappedText wrap(font);

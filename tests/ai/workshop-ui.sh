@@ -142,10 +142,10 @@ key Escape
 key Escape
 
 # The program exchange: Burthen is Syndicate space, which sells Lead Without
-# Leading (4) and Close Guard (1). Then back in the fleet, choose each of the
+# Leading (9, in alphabetical order) and Close Guard (1). Then back in the fleet, choose each of the
 # Meteor launcher's programs in turn, ending back at the player's own.
 key x
-key 4
+key 9
 key 1
 shot exchange
 key f

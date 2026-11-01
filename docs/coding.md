@@ -122,6 +122,54 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   it closes in, then choose it for your own launcher, or open it in the
   simulator and improve it.
 
+- **Linear scripts.** A script that `wait`s is linear: like a missilecmd
+  generator, it carries on each step from where it waited, keeping its
+  variables and its turn and thrust. Missiles have routines that wait until
+  they're done: `turn_to(direction)` (aimed where the direction pointed when
+  the turn began), `turn_by(degrees)`, `fly(steps)`, `burn(steps)`,
+  `coast(steps)` and `track(steps)`. `while` and `loop` repeat lines, and
+  `routine name(...)` defines your own. A plan like this commits to things,
+  so it's simple to write and easy to dodge:
+
+      if target
+          turn_to(target.direction)
+      fly(45)
+      track(60)
+
+  The editor shows "waiting N steps" on the line a missile is waiting on.
+  New linear firmware: Dead Reckoning (Kor Mereti and Kor Sestor automata),
+  Pursuit Bursts (the Free Worlds, ported from missilecmd), Dogleg (bounty
+  hunters) and Hunter-Seeker (Militia: sweep, close in, strike). Each hits
+  less often than reactive guidance, against nimble targets especially.
+- **A smarter missile.** Lock Keeper (Syndicate) keeps a smoothed estimate
+  of its target, solves for the intercept with a loop, and keeps flying at
+  the estimate when jamming blinds its seeker: it beats the factory programs
+  on every launcher in the bench, most of all against jammers. It's in
+  `data/programs.txt`, as are the rest.
+- **Escort roles.** In the workshop, give each escort a role, or one role to
+  all of them (**R** cycles it). A role is a list of gambits, the first that
+  applies deciding what the escort does:
+
+      if hull < .3
+          retreat
+      elif threat && threat.distance < 1200
+          attack_threat
+      else
+          station = vec(180, -150)    # right of the leader, a bit behind
+          keep_station
+
+  It can keep station anywhere around you, attack the nearest threat, your
+  target or its own, retreat, or leave it to the usual AI (`independent`).
+  Bodyguard, Striker and Picket come with the game; the exchange sells
+  Shieldwall (Navy: a wall between you and the threat), Wolf Pack (pirates:
+  pile onto whatever's hurt) and Hit and Run (Syndicate, linear: strike for
+  ten seconds, fall back for five). See `data/roles.txt`.
+- **Editing roles in flight.** Select an escort (click it in the escort list,
+  bottom left) and open the scripts pane (**K**): its role runs there with
+  its values. **EDIT** pauses the game; change the code, and once you stop
+  typing the escort flies the new version (marked lines if it doesn't
+  compile). **Escape** flies on.
+
 Things worth trying: make your Meteors lead their targets (they can't, on
 basic hardware: the workshop will tell you why), make them coast instead of
 overshooting, or make a missile that gives up and flies straight when it
@@ -135,7 +183,11 @@ scanner.
   (`tests/ai/daemon-test.sh` adds pirate Ravens to Al Dhanab to test the
   Defense Daemon, and could be used for that.)
 - You can choose a defense daemon, buy one, or copy one, but not yet write
-  one: daemons have no editor or simulator of their own.
+  one: daemons have no editor or simulator of their own. Roles can only be
+  written in flight, in the scripts pane; the escort workshop doesn't
+  simulate them yet (it would need a ship to fight).
+- A role's "threat" is simply the nearest hostile ship to the leader; there
+  is no list of all of them, or of incoming missiles, to choose from yet.
 - A copied maneuver (say, a pirate's "fight") shows up as a choice for how
   your escorts keep station, which is probably not what it's for.
 - Faction firmware is only tuned roughly against the guidance bench; some

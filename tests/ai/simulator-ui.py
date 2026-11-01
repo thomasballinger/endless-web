@@ -158,8 +158,9 @@ def hacked(image):
 
 # The missile workshop: a box in the middle of the screen, and the weapons'
 # rows in it.
-WORKSHOP_POINTS = [(600, 580), (1000, 580), (800, 590)]
-WORKSHOP_STATUS = (440, 300, 1160, 760)
+# (In its margins, clear of its rows, however many there are.)
+WORKSHOP_POINTS = [(428, 400), (1172, 400), (428, 600)]
+WORKSHOP_STATUS = (440, 100, 1160, 900)
 
 
 def workshop(image):
