@@ -79,4 +79,7 @@ public:
 	// Or, where the target starts, and its pilot.
 	Motion start;
 	std::function<Control(const Situation &situation)> pilot;
+	// Or, if not empty, the target is flown by the game's own AI (from where
+	// it starts), with this personality (see AIWorld).
+	std::string ai;
 };

@@ -17,10 +17,11 @@
 # escort workshop on a role (Bodyguard, to start with), and check that:
 #
 #   1. It opens.
-#   2. A raider comes, and the escort, as its role says, fights it off.
+#   2. A raider (flown by the game's AI) comes, and the escort, as its role
+#      says, attacks it.
 #   3. Changing the role so that the escort only ever keeps station (its
-#      "attack_threat" line becomes "keep_station"), the escort lets raiders
-#      be: none is destroyed in the replay.
+#      "attack_threat" line becomes "keep_station"), the escort no longer
+#      attacks.
 #
 # Usage: escort-role-ui.sh BINARY
 #
@@ -88,10 +89,10 @@ check "the escort workshop opens on a role" escorts "$OUT/start.png"
 # The first raider comes about four seconds in; give the escort time to fight.
 sleep 20
 shot fight
-if grep -q "raider destroyed" "$OUT/game.log"; then
-	echo "ok: the escort fights off the raider ($(grep -c 'raider destroyed' "$OUT/game.log") destroyed)"
+if grep -q "escort: attack threat" "$OUT/game.log"; then
+	echo "ok: the escort attacks the raider ($(grep -c 'raider destroyed' "$OUT/game.log") destroyed so far)"
 else
-	echo "FAILED: the escort fights off the raider"
+	echo "FAILED: the escort attacks the raider"
 	FAILED=1
 fi
 
@@ -104,15 +105,15 @@ key End shift+Home
 xdotool type --delay 30 "		keep_station"
 sleep 2
 key Escape
-BEFORE=$(grep -c "raider destroyed" "$OUT/game.log")
+BEFORE=$(grep -c "escort: attack" "$OUT/game.log")
 key r
 sleep 20
 shot passive
-AFTER=$(grep -c "raider destroyed" "$OUT/game.log")
+AFTER=$(grep -c "escort: attack" "$OUT/game.log")
 if [ "$AFTER" -eq "$BEFORE" ]; then
-	echo "ok: with the attack taken out of the role, the escort lets the raider be"
+	echo "ok: with the attack taken out of the role, the escort no longer attacks"
 else
-	echo "FAILED: with the attack taken out of the role, the escort lets the raider be ($((AFTER - BEFORE)) destroyed)"
+	echo "FAILED: with the attack taken out of the role, the escort no longer attacks ($((AFTER - BEFORE)) times)"
 	FAILED=1
 fi
 

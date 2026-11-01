@@ -148,6 +148,19 @@ void EscortWorkshopPanel::Step()
 			printf("ESCORT WORKSHOP raider destroyed at step %d\n", simulation->CurrentStep());
 			fflush(stdout);
 		}
+		// And each time the role changes its mind.
+		static int lastBehavior = -1;
+		const int behavior = simulation->RoleRan() && simulation->RoleOutput().chose
+			? static_cast<int>(simulation->RoleOutput().behavior) : -1;
+		if(log && IsRole() && behavior != lastBehavior)
+		{
+			static const char *const NAMES[] = {"keep station", "attack threat", "attack leader target",
+				"attack target", "retreat", "independent"};
+			printf("ESCORT WORKSHOP escort: %s at step %d\n", behavior < 0 ? "nothing" : NAMES[behavior],
+				simulation->CurrentStep());
+			fflush(stdout);
+		}
+		lastBehavior = behavior;
 	}
 	editor.SetRun(CodeEditor::RunNotes(IsRole() ? simulation->RoleTrace() : simulation->LastTrace()));
 }

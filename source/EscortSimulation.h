@@ -24,16 +24,21 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <deque>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
+
+
+
+class AIWorld;
 
 
 
 // A small, repeatable world for trying out how escorts fly: a leader flies a
 // drill (or is flown by the player), and an escort keeps station on it with
 // a maneuver script. Given a role (see EscortRole), the escort does what the
-// role says instead, and a raider comes to attack: it circles in on the
-// leader (or on the escort, if the escort is fighting it), and is destroyed
+// role says instead, and a raider comes to attack, flown by the game's own AI
+// (which sees the leader and the escort as the player's ships), and is destroyed
 // if the escort fights it long enough, to come back later from somewhere
 // else. Ships hurt what they are close to and facing, and slowly recover.
 // Ships move as the game moves them: turning at their turn rate, thrusting
@@ -50,6 +55,7 @@ public:
 
 public:
 	EscortSimulation(const Ship &leaderModel, const Ship &escortModel);
+	~EscortSimulation();
 
 	// Fly the escort with this maneuver (or, if null, the game's).
 	void SetProgram(const ShipManeuver *program);
@@ -144,9 +150,13 @@ private:
 	EscortRole::Output roleOutput;
 	bool roleRan = false;
 	Point stationPoint;
-	// The raider, and the ships' health.
-	Ship raider;
-	bool hasRaiderModel = false;
+	// The raider, the world its AI flies it in (with stand-ins for the leader
+	// and the escort), and the ships' health.
+	const Ship *raiderModel = nullptr;
+	std::shared_ptr<Ship> raider;
+	std::unique_ptr<AIWorld> world;
+	std::shared_ptr<Ship> leaderStandIn;
+	std::shared_ptr<Ship> escortStandIn;
 	bool raiderHere = false;
 	GuidanceDrill::Motion raiderMotion;
 	std::deque<Point> raiderTrail;

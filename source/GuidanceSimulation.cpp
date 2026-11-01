@@ -15,6 +15,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "GuidanceSimulation.h"
 
+#include "AIWorld.h"
 #include "DefenseDaemon.h"
 #include "GameData.h"
 #include "Government.h"
@@ -26,6 +27,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 
 using namespace std;
@@ -95,12 +97,28 @@ GuidanceSimulation::GuidanceSimulation(const Outfit &outfit, const Ship &targetM
 {
 	auto model = make_shared<Ship>(targetModel);
 	const double distance = min(1500., .5 * weapon.Range());
-	// Drills with a pilot flying the target come first.
-	drills = GuidanceDrill::MakeFlownDrills(distance);
+	// The game's own AI flies the target first: a pirate that fights back,
+	// and a ship that runs. Then drills with a pilot, then fixed courses.
+	GuidanceDrill pirate;
+	pirate.name = "the game's AI: a pirate, fighting back";
+	pirate.start = GuidanceDrill::Motion{Point(0., -distance), Point(), Angle(180.)};
+	pirate.ai = "heroic staying";
+	drills.push_back(pirate);
+	GuidanceDrill runner = pirate;
+	runner.name = "the game's AI: running away";
+	runner.start.facing = Angle();
+	runner.ai = "fleeing staying";
+	drills.push_back(runner);
+	for(GuidanceDrill &drill : GuidanceDrill::MakeFlownDrills(distance))
+		drills.push_back(std::move(drill));
 	for(GuidanceDrill &drill : GuidanceDrill::MakeDrills(distance, model->MaxVelocity()))
 		drills.push_back(std::move(drill));
 	Reset();
 }
+
+
+
+GuidanceSimulation::~GuidanceSimulation() = default;
 
 
 
@@ -178,8 +196,20 @@ void GuidanceSimulation::Reset()
 	launcherMotion = GuidanceDrill::Motion{Point(), Point(), Angle()};
 	launcher.SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
 	const GuidanceDrill &current = drills[drill];
-	targetMotion = current.pilot ? current.start : current.motion(0);
+	targetMotion = (current.pilot || !current.ai.empty()) ? current.start : current.motion(0);
 	target->SetKinematics(targetMotion.position, targetMotion.velocity, targetMotion.facing);
+	// For the game's AI, a fresh world each time, so replays are the same.
+	world.reset();
+	launcherShip.reset();
+	if(!current.ai.empty())
+	{
+		world = make_unique<AIWorld>();
+		launcherShip = make_shared<Ship>(launcher);
+		launcherShip->SetGovernment(GameData::PlayerGovernment());
+		world->AddPlayerShip(launcherShip);
+		world->AddAIShip(target, current.ai);
+		target->SetTargetShip(launcherShip);
+	}
 }
 
 
@@ -190,7 +220,14 @@ void GuidanceSimulation::Step()
 	++step;
 	// As in the game, ships move before projectiles do.
 	const GuidanceDrill &current = drills[drill];
-	if(targetControlStart >= 0 && step > targetControlStart)
+	if(world && !(targetControlStart >= 0 && step > targetControlStart))
+	{
+		// The game's AI flies the target, seeing the launcher where it is.
+		launcherShip->SetKinematics(launcherMotion.position, launcherMotion.velocity, launcherMotion.facing);
+		world->Step();
+		targetMotion = GuidanceDrill::Motion{target->Position(), target->Velocity(), target->Facing()};
+	}
+	else if(targetControlStart >= 0 && step > targetControlStart)
 	{
 		// The player flew the target from here on.
 		const size_t index = min(static_cast<size_t>(step - 1 - targetControlStart), targetControls.size() - 1);

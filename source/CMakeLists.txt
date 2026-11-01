@@ -18,6 +18,8 @@ target_sources(EndlessSkyLib PRIVATE
 	AI.h
 	AIRules.cpp
 	AIRules.h
+	AIWorld.cpp
+	AIWorld.h
 	Account.cpp
 	Account.h
 	AlertLabel.cpp

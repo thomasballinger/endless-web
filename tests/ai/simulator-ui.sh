@@ -99,9 +99,10 @@ line() { echo $((59 + ($1 - 1) * 18)); }
 start "$OUT/config" Argosy
 check "the simulator starts" ready "$OUT/start.png" || exit 1
 
-# The jinking drill, at 2x speed for a few seconds (not long enough for the
-# drill to start over), then paused.
-xdotool key 8 equal
+# The jinking drill (the tenth, after the game's AI and the piloted drills),
+# at 2x speed for a few seconds (not long enough for the drill to start
+# over), then paused.
+xdotool key 0 equal
 sleep 5
 xdotool key space
 # Let the camera settle.
@@ -172,7 +173,7 @@ wait $GAME 2> /dev/null
 # pause, and select it. (A new configuration leaves out the script saved above.)
 cp -r "$ROOT/tests/integration/config" "$OUT/config-jammed"
 start "$OUT/config-jammed" Carrier
-xdotool key 8 equal equal
+xdotool key 0 equal equal
 WHERE=
 for i in $(seq 60); do
 	shot jammed

@@ -30,6 +30,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+class AIWorld;
 class DefenseDaemon;
 class Outfit;
 
@@ -91,6 +92,7 @@ public:
 public:
 	// Fire the given outfit's weapon (which must be homing) at the given ship.
 	GuidanceSimulation(const Outfit &outfit, const Ship &targetModel);
+	~GuidanceSimulation();
 	GuidanceSimulation(const GuidanceSimulation &) = delete;
 	GuidanceSimulation &operator=(const GuidanceSimulation &) = delete;
 
@@ -196,6 +198,11 @@ private:
 	// keeps a pointer to its own, so these are kept in a map, not a vector.)
 	std::map<int, script::Trace> traces;
 	int selected = -1;
+
+	// For a drill flown by the game's AI: its world, and the launcher's stand-in
+	// there (which the AI sees as the player's ship).
+	std::unique_ptr<AIWorld> world;
+	std::shared_ptr<Ship> launcherShip;
 
 	// The target's defense daemon, if it runs one, and how long until its
 	// injector can hack again.

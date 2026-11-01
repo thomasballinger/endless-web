@@ -412,10 +412,11 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 		speedIndex = min(SPEED_COUNT - 1, speedIndex + 1);
 	else if(key == SDLK_MINUS || key == SDLK_KP_MINUS)
 		speedIndex = max(0, speedIndex - 1);
-	else if(key >= SDLK_1 && key <= SDLK_9)
+	else if(key >= SDLK_0 && key <= SDLK_9)
 	{
+		// 1 to 9 choose the first nine drills, and 0 the tenth.
 		Restart();
-		simulation->SetDrill(static_cast<int>(key - SDLK_1));
+		simulation->SetDrill(key == SDLK_0 ? 9 : static_cast<int>(key - SDLK_1));
 	}
 	else
 		return false;

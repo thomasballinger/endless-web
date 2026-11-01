@@ -67,8 +67,10 @@ Build as usual, then start a new pilot (or load one). Things to look for:
     keeping it. Hover over a vector's value to see it drawn from the
     missile.
   - **Arrow keys** fly your own ship, or with **P**, the target, to dodge
-    (your flying is recorded, so replays repeat it); **D** changes the drill (the first three are flown by a
-    pilot: evading, cruising, breaking away), **T** the target ship (one has
+    (your flying is recorded, so replays repeat it); **D** changes the drill
+    (the first two are flown by the game's own AI: a pirate that comes at
+    you, and a ship that runs; the next three by a simple pilot: evading,
+    cruising, breaking away; **1** to **9** and **0** pick one), **T** the target ship (one has
     radar jammers that confuse seekers), **Space** pauses, **,** and **.**
     step back and forward, and dragging on the timeline goes to any step.
   - The weapon's hardware limits its program: only "leading" seekers can
@@ -166,7 +168,8 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   ten seconds, fall back for five). See `data/roles.txt`.
 - **Trying roles against a raider.** Click an escort's role in the workshop
   to open it in the escort workshop: the escort plays the role while a
-  raider attacks (circling in on you, or on the escort if it's fighting it).
+  raider attacks, flown by the game's own AI (it goes after you or the
+  escort, as it would in the game).
   Ships hurt what they're close to and facing, so health bars fall, raiders
   get destroyed (another comes from elsewhere), and "retreat when hurt"
   gambits get tried. Every edit replays the fight; **Ctrl+S** gives the role
@@ -190,9 +193,9 @@ scanner.
   (`tests/ai/daemon-test.sh` adds pirate Ravens to Al Dhanab to test the
   Defense Daemon, and could be used for that.)
 - You can choose a defense daemon, buy one, or copy one, but not yet write
-  one: daemons have no editor or simulator of their own. The escort
-  workshop's raider is a stand-in: it fights with simple rules, not the
-  game's AI, and the damage is made up.
+  one: daemons have no editor or simulator of their own. In the simulators,
+  ships flown by the game's AI move as in the game but don't fire; the
+  escort workshop's damage is made up (ships hurt what they face, nearby).
 - A role's "threat" is simply the nearest hostile ship to the leader; there
   is no list of all of them, or of incoming missiles, to choose from yet.
 - A copied maneuver (say, a pirate's "fight") shows up as a choice for how
