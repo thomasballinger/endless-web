@@ -318,6 +318,7 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	else if(control && key == SDLK_r)
 	{
 		simulation->ClearLauncherControls();
+		simulation->ClearTargetControls();
 		Restart();
 	}
 	else if(editor.HasFocus())
@@ -353,9 +354,20 @@ bool SimulatorPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &command
 	}
 	else if(key == SDLK_r)
 	{
-		// Start over, with the launcher back where it started.
+		// Start over, with the launcher back where it started, and the target
+		// flying its drill.
 		simulation->ClearLauncherControls();
+		simulation->ClearTargetControls();
 		Restart();
+	}
+	else if(key == SDLK_p)
+	{
+		// The arrow keys fly the other ship.
+		flyTarget = !flyTarget;
+		wasFlying = false;
+		status = flyTarget ? "The arrow keys fly the target: try to dodge. (p: the launcher again)"
+			: "The arrow keys fly the launcher. (p: the target)";
+		statusTime = 300;
 	}
 	else if(key == SDLK_UP || key == SDLK_LEFT || key == SDLK_RIGHT || key == SDLK_DOWN)
 	{
@@ -559,7 +571,12 @@ void SimulatorPanel::FlyLauncher()
 	}
 	const bool flying = control.turn || control.thrust;
 	if(flying || wasFlying)
-		simulation->SetLauncherControl(control);
+	{
+		if(flyTarget)
+			simulation->SetTargetControl(control);
+		else
+			simulation->SetLauncherControl(control);
+	}
 	wasFlying = flying;
 }
 
@@ -1189,7 +1206,8 @@ void SimulatorPanel::DrawInspector() const
 		font.Draw(text, Point(left + 12., y), color);
 		y += 18.;
 	};
-	line("Drill " + to_string(simulation->Drill() + 1) + ": " + simulation->Drills()[simulation->Drill()].name, TEXT);
+	line("Drill " + to_string(simulation->Drill() + 1) + ": " + simulation->Drills()[simulation->Drill()].name
+		+ (simulation->HasTargetControls() ? " (you fly it)" : ""), TEXT);
 	line("hits " + to_string(simulation->Hits()) + " of " + to_string(simulation->Launches()) + " fired", DIM);
 	y += 10.;
 	const GuidanceSimulation::Missile *missile = simulation->Followed();
@@ -1515,7 +1533,7 @@ void SimulatorPanel::DrawStatus() const
 	const string save = player ? "ctrl+s install   ctrl+d factory" : "ctrl+s save";
 	const string help = editor.HasFocus()
 		? "editing: esc stop editing   " + save + "   ctrl+space pause   ctrl+r restart   ctrl+z undo"
-		: "e edit   arrows fly   space pause   , . step   - + speed   d drill   t target   h target's daemon   "
-			"r restart   [ ] missile   " + save + "   esc exit";
+		: "e edit   arrows fly the " + string(flyTarget ? "target" : "launcher") + " (p switches)   space pause   , . step"
+			"   - + speed   d drill   t target   h target's daemon   r restart   [ ] missile   " + save + "   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }

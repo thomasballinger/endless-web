@@ -125,6 +125,11 @@ public:
 	void SetLauncherControl(const GuidanceDrill::Control &control);
 	void ClearLauncherControls();
 	bool HasLauncherControls() const;
+	// The same for the target: from the step it is first flown, it flies as
+	// recorded instead of flying its drill. Changing the drill forgets it.
+	void SetTargetControl(const GuidanceDrill::Control &control);
+	void ClearTargetControls();
+	bool HasTargetControls() const;
 	int CurrentStep() const;
 
 	const Ship &Launcher() const;
@@ -171,6 +176,9 @@ private:
 	std::shared_ptr<Ship> target;
 	// How the launcher was flown, by step.
 	std::vector<GuidanceDrill::Control> launcherControls;
+	// How the target was flown, from the step it was first flown on.
+	std::vector<GuidanceDrill::Control> targetControls;
+	int targetControlStart = -1;
 	// How the target and launcher are moving, when they are flown.
 	GuidanceDrill::Motion targetMotion;
 	GuidanceDrill::Motion launcherMotion;

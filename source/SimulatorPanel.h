@@ -160,6 +160,8 @@ private:
 	int playFrames = 0;
 	// Whether the timeline is being dragged.
 	bool isScrubbing = false;
+	// Whether the arrow keys fly the target (rather than the launcher).
+	bool flyTarget = false;
 	// Whether the arrow keys were flying the launcher on the last step.
 	bool wasFlying = false;
 	// Where each name in the list of what a program can use was drawn, the

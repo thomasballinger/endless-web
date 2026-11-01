@@ -151,6 +151,7 @@ void GuidanceSimulation::SetDrill(int index)
 	if(index < 0 || index >= static_cast<int>(drills.size()))
 		return;
 	drill = index;
+	ClearTargetControls();
 	Reset();
 }
 
@@ -189,7 +190,14 @@ void GuidanceSimulation::Step()
 	++step;
 	// As in the game, ships move before projectiles do.
 	const GuidanceDrill &current = drills[drill];
-	if(current.pilot)
+	if(targetControlStart >= 0 && step > targetControlStart)
+	{
+		// The player flew the target from here on.
+		const size_t index = min(static_cast<size_t>(step - 1 - targetControlStart), targetControls.size() - 1);
+		GuidanceDrill::Fly(targetMotion, targetControls[index], target->TurnRate(), target->Acceleration(),
+			target->MaxVelocity());
+	}
+	else if(current.pilot)
 	{
 		GuidanceDrill::Situation situation;
 		situation.step = step;
@@ -328,6 +336,37 @@ void GuidanceSimulation::SetLauncherControl(const GuidanceDrill::Control &contro
 	// What happens from the next step on is no longer what was recorded.
 	launcherControls.resize(step, launcherControls.empty() ? GuidanceDrill::Control() : launcherControls.back());
 	launcherControls.push_back(control);
+}
+
+
+
+void GuidanceSimulation::SetTargetControl(const GuidanceDrill::Control &control)
+{
+	// (Flying it from before the first step it was flown starts over.)
+	if(targetControlStart < 0 || step < targetControlStart)
+	{
+		targetControlStart = step;
+		targetControls.clear();
+	}
+	// What happens from the next step on is no longer what was recorded.
+	const size_t recorded = max(0, step - targetControlStart);
+	targetControls.resize(recorded, targetControls.empty() ? GuidanceDrill::Control() : targetControls.back());
+	targetControls.push_back(control);
+}
+
+
+
+void GuidanceSimulation::ClearTargetControls()
+{
+	targetControls.clear();
+	targetControlStart = -1;
+}
+
+
+
+bool GuidanceSimulation::HasTargetControls() const
+{
+	return targetControlStart >= 0;
 }
 
 
