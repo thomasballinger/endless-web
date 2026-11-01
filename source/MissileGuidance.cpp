@@ -168,7 +168,12 @@ namespace {
 				error = "wrong type of argument: it takes a direction (a vector)";
 				return false;
 			}
+			// Any vector will do: only its direction matters. (A unit vector is
+			// used as it is, so that the factory scripts' turns don't change.)
 			result = arguments[0].Vector();
+			const double length = result.Length();
+			if(length && fabs(length - 1.) > 1e-9)
+				result /= length;
 			return true;
 		};
 		interface.AddFunction("bearing", 1, [direction](const script::Value *arguments, script::Value &result,
@@ -232,8 +237,8 @@ const map<string, MissileGuidance::Doc> &MissileGuidance::Documentation()
 			" max_turn either way is used.", ""}},
 		{"thrust", {"Output: how much to speed up this step. Starts at acceleration; from 0 up to acceleration"
 			" is used. Setting it needs \"throttle control\".", ""}},
-		{"bearing", {"bearing(direction): the degrees to turn to face a direction (positive is clockwise, from"
-			" -90 to 90).", "to_deg * asin(cross(facing, direction))"}},
+		{"bearing", {"bearing(direction): the degrees to turn to face a direction, given as any vector pointing"
+			" that way (positive is clockwise, from -90 to 90).", "to_deg * asin(cross(facing, unit(direction)))"}},
 		{"turn_toward", {"turn_toward(direction): the degrees to turn this step toward a direction, no more than"
 			" max_turn.", "abs(bearing(d)) > max_turn ? copysign(max_turn, bearing(d)) : bearing(d)"}},
 		{"drop_target", {"Forget the target (the seeker may pick it up again).", ""}},

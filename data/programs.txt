@@ -21,21 +21,21 @@
 program "Corkscrew"
 	guidance
 	author "Pirate"
-	"flown by" "Pirate" "Marauder" "Bounty Hunter"
+	"flown by" "Pirate" "Marauder"
 	price 18000
 	description "Pirate missile firmware, of uncertain origin. The missile weaves from side to side on its way in, which makes it harder for point defense to hit, and straightens out for the last stretch."
 
 program "Proportional Navigation"
 	guidance
 	author "Republic"
-	"flown by" "Republic" "Militia"
+	"flown by" "Republic"
 	price 60000
 	description "Navy standard issue for missiles with leading seekers. Instead of chasing the target, the missile steers to stop its line of sight to the target from turning, which puts it on a collision course without predicting where the target will be."
 
 program "Flanker"
 	guidance
 	author "Korath"
-	"flown by" "Korath" "Kor Efret" "Kor Mereti" "Kor Sestor"
+	"flown by" "Korath" "Kor Efret"
 	price 45000
 	description "Korath code: each missile picks a side at random and comes in at an angle, which shrinks as it closes, so that a ship that turns to face its attackers shows them its flank."
 
@@ -56,9 +56,43 @@ program "Thrifty Seeker"
 program "Lead Without Leading"
 	guidance
 	author "Syndicate"
-	"flown by" "Syndicate"
 	price 75000
 	description "A Syndicate patent: missiles without leading hardware can't measure their target's velocity, but this program remembers where the target was last step, works out how it is moving, and leads it anyway."
+
+program "Lock Keeper"
+	guidance
+	author "Syndicate"
+	"flown by" "Syndicate"
+	price 140000
+	description "The Syndicate's best seeker firmware. It keeps its own estimate of where the target is and how it is moving, smoothing out the seeker's noise, and flies to where the two will meet (solving for when, over and over, until the answer settles). When jamming blinds the seeker, it keeps flying at the estimate, so it often still hits."
+
+program "Dead Reckoning"
+	guidance
+	author "Kor Mereti"
+	"flown by" "Kor Mereti" "Kor Sestor"
+	price 15000
+	description "A linear program from the Kor Mereti automata: a fixed plan, carried out step by step. Aim where the target is, fly there blind, look once more, fly on, and only home in for the last stretch. A target that changes course halfway is not noticed until the end."
+
+program "Pursuit Bursts"
+	guidance
+	author "Free Worlds"
+	"flown by" "Free Worlds"
+	price 9000
+	description "Old code the Free Worlds dug out of a museum flight computer: a long burn, then over and over, turn to face the target, burn briefly, coast. Each turn is aimed where the target was when it began. Needs throttle control."
+
+program "Dogleg"
+	guidance
+	author "Bounty Hunter"
+	"flown by" "Bounty Hunter"
+	price 22000
+	description "A linear plan that swings out to one side before coming in, so the missile arrives from an unexpected angle, then homes for the end. It wastes time and fuel, and against a fast target, it shows."
+
+program "Hunter-Seeker"
+	guidance
+	author "Militia"
+	"flown by" "Militia"
+	price 30000
+	description "A plan in three parts: sweep from side to side until the seeker finds a target; close in, re-aiming every few seconds; then home in, every step, for the strike. Cheap on the seeker, slow to react while closing."
 
 program "Wingman (Right)"
 	maneuver "keep station"
@@ -189,6 +223,80 @@ guidance "Lead Without Leading"
 	else
 		have_last = false
 		turn = 0
+
+# Keep an estimate of where the target is and how it is moving, and fly to
+# where the missile will meet it. When the seeker loses the target, keep
+# flying at the estimate.
+guidance "Lock Keeper"
+	memory last_position = vec(0, 0)
+	memory last_velocity = vec(0, 0)
+	memory sightings = 0
+
+	# How many steps until something this fast can meet a point at offset
+	# that moves at moving: guess, and correct the guess until it settles.
+	function intercept_time(offset, moving, speed)
+		let t = length(offset) / speed
+		let tries = 0
+		while tries < 6
+			t = length(offset + moving * t) / speed
+			tries = tries + 1
+		return t
+
+	if target
+		# Smooth the velocity, since the seeker's view of the target is noisy.
+		if sightings > 0
+			last_velocity = last_velocity * .8 + (target.position - last_position) * .2
+		last_position = target.position
+		sightings = sightings + 1
+	else
+		# Blind: assume the target carried on as it was going.
+		last_position = last_position + last_velocity
+	if sightings == 0
+		turn = 0
+		stop
+	let t = intercept_time(last_position - position, last_velocity, top_speed)
+	turn = turn_toward(last_position + last_velocity * t - position)
+
+# A fixed plan. Each turn_to() aims where the target is when the turn
+# starts, and the missile doesn't look again until the next one.
+guidance "Dead Reckoning"
+	if target
+		turn_to(target.direction)
+	fly(45)
+	if target
+		turn_to(target.direction)
+	fly(25)
+	track(60)
+
+# The missile from missilecmd: a long burn, then over and over, turn toward
+# the target and burst.
+guidance "Pursuit Bursts"
+	burn(36)
+	loop
+		if target
+			turn_to(target.direction)
+		burn(8)
+		coast(4)
+
+# Swing out to the right, then come in from there.
+guidance "Dogleg"
+	turn_by(60)
+	fly(25)
+	if target
+		turn_to(target.direction)
+	fly(30)
+	track(90)
+
+# Search, close in, strike.
+guidance "Hunter-Seeker"
+	let sweep = 30
+	while !target
+		turn_by(sweep)
+		sweep = -sweep
+	while target && target.distance > 500
+		turn_to(target.direction)
+		fly(15)
+	track(1000)
 
 # Hold position 250 behind the leader and 200 to its right.
 maneuver "Wingman (Right)"

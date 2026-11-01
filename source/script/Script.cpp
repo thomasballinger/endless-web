@@ -1901,8 +1901,21 @@ bool Program::Implementation::CompileExpression(const SExpression &source, const
 	expression.builtin = it->second.builtin;
 	expression.arguments.resize(count);
 	bool ok = true;
+	// "and" only evaluates each argument if the ones before it were true, and
+	// "c ? a : b" only evaluates a if c is, so what those say holds there
+	// (as in "target && target.distance < 500").
+	const bool isAnd = (expression.builtin == Builtin::AND);
+	const bool isChoice = (expression.builtin == Builtin::IF);
+	known.emplace_back();
 	for(int i = 0; i < count; ++i)
+	{
 		ok &= CompileExpression(source.items[i + 1], node, expression.arguments[i]);
+		if(isAnd || (isChoice && i == 0))
+			Guarantees(expression.arguments[i], known.back());
+		else if(isChoice && i == 1)
+			known.back().clear();
+	}
+	known.pop_back();
 	return ok;
 }
 

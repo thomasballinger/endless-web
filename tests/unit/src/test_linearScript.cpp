@@ -193,6 +193,29 @@ SCENARIO( "Tracing a linear script", "[Script][Linear]" ) {
 		}
 	}
 }
+SCENARIO( "Reading guarded inputs after \"&&\" and \"?\"", "[Script][Linear]" ) {
+	// "dist" only means something while "seen" is true.
+	script::Interface interface;
+	const int seen = interface.AddInput("seen");
+	const int dist = interface.AddInput("dist");
+	interface.AddOutput("out");
+	interface.SetGuard(dist, seen);
+	auto valid = [&interface](const std::string &text) {
+		script::Program program;
+		program.Load(AsDataNode(text), interface, false);
+		return program.IsValid();
+	};
+	THEN( "it can be read after the guard in an \"and\", or a choice on it" ) {
+		CHECK( valid("program test\n\tout = seen && dist > 5 ? 1 : 0\n") );
+		CHECK( valid("program test\n\tout = seen ? dist : 0\n") );
+		CHECK( valid("program test\n\twhile seen && dist > 5\n\t\tout = dist\n\t\twait\n") );
+	}
+	THEN( "but not before it, after \"or\", or in the other branch of a choice" ) {
+		CHECK_FALSE( valid("program test\n\tout = dist > 5 && seen ? 1 : 0\n") );
+		CHECK_FALSE( valid("program test\n\tout = seen || dist > 5 ? 1 : 0\n") );
+		CHECK_FALSE( valid("program test\n\tout = seen ? 0 : dist\n") );
+	}
+}
 // #endregion unit tests
 
 
