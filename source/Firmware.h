@@ -60,6 +60,16 @@ public:
 	// hardware).
 	static const Firmware *GuidanceFor(const Government *government, const Weapon &weapon);
 
+	// For the text of a program: its kind ("guidance" or "maneuver", from its
+	// first node) and its name, or empty strings if it isn't one.
+	static std::string KindOf(const std::string &text);
+	static std::string NameOf(const std::string &text);
+	// The text with its first node renamed.
+	static std::string Renamed(const std::string &text, const std::string &name);
+	// Whether the game itself has a script of this kind and name (a factory
+	// program, or one of these), as opposed to one only the player has.
+	static bool IsGameScript(const std::string &kind, const std::string &name);
+
 
 private:
 	std::string name;

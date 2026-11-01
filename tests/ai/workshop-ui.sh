@@ -21,8 +21,10 @@
 #   2. Choosing the first weapon (1) opens it in the simulator.
 #   3. Adding a line to its program and installing it (ctrl+s) makes the
 #      workshop list it as the player's program.
-#   4. Taking off saves the program with the game.
-#   5. In flight, the flagship's missiles fly it: its code, in the pane of
+#   4. At the program exchange, buying programs; then choosing each of the
+#      weapon's programs in turn, back to the player's own.
+#   5. Taking off saves the program with the game, and the library.
+#   6. In flight, the flagship's missiles fly it: its code, in the pane of
 #      the flagship's scripts, shows the added line running.
 #
 # Usage: workshop-ui.sh BINARY
@@ -139,6 +141,20 @@ key ctrl+s
 key Escape
 key Escape
 
+# The program exchange: Burthen is Syndicate space, which sells Lead Without
+# Leading (4) and Close Guard (1). Then back in the fleet, choose each of the
+# Meteor launcher's programs in turn, ending back at the player's own.
+key x
+key 4
+key 1
+shot exchange
+key f
+for i in 1 2 3; do
+	key shift+1
+done
+shot cycled
+check "after choosing each program in turn, the weapon flies the player's again" programmed "$OUT/cycled.png"
+
 # Take off, which saves the game.
 key Escape
 key d
@@ -154,6 +170,19 @@ if [ -n "$SAVE" ] && grep -q "maneuver program" "$SAVE" && grep -q "let position
 	echo "ok: and the escorts' program"
 else
 	echo "FAILED: and the escorts' program"
+	FAILED=1
+fi
+
+if [ -n "$SAVE" ] && grep -q 'firmware "Lead Without Leading"' "$SAVE" && grep -q 'firmware "Close Guard"' "$SAVE"; then
+	echo "ok: and the programs bought at the exchange"
+else
+	echo "FAILED: and the programs bought at the exchange"
+	FAILED=1
+fi
+if [ -n "$SAVE" ] && grep -q '"library program" "Meteor Missile Launcher program"' "$SAVE"; then
+	echo "ok: and the player's library"
+else
+	echo "FAILED: and the player's library"
 	FAILED=1
 fi
 

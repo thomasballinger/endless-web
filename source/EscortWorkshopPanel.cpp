@@ -21,6 +21,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataNode.h"
 #include "shader/DrawList.h"
 #include "shader/FillShader.h"
+#include "Firmware.h"
 #include "text/Font.h"
 #include "text/FontSet.h"
 #include "GameData.h"
@@ -381,11 +382,30 @@ void EscortWorkshopPanel::Install()
 		statusTime = 300;
 		return;
 	}
+	// As in the missile workshop: a program the game has is installed as it
+	// is, and an edited one is the player's, and kept in their library.
 	const bool isFactory = (document.Text() == FactoryText());
-	if(player->SetManeuverProgram("keep station", isFactory ? string() : document.Text()))
-		status = isFactory ? "Your escorts fly the factory's program." : "Installed: your escorts keep station with this.";
-	else
+	string text = document.Text();
+	string name = Firmware::NameOf(text);
+	const bool isGameScript = Firmware::IsGameScript("maneuver", name);
+	const bool unchanged = isGameScript && text == GameData::ScriptText("maneuver", name);
+	if(!isFactory && !unchanged && (isGameScript || name.empty()))
+	{
+		name = "Escort program";
+		text = Firmware::Renamed(text, name);
+		document.SetText(text);
+	}
+	if(!player->SetManeuverProgram("keep station", isFactory ? string() : text))
 		status = "That program doesn't compile.";
+	else if(isFactory)
+		status = "Your escorts fly the factory's program.";
+	else if(unchanged)
+		status = "Installed: your escorts fly " + name + ".";
+	else
+	{
+		player->SetLibraryProgram(name, text);
+		status = "Installed, and saved in your library as \"" + name + "\".";
+	}
 	statusTime = 300;
 }
 

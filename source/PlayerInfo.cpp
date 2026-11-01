@@ -29,6 +29,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DistanceMap.h"
 #include "Endpoint.h"
 #include "Files.h"
+#include "Firmware.h"
 #include "Fleet.h"
 #include "text/Format.h"
 #include "GameData.h"
@@ -397,6 +398,16 @@ void PlayerInfo::Load(const filesystem::path &path, const shared_ptr<PilotProfil
 				if(grand.Token(0) == "line")
 					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
 			SetManeuverProgram(child.Token(1), text);
+		}
+		else if(key == "firmware" && hasValue)
+			ownedFirmware.insert(child.Token(1));
+		else if(key == "library program" && hasValue)
+		{
+			string text;
+			for(const DataNode &grand : child)
+				if(grand.Token(0) == "line")
+					text += (text.empty() ? "" : "\n") + (grand.Size() >= 2 ? grand.Token(1) : string());
+			SetLibraryProgram(child.Token(1), text);
 		}
 		else if(key == "guidance program" && hasValue)
 		{
@@ -5114,6 +5125,50 @@ bool PlayerInfo::SetGuidanceProgram(const Outfit *outfit, const string &text)
 
 
 
+const set<string> &PlayerInfo::OwnedFirmware() const
+{
+	return ownedFirmware;
+}
+
+
+
+bool PlayerInfo::OwnsFirmware(const string &name) const
+{
+	return ownedFirmware.contains(name);
+}
+
+
+
+bool PlayerInfo::BuyFirmware(const Firmware &firmware)
+{
+	if(OwnsFirmware(firmware.Name()))
+		return true;
+	if(accounts.Credits() < firmware.Price())
+		return false;
+	accounts.AddCredits(-firmware.Price());
+	ownedFirmware.insert(firmware.Name());
+	return true;
+}
+
+
+
+const map<string, string> &PlayerInfo::ProgramLibrary() const
+{
+	return programLibrary;
+}
+
+
+
+void PlayerInfo::SetLibraryProgram(const string &name, const string &text)
+{
+	if(text.empty())
+		programLibrary.erase(name);
+	else
+		programLibrary[name] = text;
+}
+
+
+
 void PlayerInfo::Save(const string &filePath) const
 {
 	if(transactionSnapshot)
@@ -5198,6 +5253,19 @@ void PlayerInfo::Save(DataWriter &out) const
 	for(const auto &[name, text] : maneuverPrograms)
 	{
 		out.Write("maneuver program", name);
+		out.BeginChild();
+		{
+			istringstream in(text);
+			for(string line; getline(in, line); )
+				out.Write("line", line);
+		}
+		out.EndChild();
+	}
+	for(const string &name : ownedFirmware)
+		out.Write("firmware", name);
+	for(const auto &[name, text] : programLibrary)
+	{
+		out.Write("library program", name);
 		out.BeginChild();
 		{
 			istringstream in(text);

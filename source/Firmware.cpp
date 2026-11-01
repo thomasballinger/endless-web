@@ -15,14 +15,17 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 #include "Firmware.h"
 
+#include "DataFile.h"
 #include "DataNode.h"
 #include "GameData.h"
 #include "Government.h"
 #include "MissileGuidance.h"
+#include "ShipManeuver.h"
 #include "Weapon.h"
 
 #include <algorithm>
 #include <map>
+#include <sstream>
 #include <utility>
 
 using namespace std;
@@ -151,4 +154,51 @@ const Firmware *Firmware::GuidanceFor(const Government *government, const Weapon
 	}
 	cache[{government, &weapon}] = found;
 	return found;
+}
+
+
+
+string Firmware::KindOf(const string &text)
+{
+	istringstream in(text);
+	DataFile file(in);
+	for(const DataNode &node : file)
+	{
+		const string &key = node.Token(0);
+		return (key == "guidance" || key == "maneuver") && node.Size() >= 2 ? key : string();
+	}
+	return "";
+}
+
+
+
+string Firmware::NameOf(const string &text)
+{
+	istringstream in(text);
+	DataFile file(in);
+	for(const DataNode &node : file)
+		return node.Size() >= 2 ? node.Token(1) : string();
+	return "";
+}
+
+
+
+string Firmware::Renamed(const string &text, const string &name)
+{
+	const string kind = KindOf(text);
+	if(kind.empty())
+		return text;
+	const size_t end = text.find('\n');
+	return kind + " \"" + name + "\"" + (end == string::npos ? string() : text.substr(end));
+}
+
+
+
+bool Firmware::IsGameScript(const string &kind, const string &name)
+{
+	if(kind == "guidance")
+		return GameData::Guidance().Has(name);
+	if(kind == "maneuver")
+		return GameData::Maneuvers().Has(name);
+	return false;
 }

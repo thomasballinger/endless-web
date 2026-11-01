@@ -23,6 +23,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "shader/DrawList.h"
 #include "Files.h"
 #include "shader/FillShader.h"
+#include "Firmware.h"
 #include "text/Font.h"
 #include "text/FontSet.h"
 #include "GameData.h"
@@ -711,28 +712,34 @@ void SimulatorPanel::Save()
 		statusTime = 300;
 		return;
 	}
-	// In the workshop, saving installs the program on the player's ships,
-	// named for the weapon, so that it can't be mistaken for any other.
+	// In the workshop, saving installs the program on the player's ships, and
+	// keeps it in their library. A program the game has (the factory's, or
+	// one the player bought) is installed as it is; once edited, it is the
+	// player's, named for the weapon unless the player named it themselves.
 	if(player)
 	{
 		const bool isFactory = (document.Text() == FactoryText());
-		const string programName = outfit.DisplayName() + " program";
 		string text = document.Text();
-		if(!isFactory && text.compare(0, 9, "guidance ") == 0)
+		string name = Firmware::NameOf(text);
+		const bool isGameScript = Firmware::IsGameScript("guidance", name);
+		const bool unchanged = isGameScript && text == GameData::ScriptText("guidance", name);
+		if(!isFactory && !unchanged && (isGameScript || name.empty()))
 		{
-			const size_t end = text.find('\n');
-			const string firstLine = "guidance \"" + programName + "\"";
-			if(text.substr(0, end) != firstLine)
-			{
-				text = firstLine + (end == string::npos ? string() : text.substr(end));
-				document.SetText(text);
-			}
+			name = outfit.DisplayName() + " program";
+			text = Firmware::Renamed(text, name);
+			document.SetText(text);
 		}
-		if(player->SetGuidanceProgram(&outfit, isFactory ? string() : text))
-			status = isFactory ? "Your " + outfit.DisplayName() + "s fly the factory's guidance."
-				: "Installed: your " + outfit.DisplayName() + "s will fly this program.";
-		else
+		if(!player->SetGuidanceProgram(&outfit, isFactory ? string() : text))
 			status = "This weapon's hardware can't run that program.";
+		else if(isFactory)
+			status = "Your " + outfit.DisplayName() + "s fly the factory's guidance.";
+		else if(unchanged)
+			status = "Installed " + name + " on your " + outfit.DisplayName() + "s.";
+		else
+		{
+			player->SetLibraryProgram(name, text);
+			status = "Installed on your " + outfit.DisplayName() + "s, and saved in your library as \"" + name + "\".";
+		}
 		statusTime = 300;
 		return;
 	}

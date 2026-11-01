@@ -41,6 +41,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <vector>
 
 class DistanceMap;
+class Firmware;
 class Outfit;
 class PilotProfile;
 class Planet;
@@ -245,6 +246,15 @@ public:
 	// it (with empty text). Returns false, and installs nothing, if it doesn't
 	// compile or needs more than the weapon has.
 	bool SetGuidanceProgram(const Outfit *outfit, const std::string &text);
+	// Programs the player has bought (see Firmware), by name. Buying one
+	// costs its price, and fails if the player can't afford it.
+	const std::set<std::string> &OwnedFirmware() const;
+	bool OwnsFirmware(const std::string &name) const;
+	bool BuyFirmware(const Firmware &firmware);
+	// The player's library: programs they wrote or copied, by name, as the
+	// text of a "guidance" or "maneuver" node. An empty text removes one.
+	const std::map<std::string, std::string> &ProgramLibrary() const;
+	void SetLibraryProgram(const std::string &name, const std::string &text);
 
 	// Get the player's logbook.
 	const std::map<Date, BookEntry> &Logbook() const;
@@ -619,6 +629,8 @@ private:
 	std::map<std::string, std::set<std::string>> collapsed;
 	std::map<const Outfit *, std::string> guidancePrograms;
 	std::map<std::string, std::string> maneuverPrograms;
+	std::set<std::string> ownedFirmware;
+	std::map<std::string, std::string> programLibrary;
 
 	bool freshlyLoaded = true;
 	int desiredCrew = 0;
