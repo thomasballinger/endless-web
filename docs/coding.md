@@ -7,7 +7,12 @@ ideas to try next. (`tests/ai/README.md` has the technical details.)
 
 ## Trying it
 
-Build as usual, then start a new pilot (or load one). Things to look for:
+Build as usual, then start a new pilot (or load one). Or skip straight to a
+simulator: `--simulator <homing weapon>` (or `escort`, `role`, `fighters`)
+with `--simulator-target <ship model>`; in the browser, the same as a link:
+`?simulator=fighters&target=Lance`, or
+`?simulator=Sidewinder%20Missile%20Launcher&target=Carrier`. Things to look
+for:
 
 - **The HUD's code maps.** Under your target's name, and beside your ship's
   status (on the right), a small map of the code each is running: one dash
@@ -186,11 +191,21 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   `leader` is its carrier. In the workshop, once you own fighters, there's
   a role for all fighters (a fighter without one of its own plays it, and
   without that, the one for all escorts) and one for each fighter. Clicking
-  a fighter's role opens the escort workshop with the fighter in its
-  carrier's bay (or a Dagger in a Carrier's, if you have none): the carrier
-  deploys it, it plays the role against a pirate fighter, and when it's
-  recalled or badly hurt it goes back to its bay, as in the game (that
-  comes before any role). **T** tries other fighters.
+  a fighter's role opens the escort workshop with the carrier's bays full of
+  that fighter (or of Daggers in a Carrier, if you have none), all playing
+  the role, each with its own memory and place (`escort_index`). The
+  carrier deploys them against a raid that outguns them (two pirate
+  Leviathans: as in the game, fighters that aren't outgunned save their
+  missiles), so some don't come back; one that's recalled or badly hurt
+  goes back to its bay first, as in the game (that comes before any role,
+  so a "retreat when hurt" gambit only matters if it's quicker than that).
+  **[** and **]** follow another fighter; **T** tries other fighters.
+- **Edits rewind to where they matter.** In the escort workshop, an edit
+  replays the fight and stops at the first step where any escort decides
+  something different (shown, and held for a moment), then plays on from
+  there, with the old courses faint behind: e.g. make Bodyguard retreat at
+  `shields < .9`: the fight picks up 12 seconds in, where the first
+  fighter now turns away, and the fighter lost at 19 seconds isn't.
 - **Editing roles in flight.** Select an escort (click it in the escort list,
   bottom left) and open the scripts pane (**K**): its role runs there with
   its values. **EDIT** pauses the game; change the code, and once you stop

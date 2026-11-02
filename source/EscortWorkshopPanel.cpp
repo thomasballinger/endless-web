@@ -50,6 +50,9 @@ namespace {
 	const double FOOTER_HEIGHT = 30.;
 	// Start the drill over this often.
 	const int LOOP_STEPS = 3600;
+	// How many frames to hold at the step where an edit first made a
+	// difference, before playing on.
+	const int REWIND_HOLD = 75;
 	// How long typing must pause before the program is compiled and run.
 	const int QUIET_FRAMES = 20;
 	// The distance within which "keep station" stops trying to adjust its
@@ -122,7 +125,9 @@ void EscortWorkshopPanel::Step()
 		Recompile();
 	if(statusTime)
 		--statusTime;
-	if(!paused && !isScrubbing)
+	if(rewindFrames > 0)
+		--rewindFrames;
+	else if(!paused && !isScrubbing)
 	{
 		// The arrow keys fly the leader (unless the editor has the keyboard).
 		GuidanceDrill::Control control;
@@ -141,12 +146,18 @@ void EscortWorkshopPanel::Step()
 		if(simulation->CurrentStep() >= LOOP_STEPS || (lost >= 0 && simulation->CurrentStep() >= lost + 180))
 			simulation->Reset();
 		const int destroyed = simulation->RaidersDestroyed();
+		const int lostBefore = simulation->EscortsLost();
 		simulation->Step();
 		// For tests: note each raider the escort destroys.
 		static const bool log = getenv("ES_SIMULATOR_LOG");
 		if(log && simulation->RaidersDestroyed() > destroyed)
 		{
 			printf("ESCORT WORKSHOP raider destroyed at step %d\n", simulation->CurrentStep());
+			fflush(stdout);
+		}
+		if(log && simulation->EscortsLost() > lostBefore)
+		{
+			printf("ESCORT WORKSHOP escort lost at step %d\n", simulation->CurrentStep());
 			fflush(stdout);
 		}
 		// And each time the role changes its mind.
@@ -176,12 +187,17 @@ void EscortWorkshopPanel::Draw()
 	// Keep every ship in view (the raider too, once it is close).
 	Point low(min(leader.X(), escort.X()), min(leader.Y(), escort.Y()));
 	Point high(max(leader.X(), escort.X()), max(leader.Y(), escort.Y()));
-	if(simulation->HasRaider() && simulation->Raider().Position().Distance(leader) < 2500.)
-	{
-		const Point raider = simulation->Raider().Position();
-		low = Point(min(low.X(), raider.X()), min(low.Y(), raider.Y()));
-		high = Point(max(high.X(), raider.X()), max(high.Y(), raider.Y()));
-	}
+	auto frame = [&](const Ship &ship) {
+		if(ship.ShouldBeRemoved() || ship.Position().Distance(leader) > 2500.)
+			return;
+		const Point at = ship.Position();
+		low = Point(min(low.X(), at.X()), min(low.Y(), at.Y()));
+		high = Point(max(high.X(), at.X()), max(high.Y(), at.Y()));
+	};
+	for(const EscortSimulation::Member &member : simulation->Members())
+		frame(*member.ship);
+	for(const EscortSimulation::RaiderShip &raider : simulation->Raiders())
+		frame(*raider.ship);
 	const Point span = high - low + Point(1200., 1200.);
 	const double fit = min(view.Width() / span.X(), view.Height() / span.Y());
 	center += ((low + high) / 2. - center) * .1;
@@ -191,8 +207,9 @@ void EscortWorkshopPanel::Draw()
 	DrawGrid();
 
 	// Where the escort went before the last edit, and where both have been.
-	for(size_t i = 1; i < ghost.size(); ++i)
-		LineShader::Draw(ToScreen(ghost[i - 1]), ToScreen(ghost[i]), 1.f, GHOST, false);
+	for(const deque<Point> &ghost : ghosts)
+		for(size_t i = 1; i < ghost.size(); ++i)
+			LineShader::Draw(ToScreen(ghost[i - 1]), ToScreen(ghost[i]), 1.f, GHOST, false);
 	auto trail = [this](const deque<Point> &points, const Color &color) {
 		for(size_t i = 1; i < points.size(); ++i)
 		{
@@ -202,9 +219,13 @@ void EscortWorkshopPanel::Draw()
 		}
 	};
 	trail(simulation->LeaderTrail(), LEADER);
-	trail(simulation->EscortTrail(), ESCORT);
-	if(simulation->HasRaider())
-		trail(simulation->RaiderTrail(), RAIDER);
+	// (The followed escort's trail is the brightest.)
+	const Color dimEscort(ESCORT.Get()[0] * .55f, ESCORT.Get()[1] * .55f, ESCORT.Get()[2] * .55f, 1.f);
+	for(size_t i = 0; i < simulation->Members().size(); ++i)
+		trail(simulation->Members()[i].trail, static_cast<int>(i) == simulation->Followed() ? ESCORT : dimEscort);
+	for(const EscortSimulation::RaiderShip &raider : simulation->Raiders())
+		if(!raider.ship->ShouldBeRemoved())
+			trail(raider.trail, RAIDER);
 
 	if(IsRole())
 	{
@@ -230,10 +251,11 @@ void EscortWorkshopPanel::Draw()
 	const double shipZoom = max(zoom, .3);
 	// (A fighter in its bay isn't drawn.)
 	vector<const Ship *> ships = {&simulation->Leader()};
-	if(simulation->EscortIsOut())
-		ships.push_back(&simulation->Escort());
-	if(simulation->HasRaider())
-		ships.push_back(&simulation->Raider());
+	for(const EscortSimulation::Member &member : simulation->Members())
+		if(member.ship->GetSystem())
+			ships.push_back(member.ship.get());
+	for(const EscortSimulation::RaiderShip &raider : simulation->Raiders())
+		ships.push_back(raider.ship.get());
 	for(const Ship *ship : ships)
 	{
 		// (A destroyed ship is not drawn, once it is gone.)
@@ -262,6 +284,18 @@ void EscortWorkshopPanel::Draw()
 		font.Draw(fighter ? "fighter" : "escort", ToScreen(escort) + Point(18., -20.), ESCORT);
 	if(simulation->HasRaider())
 		font.Draw("raider", ToScreen(simulation->Raider().Position()) + Point(18., -20.), RAIDER);
+	// Held where the last edit first made a difference.
+	if(rewindFrames > 0)
+	{
+		const Font &big = FontSet::Get(18);
+		char text[96];
+		snprintf(text, sizeof(text), "<< step %d (%.1f s): your edit changes things from here", matteredStep,
+			matteredStep / 60.);
+		const string line = text;
+		const Point at(view.Center().X() - big.Width(line) / 2., view.Top() + 30.);
+		FillShader::Fill(Point(view.Center().X(), at.Y() + 9.), Point(big.Width(line) + 30., 34.), PANEL);
+		big.Draw(line, at, ESCORT);
+	}
 
 	// The timeline.
 	const double left = view.Left() + 20.;
@@ -332,10 +366,12 @@ bool EscortWorkshopPanel::KeyDown(SDL_Keycode key, Uint16 mod, const Command &co
 	{
 		const int count = simulation->Drills().size();
 		simulation->SetDrill((simulation->DrillIndex() + ((mod & KMOD_SHIFT) ? count - 1 : 1)) % count);
-		ghost.clear();
+		ghosts.clear();
 	}
 	else if(key == SDLK_t)
 		NextEscort();
+	else if((key == '[' || key == ']') && simulation->Members().size() > 1)
+		simulation->Follow(simulation->Followed() + (key == ']' ? 1 : -1));
 	else if(key == SDLK_UP || key == SDLK_LEFT || key == SDLK_RIGHT || key == SDLK_DOWN)
 	{
 		// Flying the leader: see Step().
@@ -447,12 +483,37 @@ void EscortWorkshopPanel::Recompile()
 		hasErrors = !errors.empty();
 		if(hasErrors)
 			return;
-		if(role.IsValid())
-			ghost = simulation->EscortTrail();
+		// Keep the escorts' courses before the edit to compare with, and replay
+		// the run with the new role up to the first step on which any escort
+		// decides something else, then play on from there.
+		const bool hadRole = role.IsValid();
+		if(hadRole)
+		{
+			ghosts.clear();
+			for(const EscortSimulation::Member &member : simulation->Members())
+				ghosts.push_back(member.trail);
+		}
 		const int step = simulation->CurrentStep();
+		const vector<uint64_t> before = simulation->Decisions();
 		role = std::move(candidate);
 		simulation->SetRole(&role);
-		simulation->ReplayTo(step);
+		if(!hadRole)
+		{
+			simulation->ReplayTo(step);
+			return;
+		}
+		matteredStep = simulation->ReplayUntilDifferent(before, step);
+		if(matteredStep < 0)
+			status = "So far, the edit changes nothing the escorts decided.";
+		else
+		{
+			char text[120];
+			snprintf(text, sizeof(text), "The edit first changes a decision at step %d (%.1f s): watch from there.",
+				matteredStep, matteredStep / 60.);
+			status = text;
+			rewindFrames = REWIND_HOLD;
+		}
+		statusTime = 300;
 		return;
 	}
 	ShipManeuver candidate;
@@ -468,7 +529,7 @@ void EscortWorkshopPanel::Recompile()
 	// before the edit to compare with.
 	const bool isFirst = !program.IsValid();
 	if(!isFirst)
-		ghost = simulation->EscortTrail();
+		ghosts = {simulation->EscortTrail()};
 	program = std::move(candidate);
 	simulation->SetProgram(&program);
 	simulation->ReplayTo(simulation->CurrentStep());
@@ -595,7 +656,7 @@ void EscortWorkshopPanel::NextEscort()
 		simulation->SetProgram(program.IsValid() ? &program : nullptr);
 		simulation->SetRole(IsRole() && role.IsValid() ? &role : nullptr);
 		simulation->Reset();
-		ghost.clear();
+		ghosts.clear();
 		status = string(fighter ? "Your fighter is a " : "Your escort is a ") + model->DisplayModelName() + ".";
 		statusTime = 180;
 		return;
@@ -680,7 +741,10 @@ void EscortWorkshopPanel::DrawInspector() const
 			y += 20.;
 		};
 		bar("you", simulation->Leader(), LEADER);
-		bar(fighter ? "fighter" : "escort", simulation->Escort(), ESCORT);
+		const int squadron = simulation->Members().size();
+		const string followedName = string(fighter ? "fighter" : "escort")
+			+ (squadron > 1 ? " " + to_string(simulation->Followed() + 1) : string());
+		bar(followedName, simulation->Escort(), ESCORT);
 		if(simulation->HasRaider())
 			bar("raider", simulation->Raider(), RAIDER);
 		else
@@ -688,6 +752,13 @@ void EscortWorkshopPanel::DrawInspector() const
 		line("shields above, hull below", DIM);
 		snprintf(text, sizeof(text), "raiders beaten: %d", simulation->RaidersDestroyed());
 		line(text, DIM);
+		if(squadron > 1)
+		{
+			snprintf(text, sizeof(text), "%d %s: %d out, %d lost", squadron, fighter ? "fighters" : "escorts",
+				simulation->EscortsOut(), simulation->EscortsLost());
+			line(text, simulation->EscortsLost() ? BAD : DIM);
+			line("([ ] to follow another)", DIM);
+		}
 		y += 10.;
 		static const char *const WHAT[] = {"keeping station", "attacking the threat", "attacking your target",
 			"attacking its target", "retreating", "left to the usual AI"};
@@ -775,7 +846,8 @@ void EscortWorkshopPanel::DrawStatus() const
 	FillShader::Fill(Point(0., Screen::Bottom() - FOOTER_HEIGHT / 2.), Point(Screen::Width(), FOOTER_HEIGHT), PANEL);
 	const string help = editor.HasFocus()
 		? "editing: esc stop editing   ctrl+s install   ctrl+d factory   ctrl+space pause   ctrl+z undo"
-		: "e edit   arrows fly   space pause   , . step   d drill   t escort   r restart   ctrl+s install"
+		: string("e edit   arrows fly   space pause   , . step   d drill   t escort   ")
+			+ (simulation->Members().size() > 1 ? "[ ] follow   " : "") + "r restart   ctrl+s install"
 			"   ctrl+d factory   esc exit";
 	font.Draw(help, Point(Screen::Left() + 14., Screen::Bottom() - FOOTER_HEIGHT + 8.), DIM);
 }

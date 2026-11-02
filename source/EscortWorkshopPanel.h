@@ -96,8 +96,12 @@ private:
 	uint64_t seenVersion = 0;
 	int quietFrames = 0;
 	bool hasErrors = false;
-	// The escort's course before the last edit, shown faintly.
-	std::deque<Point> ghost;
+	// The escorts' courses before the last edit, shown faintly.
+	std::vector<std::deque<Point>> ghosts;
+	// After an edit, the simulation holds at the step where the edit first
+	// changed what an escort decided, for this many frames, before going on.
+	int rewindFrames = 0;
+	int matteredStep = -1;
 	std::string status;
 	int statusTime = 0;
 	bool paused = false;

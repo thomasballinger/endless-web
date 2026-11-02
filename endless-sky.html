@@ -588,7 +588,17 @@
         // important to hide to avoid stealing focus
         document.querySelector('.plugin-editor-upload').style.display = 'none';
 
-        Module.callMain([]);
+        // A link can open a simulator directly: ?simulator=<a homing weapon, or
+        // "escort", "role" or "fighters">&target=<a ship model>, e.g.
+        // ?simulator=fighters&target=Lance or
+        // ?simulator=Sidewinder%20Missile%20Launcher&target=Carrier
+        const params = new URLSearchParams(window.location.search);
+        const args = [];
+        if (params.get('simulator')) {
+          args.push('--simulator', params.get('simulator'));
+          if (params.get('target')) args.push('--simulator-target', params.get('target'));
+        }
+        Module.callMain(args);
       }
 
       main();
