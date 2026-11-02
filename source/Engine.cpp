@@ -1519,11 +1519,20 @@ void Engine::ApplyRoleEdit(const string &text, const string &uuid)
 		scriptDisplay.SetEditResult(errors, "NOT APPLIED: fix the marked lines (the escort keeps its old role)");
 		return;
 	}
-	// An escort without a role of its own was playing the one for all.
-	const string target = player.EscortRoles().contains(uuid) ? uuid : "*";
+	// An escort without a role of its own was playing the one for all its
+	// fighters (if it is one), or for all escorts.
+	bool isFighter = false;
+	for(const shared_ptr<Ship> &ship : player.Ships())
+		if(ship->UUID().ToString() == uuid)
+			isFighter = ship->CanBeCarried();
+	string target = EscortRole::KeyFor(uuid, isFighter, player.EscortRoles());
+	if(target.empty())
+		target = uuid;
 	player.SetEscortRole(target, text);
-	scriptDisplay.SetEditResult(errors, target == "*" ? "APPLIED to all your escorts without a role of their own"
-		: "APPLIED to this escort");
+	scriptDisplay.SetEditResult(errors, target == EscortRole::ALL_ESCORTS
+		? "APPLIED to all your escorts without a role of their own"
+		: target == EscortRole::ALL_FIGHTERS ? "APPLIED to all your fighters without a role of their own"
+		: isFighter ? "APPLIED to this fighter" : "APPLIED to this escort");
 }
 
 

@@ -56,9 +56,11 @@ private:
 		// "guidance", "maneuver", "daemon" or "role".
 		std::string kind = "guidance";
 		const Outfit *outfit = nullptr;
-		// For a role: the escort's UUID ("*" for all escorts), and its name.
+		// For a role: the escort's UUID (or EscortRole::ALL_ESCORTS or
+		// ALL_FIGHTERS), its name, and whether it is a fighter.
 		std::string uuid;
 		std::string name;
+		bool fighter = false;
 		int count = 0;
 		Rectangle box;
 		Rectangle previous;
@@ -93,8 +95,8 @@ private:
 	void Cycle(const Row &row, int direction);
 	void Open(const Outfit &outfit);
 	// Open the escort workshop, for how the player's escorts keep station, or
-	// for the role of an escort (or of all of them).
-	void OpenEscorts(const std::string &roleUuid = "");
+	// for the role of an escort or fighter (or of all of them).
+	void OpenEscorts(const std::string &roleUuid = "", bool fighter = false);
 	bool IsSoldHere(const Firmware &firmware) const;
 	void Buy(const Firmware &firmware);
 
@@ -108,7 +110,8 @@ private:
 	std::vector<Row> rows;
 	Row escortRow;
 	Row daemonRow;
-	// A role for all escorts, then each escort's own.
+	// A role for all escorts, then for all fighters (if there are any), then
+	// each escort's own, then each fighter's.
 	std::vector<Row> roleRows;
 	std::vector<Offer> offers;
 	bool showExchange = false;

@@ -105,6 +105,12 @@ public:
 	int RaidersDestroyed() const;
 	// The step on which you or the escort was destroyed, or -1.
 	int DestroyedStep() const;
+	// Whether the escort is a fighter carried by the leader (when the escort
+	// can be carried, and the leader has a bay for it); if so, whether it is
+	// out of its bay, and whether it is on its way back to it.
+	bool IsCarried() const;
+	bool EscortIsOut() const;
+	bool EscortIsReturning() const;
 	const std::vector<Projectile> &Shots() const;
 	// How the role ran on the latest step, and what it decided, and where the
 	// escort's station is (if it is keeping station).
@@ -167,6 +173,8 @@ private:
 	bool raiderHere = false;
 	bool raiderBeaten = false;
 	int destroyedStep = -1;
+	bool carried = false;
+	bool returning = false;
 	GuidanceDrill::Motion raiderMotion;
 	std::deque<Point> raiderTrail;
 	int raiderReturns = 0;

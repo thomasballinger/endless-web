@@ -185,8 +185,12 @@ void GuidanceSimulation::Reset()
 	// The launcher fires only the weapon being tried; a target only fights
 	// back if the game's AI flies it.
 	world->HoldFire(launcherShip);
+	// A target the AI flies launches its fighters, if it carries any.
 	if(!current.ai.empty())
+	{
 		world->AddShip(target, AIWorld::Pilot::AI, current.ai);
+		world->FillBays(target);
+	}
 	else
 	{
 		world->AddShip(target, current.pilot ? AIWorld::Pilot::COMMANDS : AIWorld::Pilot::FIXED);
@@ -447,6 +451,13 @@ const Ship &GuidanceSimulation::Target() const
 const vector<Projectile> &GuidanceSimulation::Shots() const
 {
 	return world->Projectiles();
+}
+
+
+
+const list<shared_ptr<Ship>> &GuidanceSimulation::Ships() const
+{
+	return world->Ships();
 }
 
 

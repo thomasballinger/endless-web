@@ -259,7 +259,7 @@ bool WorkshopPanel::Click(int x, int y, MouseButton button, int clicks)
 		else if(row->kind == "daemon" && row->box.Contains(point))
 			Cycle(*row, 1);
 		else if(row->kind == "role" && row->box.Contains(point))
-			OpenEscorts(row->uuid);
+			OpenEscorts(row->uuid, row->fighter);
 		else if(row->box.Contains(point))
 		{
 			if(row->outfit)
@@ -326,9 +326,12 @@ void WorkshopPanel::DrawFleet(const Rectangle &box, double y)
 	for(Row &row : roleRows)
 	{
 		row.box = Rectangle::WithCorners(Point(box.Left() + 16., y), Point(box.Right() - 16., y + ROW_HEIGHT - 6.));
-		const bool all = (row.uuid == "*");
-		DrawRow(row, all ? "r.  All escorts" : "     " + row.name, all
-			? "the role of every escort without one of its own" : "this escort's own role");
+		if(row.uuid == EscortRole::ALL_ESCORTS)
+			DrawRow(row, "r.  All escorts", "the role of every escort (and fighter) without one of its own");
+		else if(row.uuid == EscortRole::ALL_FIGHTERS)
+			DrawRow(row, "     All fighters", "the role of every fighter without one of its own");
+		else
+			DrawRow(row, "     " + row.name, row.fighter ? "this fighter's own role" : "this escort's own role");
 		y += ROW_HEIGHT;
 	}
 	y += 6.;
@@ -519,26 +522,40 @@ void WorkshopPanel::FindWeapons()
 
 void WorkshopPanel::FindEscorts()
 {
-	// A row for all escorts, then one for each escort here (as many as fit).
+	// A row for all escorts, then for all fighters (if there are any), then one
+	// for each escort here, then each fighter (as many as fit).
 	vector<Row> found;
 	Row all;
 	all.kind = "role";
-	all.uuid = "*";
+	all.uuid = EscortRole::ALL_ESCORTS;
 	found.push_back(all);
 	const Ship *flagship = player.Flagship();
+	vector<shared_ptr<Ship>> escorts;
+	vector<shared_ptr<Ship>> fighters;
 	for(const shared_ptr<Ship> &ship : player.Ships())
+		if(ship.get() != flagship && !ship->IsDestroyed() && !ship->IsParked())
+			(ship->CanBeCarried() ? fighters : escorts).push_back(ship);
+	if(!fighters.empty())
 	{
-		if(found.size() > 6)
-			break;
-		if(ship.get() == flagship || ship->IsDestroyed() || ship->IsParked() || ship->CanBeCarried())
-			continue;
-		Row row;
-		row.kind = "role";
-		row.uuid = ship->UUID().ToString();
-		row.name = ship->GivenName().empty() ? ship->DisplayModelName() : ship->GivenName();
-		row.name += " (" + ship->DisplayModelName() + ")";
-		found.push_back(row);
+		Row allFighters;
+		allFighters.kind = "role";
+		allFighters.uuid = EscortRole::ALL_FIGHTERS;
+		allFighters.fighter = true;
+		found.push_back(allFighters);
 	}
+	for(const vector<shared_ptr<Ship>> *group : {&escorts, &fighters})
+		for(const shared_ptr<Ship> &ship : *group)
+		{
+			if(found.size() > 8)
+				break;
+			Row row;
+			row.kind = "role";
+			row.uuid = ship->UUID().ToString();
+			row.fighter = ship->CanBeCarried();
+			row.name = ship->GivenName().empty() ? ship->DisplayModelName() : ship->GivenName();
+			row.name += " (" + ship->DisplayModelName() + (row.fighter ? ", fighter)" : ")");
+			found.push_back(row);
+		}
 	// Keep where the rows were drawn, for clicks.
 	for(Row &row : found)
 		for(const Row &old : roleRows)
@@ -570,7 +587,8 @@ vector<WorkshopPanel::Choice> WorkshopPanel::Choices(const Row &row) const
 	else if(row.kind == "role")
 	{
 		// No role, then the roles that come with the game.
-		choices.push_back({row.uuid == "*" ? "no role" : "as all escorts", ""});
+		choices.push_back({row.uuid == EscortRole::ALL_ESCORTS ? "no role"
+			: (row.fighter && row.uuid != EscortRole::ALL_FIGHTERS) ? "as all fighters" : "as all escorts", ""});
 		for(const auto &[name, role] : GameData::Roles())
 			if(role.IsValid() && !GameData::Firmwares().Has(name))
 				choices.push_back({name, GameData::ScriptText("role", name)});
@@ -679,12 +697,15 @@ void WorkshopPanel::Cycle(const Row &row, int direction)
 		status = "Your " + row.outfit->DisplayName() + "s now fly " + choice.name + ".";
 	else if(row.kind == "maneuver")
 		status = "Your escorts now keep station with " + choice.name + ".";
-	else if(row.kind == "role" && row.uuid == "*")
+	else if(row.kind == "role" && row.uuid == EscortRole::ALL_ESCORTS)
 		status = choice.text.empty() ? "Your escorts have no role: they fight as escorts usually do."
 			: "Your escorts (those without a role of their own) now play " + choice.name + ".";
+	else if(row.kind == "role" && row.uuid == EscortRole::ALL_FIGHTERS)
+		status = choice.text.empty() ? "Your fighters now play the role all your escorts do."
+			: "Your fighters (those without a role of their own) now play " + choice.name + ".";
 	else if(row.kind == "role")
-		status = row.name + (choice.text.empty() ? " now plays the role all your escorts do."
-			: " now plays " + choice.name + ".");
+		status = row.name + (choice.text.empty() ? (row.fighter ? " now plays the role all your fighters do."
+			: " now plays the role all your escorts do.") : " now plays " + choice.name + ".");
 	else
 		status = "Your defense daemon now runs " + choice.name + ".";
 	statusTime = 300;
@@ -729,19 +750,32 @@ void WorkshopPanel::Buy(const Firmware &firmware)
 
 
 
-void WorkshopPanel::OpenEscorts(const string &roleUuid)
+void WorkshopPanel::OpenEscorts(const string &roleUuid, bool fighter)
 {
 	// The player's flagship leads; the escort is the one whose role this is,
 	// or one of the player's own, if they have any, or else a light warship.
+	// A fighter is led by its carrier (from whose bay it launches), or else
+	// by a Carrier.
 	const Ship *leader = player.Flagship();
 	const Ship *escort = nullptr;
+	const bool all = (roleUuid.empty() || roleUuid == EscortRole::ALL_ESCORTS || roleUuid == EscortRole::ALL_FIGHTERS);
 	for(const shared_ptr<Ship> &ship : player.Ships())
-		if(ship.get() != leader && !ship->IsDestroyed() && !ship->IsParked() && !ship->CanBeCarried()
-				&& (roleUuid.empty() || roleUuid == "*" || ship->UUID().ToString() == roleUuid))
+		if(ship.get() != leader && !ship->IsDestroyed() && !ship->IsParked() && ship->CanBeCarried() == fighter
+				&& (all || ship->UUID().ToString() == roleUuid))
 		{
 			escort = ship.get();
+			if(fighter && ship->GetParent() && !ship->GetParent()->CanBeCarried())
+				leader = ship->GetParent().get();
 			break;
 		}
+	if(fighter && (!escort || !leader || !leader->HasBays()))
+	{
+		if(!escort)
+			escort = GameData::Ships().Find("Dagger");
+		const Ship *carrier = GameData::Ships().Find("Carrier");
+		if(!leader || !leader->HasBays())
+			leader = carrier;
+	}
 	if(!escort)
 		escort = GameData::Ships().Find("Sparrow");
 	if(!leader)

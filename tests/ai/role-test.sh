@@ -18,9 +18,12 @@
 # do what it says: for most roles, keep station until the pirates come, then
 # attack them.
 #
-# Usage: role-test.sh BINARY [ROLE]
+# Usage: role-test.sh BINARY [ROLE] [WHO]
 #
-# ROLE is a role in data/roles.txt (by default, "Bodyguard").
+# ROLE is a role in data/roles.txt (by default, "Bodyguard"). WHO is "*" (the
+# default) to give it to all the escorts, or "fighters" to give it to the
+# fighters only: they are deployed, and must play it while the other escorts
+# play none.
 # Needs Xvfb (xvfb-run). Environment: ES_KEEP_DIR, a directory to keep the
 # game's output in.
 
@@ -33,6 +36,7 @@ fi
 
 BINARY=$(realpath "$1")
 ROLE=${2:-Bodyguard}
+WHO=${3:-*}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 OUT=${ES_KEEP_DIR:-$(mktemp -d)}
@@ -42,9 +46,9 @@ cp -r "$ROOT/tests/integration/config" "$OUT/config"
 TESTS="$OUT/config/plugins/integration-tests/data/tests"
 "$HERE/add-outfits.py" "$TESTS/tests_ai_scenarios.txt" "AI Combat Carriers Save" "Role Save" > "$TESTS/tests_roles.txt"
 # Give every escort the role.
-python3 - "$TESTS/tests_roles.txt" "$ROOT/data/roles.txt" "$ROLE" << 'PYTHON'
+python3 - "$TESTS/tests_roles.txt" "$ROOT/data/roles.txt" "$ROLE" "$WHO" << 'PYTHON'
 import sys
-path, roles, role = sys.argv[1:]
+path, roles, role, who = sys.argv[1:]
 lines = open(roles).read().split("\n")
 start = lines.index('role "%s"' % role)
 end = start + 1
@@ -54,7 +58,7 @@ while not lines[end - 1]:
     end -= 1
 body = "".join("\t\t\tline `%s`\n" % line for line in lines[start:end])
 text = open(path).read()
-text = text.replace("\t\tplanet Burthen\n", "\t\tplanet Burthen\n\t\t\"escort role\" *\n" + body, 1)
+text = text.replace("\t\tplanet Burthen\n", "\t\tplanet Burthen\n\t\t\"escort role\" %s\n" % who + body, 1)
 open(path, "w").write(text)
 PYTHON
 cat >> "$TESTS/tests_roles.txt" << EOF
@@ -65,6 +69,8 @@ test "Escort roles"
 		inject "Role Save"
 		call "Load First Savegame"
 		call "Depart"
+		input
+			command deploy
 		apply
 			"test: steps to wait" = 2400
 		label "idle"
@@ -105,6 +111,15 @@ check() {
 		FAILED=1
 	fi
 }
+if [ "$WHO" = fighters ]; then
+	check "the fighters play the role" "^ROLE $ROLE \(Flame Meteor\|Torpedo Javelin\):"
+	if grep -q "^ROLE .*\(Carrier\|Escort 1\):" "$OUT/game.log"; then
+		echo "FAILED: only the fighters should play it: $(grep -m1 '^ROLE .*\(Carrier\|Escort 1\):' "$OUT/game.log")"
+		FAILED=1
+	else
+		echo "ok: and the other escorts don't"
+	fi
+fi
 check "the role runs and decides" "^ROLE "
 if grep -q "^ROLE .*: failed" "$OUT/game.log"; then
 	echo "FAILED: a role failed: $(grep -m1 '^ROLE .*: failed' "$OUT/game.log")"

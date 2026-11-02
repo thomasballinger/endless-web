@@ -25,6 +25,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Weapon.h"
 
 #include <deque>
+#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -145,6 +146,9 @@ public:
 	// The shots the ships themselves fired (the target's, at the launcher),
 	// still flying.
 	const std::vector<Projectile> &Shots() const;
+	// Every ship in the world now: the launcher, the target, and any fighters
+	// the target launched.
+	const std::list<std::shared_ptr<Ship>> &Ships() const;
 	int Launches() const;
 	int Hits() const;
 	// The step on which the target or the launcher was destroyed, or -1.

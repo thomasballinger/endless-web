@@ -3224,7 +3224,7 @@ void AI::KeepStation(const Ship &ship, Command &command, const Body &target)
 bool AI::RunRole(Ship &ship, Command &command, const Ship &parent)
 {
 	script::Memory *memory = nullptr;
-	const EscortRole *role = EscortRole::PlayerRole(ship.UUID().ToString(), &memory);
+	const EscortRole *role = EscortRole::PlayerRole(ship.UUID().ToString(), &memory, ship.CanBeCarried());
 	if(!role)
 		return false;
 
@@ -3281,10 +3281,12 @@ bool AI::RunRole(Ship &ship, Command &command, const Ship &parent)
 		input.targetPosition = target->Position();
 		input.targetHull = target->HullFraction();
 	}
-	// Its place among the leader's escorts here.
+	// Its place among the leader's escorts here: the ships that follow the same
+	// leader (for a fighter, its carrier's fighters that are out of their bays).
 	input.escortCount = 0;
 	for(const shared_ptr<Ship> &escort : player.Ships())
-		if(escort.get() != &parent && escort->GetSystem() == here && !escort->IsParked() && !escort->IsDestroyed())
+		if(escort->GetParent().get() == &parent && escort->GetSystem() == here && !escort->IsParked()
+				&& !escort->IsDestroyed())
 		{
 			if(escort.get() == &ship)
 				input.escortIndex = input.escortCount;

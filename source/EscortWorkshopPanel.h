@@ -74,6 +74,8 @@ private:
 	void DrawInspector() const;
 	void DrawStatus() const;
 	bool IsRole() const;
+	// Who the role is for, as words ("this escort", "all your fighters").
+	std::string Whom() const;
 	void ScrubTo(double x);
 
 
@@ -85,6 +87,8 @@ private:
 	ShipManeuver program;
 	// For a role: whose it is, and the role.
 	std::string roleUuid;
+	// Whether the escort is a fighter, carried in its leader's bay.
+	bool fighter = false;
 	EscortRole role;
 	CodeDocument document;
 	CodeEditor editor;

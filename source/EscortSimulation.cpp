@@ -146,11 +146,22 @@ void EscortSimulation::Reset()
 	escort = make_shared<Ship>(escortModel);
 	leader->SetKinematics(leaderMotion.position, leaderMotion.velocity, leaderMotion.facing);
 	escort->SetKinematics(escortMotion.position, escortMotion.velocity, escortMotion.facing);
-	for(const shared_ptr<Ship> &ship : {leader, escort})
+	leader->SetGovernment(GameData::PlayerGovernment());
+	world->AddPlayerShip(leader);
+	// A fighter starts in its carrier's bay, ordered to deploy (as if you had
+	// pressed the deploy key), if the leader has a bay for it.
+	carried = world->AddCarried(leader, escort);
+	if(carried)
 	{
-		ship->SetGovernment(GameData::PlayerGovernment());
-		world->AddPlayerShip(ship);
+		escort->SetDeployOrder(true);
+		escortMotion = leaderMotion;
 	}
+	else
+	{
+		escort->SetGovernment(GameData::PlayerGovernment());
+		world->AddPlayerShip(escort);
+	}
+	returning = false;
 	raider = make_shared<Ship>(escortModel);
 	leaderTrail.clear();
 	escortTrail.clear();
@@ -202,11 +213,24 @@ void EscortSimulation::Step()
 		situation.launcher = escortMotion.position;
 		control = drills[drill].pilot(situation);
 	}
-	leader->SetCommands(AIWorld::ToCommand(control));
+	// (A carrier with fighters ready to go also deploys them, as the AI said.)
+	Command leaderCommand = AIWorld::ToCommand(control);
+	if(leader->Commands().Has(Command::DEPLOY))
+		leaderCommand |= Command::DEPLOY;
+	leader->SetCommands(leaderCommand);
 
-	// The escort does what its role says, or keeps station. (The role is told
-	// whether the escort was attacking on the last step.)
-	if(role)
+	// A fighter in its bay does nothing, and one the AI is bringing back to its
+	// bay (recalled, or badly damaged) does that first, as in the game.
+	returning = carried && EscortIsOut() && escort->Commands().Has(Command::BOARD);
+	if(carried && (!EscortIsOut() || returning))
+	{
+		escortAttacking = false;
+		stationPoint = leaderMotion.position;
+		lastTurn = escort->Commands().Turn();
+	}
+	// Otherwise, the escort does what its role says, or keeps station. (The
+	// role is told whether the escort was attacking on the last step.)
+	else if(role)
 	{
 		roleTrace.Clear();
 		roleRan = role->Run(RoleInput(), roleOutput, &roleMemory, &roleTrace);
@@ -249,7 +273,9 @@ void EscortSimulation::Step()
 	// Then every ship moves, as ships move in the game.
 	world->Move();
 	leaderMotion = GuidanceDrill::Motion{leader->Position(), leader->Velocity(), leader->Facing()};
-	escortMotion = GuidanceDrill::Motion{escort->Position(), escort->Velocity(), escort->Facing()};
+	// (A fighter in its bay is where its carrier is.)
+	escortMotion = EscortIsOut() ? GuidanceDrill::Motion{escort->Position(), escort->Velocity(), escort->Facing()}
+		: leaderMotion;
 	if(raiderHere)
 		raiderMotion = GuidanceDrill::Motion{raider->Position(), raider->Velocity(), raider->Facing()};
 
@@ -495,6 +521,27 @@ int EscortSimulation::RaidersDestroyed() const
 int EscortSimulation::DestroyedStep() const
 {
 	return destroyedStep;
+}
+
+
+
+bool EscortSimulation::IsCarried() const
+{
+	return carried;
+}
+
+
+
+bool EscortSimulation::EscortIsOut() const
+{
+	return !carried || escort->GetSystem();
+}
+
+
+
+bool EscortSimulation::EscortIsReturning() const
+{
+	return returning;
 }
 
 

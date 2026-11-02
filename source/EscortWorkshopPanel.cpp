@@ -74,6 +74,7 @@ namespace {
 
 	// Ships to try as the escort, if the player has none of their own.
 	const vector<string> ESCORTS = {"Sparrow", "Hawk", "Clipper", "Argosy", "Bulk Freighter"};
+	const vector<string> FIGHTERS = {"Dagger", "Lance", "Boxwing", "Finch"};
 }
 
 
@@ -81,23 +82,18 @@ namespace {
 EscortWorkshopPanel::EscortWorkshopPanel(PlayerInfo *player, const Ship &leader, const Ship &escort,
 		const string &roleUuid)
 	: player(player), leaderModel(&leader), simulation(make_unique<EscortSimulation>(leader, escort)),
-	roleUuid(roleUuid), editor(document)
+	roleUuid(roleUuid), fighter(escort.CanBeCarried()), editor(document)
 {
 	SetIsFullScreen(true);
 	SetInterruptible(false);
 	string text = FactoryText();
 	if(player && IsRole())
 	{
-		// The escort's own role, or else the one all escorts play.
-		for(const string &uuid : {roleUuid, string("*")})
-		{
-			auto it = player->EscortRoles().find(uuid);
-			if(it != player->EscortRoles().end())
-			{
-				text = it->second;
-				break;
-			}
-		}
+		// The escort's own role, or else the one all fighters (if it is one)
+		// or all escorts play.
+		const string key = EscortRole::KeyFor(roleUuid, fighter, player->EscortRoles());
+		if(!key.empty())
+			text = player->EscortRoles().at(key);
 	}
 	else if(player)
 	{
@@ -176,7 +172,7 @@ void EscortWorkshopPanel::Draw()
 {
 	Layout();
 	const Point leader = simulation->Leader().Position();
-	const Point escort = simulation->Escort().Position();
+	const Point escort = simulation->EscortIsOut() ? simulation->Escort().Position() : leader;
 	// Keep every ship in view (the raider too, once it is close).
 	Point low(min(leader.X(), escort.X()), min(leader.Y(), escort.Y()));
 	Point high(max(leader.X(), escort.X()), max(leader.Y(), escort.Y()));
@@ -232,7 +228,10 @@ void EscortWorkshopPanel::Draw()
 
 	// The ships, drawn at least big enough to see, each where it is.
 	const double shipZoom = max(zoom, .3);
-	vector<const Ship *> ships = {&simulation->Leader(), &simulation->Escort()};
+	// (A fighter in its bay isn't drawn.)
+	vector<const Ship *> ships = {&simulation->Leader()};
+	if(simulation->EscortIsOut())
+		ships.push_back(&simulation->Escort());
 	if(simulation->HasRaider())
 		ships.push_back(&simulation->Raider());
 	for(const Ship *ship : ships)
@@ -259,7 +258,8 @@ void EscortWorkshopPanel::Draw()
 	}
 	const Font &font = FontSet::Get(14);
 	font.Draw("you", ToScreen(leader) + Point(18., -20.), LEADER);
-	font.Draw("escort", ToScreen(escort) + Point(18., -20.), ESCORT);
+	if(simulation->EscortIsOut())
+		font.Draw(fighter ? "fighter" : "escort", ToScreen(escort) + Point(18., -20.), ESCORT);
 	if(simulation->HasRaider())
 		font.Draw("raider", ToScreen(simulation->Raider().Position()) + Point(18., -20.), RAIDER);
 
@@ -513,7 +513,7 @@ void EscortWorkshopPanel::Install()
 		{
 			if(!unchanged)
 				player->SetLibraryProgram(name, text);
-			status = (roleUuid == "*" ? "Installed: your escorts play " : "Installed: this escort plays ") + name
+			status = "Installed: " + Whom() + " plays " + name
 				+ (unchanged ? "." : ", saved in your library.");
 		}
 		statusTime = 300;
@@ -555,6 +555,17 @@ bool EscortWorkshopPanel::IsRole() const
 
 
 
+string EscortWorkshopPanel::Whom() const
+{
+	if(roleUuid == EscortRole::ALL_ESCORTS)
+		return "all your escorts";
+	if(roleUuid == EscortRole::ALL_FIGHTERS)
+		return "all your fighters";
+	return fighter ? "this fighter" : "this escort";
+}
+
+
+
 string EscortWorkshopPanel::FactoryText() const
 {
 	if(IsRole())
@@ -570,10 +581,12 @@ string EscortWorkshopPanel::FactoryText() const
 
 void EscortWorkshopPanel::NextEscort()
 {
-	for(size_t tries = 0; tries < ESCORTS.size(); ++tries)
+	// (A fighter is tried as other fighters, from the same carrier.)
+	const vector<string> &models = fighter ? FIGHTERS : ESCORTS;
+	for(size_t tries = 0; tries < models.size(); ++tries)
 	{
-		escortIndex = (escortIndex + 1) % ESCORTS.size();
-		const Ship *model = GameData::Ships().Find(ESCORTS[escortIndex]);
+		escortIndex = (escortIndex + 1) % models.size();
+		const Ship *model = GameData::Ships().Find(models[escortIndex]);
 		if(!model)
 			continue;
 		const int drill = simulation->DrillIndex();
@@ -583,7 +596,7 @@ void EscortWorkshopPanel::NextEscort()
 		simulation->SetRole(IsRole() && role.IsValid() ? &role : nullptr);
 		simulation->Reset();
 		ghost.clear();
-		status = "Your escort is a " + model->DisplayModelName() + ".";
+		status = string(fighter ? "Your fighter is a " : "Your escort is a ") + model->DisplayModelName() + ".";
 		statusTime = 180;
 		return;
 	}
@@ -667,7 +680,7 @@ void EscortWorkshopPanel::DrawInspector() const
 			y += 20.;
 		};
 		bar("you", simulation->Leader(), LEADER);
-		bar("escort", simulation->Escort(), ESCORT);
+		bar(fighter ? "fighter" : "escort", simulation->Escort(), ESCORT);
 		if(simulation->HasRaider())
 			bar("raider", simulation->Raider(), RAIDER);
 		else
@@ -679,13 +692,17 @@ void EscortWorkshopPanel::DrawInspector() const
 		static const char *const WHAT[] = {"keeping station", "attacking the threat", "attacking your target",
 			"attacking its target", "retreating", "left to the usual AI"};
 		const EscortRole::Output &decided = simulation->RoleOutput();
-		if(!simulation->RoleRan())
+		if(simulation->IsCarried() && !simulation->EscortIsOut())
+			line("the fighter is in its bay", TEXT);
+		else if(simulation->EscortIsReturning())
+			line("the fighter is going back to its bay", TEXT);
+		else if(!simulation->RoleRan())
 			line("the role failed this step", BAD);
 		else if(!decided.chose)
 			line("the role chose nothing (usual AI)", DIM);
 		else
 		{
-			line(string("the escort is ") + WHAT[decided.behavior], TEXT);
+			line(string(fighter ? "the fighter is " : "the escort is ") + WHAT[decided.behavior], TEXT);
 			if(decided.behavior == EscortRole::KEEP_STATION)
 			{
 				snprintf(text, sizeof(text), "station: %.0f right, %.0f ahead", decided.station.X(),
@@ -694,7 +711,8 @@ void EscortWorkshopPanel::DrawInspector() const
 			}
 		}
 		y += 10.;
-		line("The escort is a " + simulation->Escort().DisplayModelName(), DIM);
+		line(string(fighter ? "The fighter is a " : "The escort is a ") + simulation->Escort().DisplayModelName()
+			+ (simulation->IsCarried() ? ", from a " + simulation->Leader().DisplayModelName() : string()), DIM);
 		line("(t to try another)", DIM);
 		return;
 	}
@@ -745,8 +763,7 @@ void EscortWorkshopPanel::DrawStatus() const
 {
 	const Font &font = FontSet::Get(14);
 	FillShader::Fill(Point(0., Screen::Top() + STATUS_HEIGHT / 2.), Point(Screen::Width(), STATUS_HEIGHT), PANEL);
-	const string what = IsRole() ? "role \"" + role.Name() + "\" for " + (roleUuid == "*" ? "all your escorts"
-		: "this escort") : "maneuver \"keep station\"";
+	const string what = IsRole() ? "role \"" + role.Name() + "\" for " + Whom() : "maneuver \"keep station\"";
 	const string line = "ESCORT WORKSHOP   " + what + "   step " + to_string(simulation->CurrentStep())
 		+ (paused ? "  (paused)" : "");
 	font.Draw(line, Point(Screen::Left() + 14., Screen::Top() + 11.), TEXT);

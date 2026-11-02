@@ -18,6 +18,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Point.h"
 #include "script/Script.h"
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -148,13 +149,23 @@ public:
 	bool Run(const Input &input, Output &output, script::Memory *memory = nullptr,
 		script::Trace *trace = nullptr) const;
 
-	// The role the player gave one of their escorts (by its UUID, or "*" for
-	// every escort without a role of its own), as the text of a "role" node,
-	// or none (with empty text). Each escort keeps its own memory for its
-	// role. Returns whether the text compiled; one that doesn't removes the
-	// role.
+	// The keys for the roles the player gives every escort, and every fighter
+	// (any ship carried in a bay), that has no role of its own.
+	static const std::string ALL_ESCORTS;
+	static const std::string ALL_FIGHTERS;
+	// Which of the given roles (by key) a ship plays: its own, or else (for a
+	// fighter) the one for all fighters, or else the one for all escorts. The
+	// key, or empty if none of them is given.
+	static std::string KeyFor(const std::string &uuid, bool isFighter,
+		const std::map<std::string, std::string> &roles);
+
+	// The role the player gave one of their escorts (by its UUID, or one of
+	// the keys above), as the text of a "role" node, or none (with empty
+	// text). Each escort keeps its own memory for its role. Returns whether
+	// the text compiled; one that doesn't removes the role.
 	static bool SetPlayerRole(const std::string &uuid, const std::string &text);
-	static const EscortRole *PlayerRole(const std::string &uuid, script::Memory **memory = nullptr);
+	static const EscortRole *PlayerRole(const std::string &uuid, script::Memory **memory = nullptr,
+		bool isFighter = false);
 	// The text of a role the player gave an escort, by the role's name, or
 	// empty if no escort has it.
 	static std::string PlayerRoleText(const std::string &name);

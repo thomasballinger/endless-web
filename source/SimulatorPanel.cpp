@@ -287,9 +287,13 @@ void SimulatorPanel::Draw()
 	DrawList draw;
 	draw.Clear(simulation->CurrentStep(), zoom);
 	draw.SetCenter(ToWorld(Point()));
-	// (A ship that was destroyed is gone once it finishes exploding.)
+	// (A ship that was destroyed is gone once it finishes exploding.) Then any
+	// fighters the target launched.
 	for(const Ship *ship : {&simulation->Launcher(), &simulation->Target()})
 		if(!ship->ShouldBeRemoved())
+			draw.Add(*ship);
+	for(const shared_ptr<Ship> &ship : simulation->Ships())
+		if(ship.get() != &simulation->Launcher() && ship.get() != &simulation->Target() && ship->GetSystem())
 			draw.Add(*ship);
 	for(const GuidanceSimulation::Missile &missile : simulation->Missiles())
 		if(missile.endStep < 0)

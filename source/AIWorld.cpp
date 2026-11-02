@@ -130,6 +130,53 @@ void AIWorld::AddAIShip(const shared_ptr<Ship> &ship, const string &personality)
 
 
 
+bool AIWorld::AddCarried(const shared_ptr<Ship> &carrier, const shared_ptr<Ship> &ship)
+{
+	if(!system || !ship->CanBeCarried())
+		return false;
+	ship->SetGovernment(carrier->GetGovernment());
+	ship->SetSystem(system);
+	ship->Recharge();
+	{
+		// (Seeded from its carrier's stream, as one launched in the game is.)
+		Random::Scope randomScope(carrier->RandomStream());
+		Random::SeedStream(ship->RandomStream());
+	}
+	if(!carrier->Carry(ship))
+		return false;
+	if(carrier->IsYours())
+		player.CaptureShip(ship);
+	return true;
+}
+
+
+
+int AIWorld::FillBays(const shared_ptr<Ship> &carrier)
+{
+	int count = 0;
+	vector<string> categories;
+	for(const Ship::Bay &bay : carrier->Bays())
+		if(!bay.ship)
+			categories.push_back(bay.category);
+	for(const string &category : categories)
+	{
+		const Ship *model = GameData::Ships().Find(category == "Fighter" ? "Lance"
+			: category == "Drone" ? "Combat Drone" : "");
+		if(!model)
+			for(const auto &[name, ship] : GameData::Ships())
+				if(ship.Attributes().Category() == category && ship.CanBeCarried())
+				{
+					model = &ship;
+					break;
+				}
+		if(model && AddCarried(carrier, make_shared<Ship>(*model)))
+			++count;
+	}
+	return count;
+}
+
+
+
 void AIWorld::Remove(const shared_ptr<Ship> &ship)
 {
 	ships.remove(ship);
@@ -183,6 +230,7 @@ void AIWorld::Move()
 	vector<Visual> visuals;
 	list<shared_ptr<Flotsam>> debris;
 	vector<Projectile> fired;
+	list<shared_ptr<Ship>> launched;
 	hasAntiMissile.clear();
 	for(const shared_ptr<Ship> &ship : ships)
 	{
@@ -194,7 +242,15 @@ void AIWorld::Move()
 			events.splice(events.end(), ship->HandleEvents());
 			if(ship->ShouldBeRemoved())
 				continue;
+			// A fighter that reached its carrier docks (and so leaves the
+			// world, until it launches again).
+			if(ship->CanBeCarried())
+				ship->Board(false, false);
 		}
+		if(ship->GetSystem() != system)
+			continue;
+		// Carriers launch the fighters that are ready to go.
+		ship->Launch(launched, visuals);
 		if(holding.contains(ship.get()))
 		{
 			FireCommand none = ship->FiringCommands();
@@ -205,13 +261,23 @@ void AIWorld::Move()
 		if(ship->HasAntiMissile())
 			hasAntiMissile.push_back(ship.get());
 	}
-	// Ships that have finished exploding are gone.
+	// Ships that have finished exploding are gone, as are fighters back in
+	// their bays; fighters that launched join the world.
 	vector<shared_ptr<Ship>> gone;
 	for(const shared_ptr<Ship> &ship : ships)
 		if(ship->ShouldBeRemoved())
 			gone.push_back(ship);
 	for(const shared_ptr<Ship> &ship : gone)
-		Remove(ship);
+	{
+		ships.remove(ship);
+		moving.erase(remove(moving.begin(), moving.end(), ship), moving.end());
+	}
+	for(const shared_ptr<Ship> &ship : launched)
+		if(find(ships.begin(), ships.end(), ship) == ships.end())
+		{
+			ships.push_back(ship);
+			moving.push_back(ship);
+		}
 
 	// Then the shots that were already flying move, and the new ones join
 	// them (to move from the next step on).
@@ -224,7 +290,7 @@ void AIWorld::Move()
 	// Then everything checks for collisions along its next movement.
 	shipCollisions.Clear(step);
 	for(const shared_ptr<Ship> &ship : ships)
-		if(ship->Zoom() == 1.)
+		if(ship->GetSystem() == system && ship->Zoom() == 1.)
 			shipCollisions.Add(*ship);
 	shipCollisions.Finish();
 	for(Projectile &projectile : projectiles)
@@ -361,4 +427,11 @@ AIWorld::Outcome AIWorld::Strike(Projectile &projectile)
 const vector<Projectile> &AIWorld::Projectiles() const
 {
 	return projectiles;
+}
+
+
+
+const list<shared_ptr<Ship>> &AIWorld::Ships() const
+{
+	return ships;
 }

@@ -22,6 +22,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "DataFile.h"
 #include "DataNode.h"
 #include "Engine.h"
+#include "EscortRole.h"
 #include "EscortWorkshopPanel.h"
 #include "Files.h"
 #include "text/Font.h"
@@ -538,6 +539,11 @@ void GameLoop(PlayerInfo &player, TaskQueue &queue, const Conversation &conversa
 					menuPanels.Push(new EscortWorkshopPanel(nullptr, *leader, *target));
 				else if(simulatorOutfit == "role" && target && leader)
 					menuPanels.Push(new EscortWorkshopPanel(nullptr, *leader, *target, "*"));
+				// "--simulator fighters" tries the role of all fighters, with the
+				// target as a fighter carried by a Carrier.
+				else if(simulatorOutfit == "fighters" && target && GameData::Ships().Find("Carrier"))
+					menuPanels.Push(new EscortWorkshopPanel(nullptr, *GameData::Ships().Find("Carrier"), *target,
+						EscortRole::ALL_FIGHTERS));
 				else if(outfit && outfit->GetWeapon() && outfit->GetWeapon()->Homing() && target)
 					menuPanels.Push(new SimulatorPanel(*outfit, *target));
 				else

@@ -191,12 +191,32 @@ bool EscortRole::SetPlayerRole(const string &uuid, const string &text)
 
 
 
-const EscortRole *EscortRole::PlayerRole(const string &uuid, script::Memory **memory)
+const string EscortRole::ALL_ESCORTS = "*";
+const string EscortRole::ALL_FIGHTERS = "fighters";
+
+
+
+string EscortRole::KeyFor(const string &uuid, bool isFighter, const map<string, string> &roles)
+{
+	if(roles.contains(uuid))
+		return uuid;
+	if(isFighter && roles.contains(ALL_FIGHTERS))
+		return ALL_FIGHTERS;
+	if(roles.contains(ALL_ESCORTS))
+		return ALL_ESCORTS;
+	return "";
+}
+
+
+
+const EscortRole *EscortRole::PlayerRole(const string &uuid, script::Memory **memory, bool isFighter)
 {
 	map<string, Assigned> &roles = PlayerRoles();
 	auto it = roles.find(uuid);
+	if(it == roles.end() && isFighter)
+		it = roles.find(ALL_FIGHTERS);
 	if(it == roles.end())
-		it = roles.find("*");
+		it = roles.find(ALL_ESCORTS);
 	if(it == roles.end())
 		return nullptr;
 	if(memory)

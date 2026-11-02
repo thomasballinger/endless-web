@@ -180,6 +180,17 @@ Build as usual, then start a new pilot (or load one). Things to look for:
   attack, the game's AI flies the escort in, as it would in the game; when
   the role chooses nothing, the usual AI flies it. Every edit replays the
   fight; **Ctrl+S** gives the role to the escort (or all of them).
+- **Fighters' roles.** Fighters (ships carried in bays) play roles too, with
+  the same modes, around their carrier rather than you: once deployed
+  (**D** in flight, as always), a fighter does what its role says, and its
+  `leader` is its carrier. In the workshop, once you own fighters, there's
+  a role for all fighters (a fighter without one of its own plays it, and
+  without that, the one for all escorts) and one for each fighter. Clicking
+  a fighter's role opens the escort workshop with the fighter in its
+  carrier's bay (or a Dagger in a Carrier's, if you have none): the carrier
+  deploys it, it plays the role against a pirate fighter, and when it's
+  recalled or badly hurt it goes back to its bay, as in the game (that
+  comes before any role). **T** tries other fighters.
 - **Editing roles in flight.** Select an escort (click it in the escort list,
   bottom left) and open the scripts pane (**K**): its role runs there with
   its values. **EDIT** pauses the game; change the code, and once you stop
@@ -205,8 +216,10 @@ scanner.
   thrusting, so a ship that stops thrusting coasts; energy and heat count),
   and fights as in the game: missiles and shots hit and do the game's
   damage, anti-missile shoots missiles down, and ships are disabled and
-  destroyed (the drill starts over soon after). Carriers don't launch their
-  fighters, though, and there are no asteroids.
+  destroyed (the drill starts over soon after). Carriers launch their
+  fighters and take them back aboard; a target the AI flies has its bays
+  filled as a Republic Carrier's are (Lances, Combat Drones). There are no
+  asteroids.
 - A role's "threat" is simply the nearest hostile ship to the leader; there
   is no list of all of them, or of incoming missiles, to choose from yet.
 - A copied maneuver (say, a pirate's "fight") shows up as a choice for how

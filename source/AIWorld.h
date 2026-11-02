@@ -44,9 +44,10 @@ class System;
 // ship is flown by the game's own AI, or by commands the simulator gives it
 // each step (as a pilot would), or not at all (the simulator sets where it
 // is). The first of the player's ships stands in for the player's flagship
-// (which fires only as the "Automatic firing" preference has it). Make a new
-// world to start over: the AI remembers things from step to step. (Carriers
-// don't launch their fighters here.)
+// (which fires only as the "Automatic firing" preference has it). Carriers
+// launch their fighters, and the fighters return to their bays, as in the
+// game. Make a new world to start over: the AI remembers things from step to
+// step.
 class AIWorld {
 public:
 	enum class Pilot { AI, COMMANDS, FIXED };
@@ -70,6 +71,15 @@ public:
 	// given as its words (e.g. "heroic staying").
 	void AddShip(const std::shared_ptr<Ship> &ship, Pilot pilot, const std::string &personality = "");
 	void AddAIShip(const std::shared_ptr<Ship> &ship, const std::string &personality);
+	// Put a fighter in a bay of a carrier already in the world (one of the
+	// player's, if the carrier is). It launches when the carrier deploys its
+	// fighters (for the player's, when it has been ordered to deploy). Returns
+	// false if the carrier has no free bay for it.
+	bool AddCarried(const std::shared_ptr<Ship> &carrier, const std::shared_ptr<Ship> &ship);
+	// Fill a carrier's empty bays as the game's fleets fill a Carrier's: with
+	// Lances in its fighter bays and Combat Drones in its drone bays (or any
+	// ship that fits a bay of another kind). Returns how many it carries.
+	int FillBays(const std::shared_ptr<Ship> &carrier);
 	void Remove(const std::shared_ptr<Ship> &ship);
 	// Fly a ship this step as the game's AI flies a ship that attacks its
 	// target on its own (as an escort does when its role says to attack).
@@ -87,8 +97,10 @@ public:
 	// testing), after it moves, for hits on the world's ships, as the game
 	// does: it deals its damage, or the ships' anti-missile shoots it down.
 	Outcome Strike(Projectile &projectile);
-	// The shots the world's ships fired that are still flying.
+	// The shots the world's ships fired that are still flying, and the ships
+	// in the world now (not those in bays).
 	const std::vector<Projectile> &Projectiles() const;
+	const std::list<std::shared_ptr<Ship>> &Ships() const;
 
 
 private:
