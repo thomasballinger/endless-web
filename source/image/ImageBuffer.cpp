@@ -19,7 +19,9 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "ImageFileData.h"
 #include "../Logger.h"
 
+#ifndef __EMSCRIPTEN__
 #include <avif/avif.h>
+#endif
 #include <jpeglib.h>
 #include <png.h>
 
@@ -34,7 +36,11 @@ using namespace std;
 namespace {
 	const set<string> PNG_EXTENSIONS{".png"};
 	const set<string> JPG_EXTENSIONS{".jpg", ".jpeg", ".jpe"};
+#ifdef __EMSCRIPTEN__
+	const set<string> AVIF_EXTENSIONS{};
+#else
 	const set<string> AVIF_EXTENSIONS{".avif", ".avifs"};
+#endif
 	const set<string> IMAGE_EXTENSIONS = []()
 	{
 		set<string> extensions(PNG_EXTENSIONS);
@@ -46,8 +52,10 @@ namespace {
 
 	bool ReadPNG(const filesystem::path &path, ImageBuffer &buffer, int frame, bool onlyDimensions);
 	bool ReadJPG(const filesystem::path &path, ImageBuffer &buffer, int frame, bool onlyDimensions);
+#ifndef __EMSCRIPTEN__
 	int ReadAVIF(const filesystem::path &path, ImageBuffer &buffer, int frame, bool alphaPreMultiplied,
 		bool onlyDimensions);
+#endif
 	void Premultiply(ImageBuffer &buffer, int frame, BlendingMode additive);
 }
 
@@ -128,6 +136,27 @@ int ImageBuffer::Frames() const
 
 
 
+double ImageBuffer::CalculateArea() const
+{
+	if(!pixels)
+		return 0.;
+	double area = 0.;
+	for(int i = 0; i < frames; ++i)
+		for(int y = 0; y < height; ++y)
+		{
+			const uint32_t *it = Begin(y, i);
+			for(const uint32_t *end = it + width; it != end; ++it)
+			{
+				uint64_t alpha = (*it & 0xFF000000) >> 24;
+				if(alpha)
+					++area;
+			}
+		}
+	return area / frames;
+}
+
+
+
 const uint32_t *ImageBuffer::Pixels() const
 {
 	return pixels;
@@ -204,7 +233,13 @@ int ImageBuffer::Read(const ImageFileData &data, int frame, bool onlyDimensions)
 	else if(isJPG)
 		loaded = ReadJPG(data.path, *this, frame, onlyDimensions);
 	else
+	{
+#ifndef __EMSCRIPTEN__
 		loaded = ReadAVIF(data.path, *this, frame, isAlphaPreMultiplied, onlyDimensions);
+#else
+		return 0;
+#endif
+	}
 
 	if(loaded <= 0)
 		return 0;
@@ -402,6 +437,7 @@ namespace {
 
 
 
+#ifndef __EMSCRIPTEN__
 	// Read an AVIF file, and return the number of frames. This might be
 	// greater than the number of frames in the file due to frame time corrections.
 	// Since sprite animation properties are not visible here, we take the shortest frame
@@ -534,6 +570,7 @@ namespace {
 
 		return bufferFrameCount;
 	}
+#endif // !__EMSCRIPTEN__
 
 
 

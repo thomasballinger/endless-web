@@ -16,9 +16,11 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Files.h"
 
 #include "Logger.h"
+#ifndef __EMSCRIPTEN__
 #include "ZipFile.h"
+#endif
 
-#include <SDL2/SDL.h>
+#include "SDL.h"
 
 #include <algorithm>
 #include <fstream>
@@ -63,6 +65,16 @@ namespace {
 #endif
 	}
 
+#ifdef __EMSCRIPTEN__
+	// No zip file support needed in the web build; data files are preloaded
+	// into Emscripten's virtual filesystem as loose files.
+	struct ZipFile {
+		vector<filesystem::path> ListFiles(const filesystem::path &, bool, bool) { return {}; }
+		bool Exists(const filesystem::path &) { return false; }
+		string ReadFile(const filesystem::path &) { return {}; }
+	};
+	shared_ptr<ZipFile> GetZipFile(const filesystem::path &) { return {}; }
+#else
 	/// The open zip files per thread. Since ZLIB doesn't support multithreaded access on the same zip handle,
 	/// each file is opened multiple times on demand.
 	thread_local map<filesystem::path, shared_ptr<ZipFile>> OPEN_ZIP_FILES;
@@ -91,6 +103,7 @@ namespace {
 
 		return {};
 	}
+#endif
 }
 
 
@@ -109,15 +122,26 @@ void Files::Init(const char *const *argv)
 
 	}
 
+#ifdef __EMSCRIPTEN__
+	resources = "/";
+	config = "/";
+#else
 	if(resources.empty())
 	{
 		// Find the path to the resource directory. This will depend on the
 		// operating system, and can be overridden by a command line argument.
+#ifdef ES_USE_SDL3
+		// This path is cached in SDL3, but not in SDL2.
+		const char *basePath = SDL_GetBasePath();
+#else
 		char *basePath = SDL_GetBasePath();
+#endif
 		if(!basePath)
 			throw runtime_error("Unable to get path to resource directory!");
 		resources = basePath;
+#ifndef ES_USE_SDL3
 		SDL_free(basePath);
+#endif
 
 		if(Exists(resources))
 			resources = filesystem::canonical(resources);
@@ -146,11 +170,13 @@ void Files::Init(const char *const *argv)
 			throw runtime_error("Unable to find the resource directories!");
 		resources = resources.parent_path();
 	}
+#endif // __EMSCRIPTEN__
 	dataPath = resources / "data";
 	imagePath = resources / "images";
 	soundPath = resources / "sounds";
 	globalPluginPath = resources / "plugins";
 
+#ifndef __EMSCRIPTEN__
 	if(config.empty())
 	{
 		// Create the directory for the saved games, preferences, etc., if necessary.
@@ -165,6 +191,7 @@ void Files::Init(const char *const *argv)
 		throw runtime_error("Unable to create config directory!");
 
 	config = filesystem::canonical(config);
+#endif
 
 	savePath = config / "saves";
 	CreateFolder(savePath);
@@ -405,6 +432,39 @@ std::string Files::NameNoExtension(const std::filesystem::path &path)
 {
 	string name = path.filename().string();
 	return name.substr(0, name.length() - path.extension().string().length());
+}
+
+
+
+// Validate that a filename doesn't contain any illegal characters.
+bool Files::IsValidCharacter(char32_t ch)
+{
+	// Don't allow characters that can't be used in a file name.
+	static const string FORBIDDEN = "/\\?*:|\"<>";
+
+	return FORBIDDEN.find(ch) == FORBIDDEN.npos;
+}
+
+
+
+// Check if a filename is valid.
+bool Files::IsValid(const string &filename)
+{
+	return !filename.empty() && all_of(filename.begin(), filename.end(), IsValidCharacter);
+}
+
+
+
+size_t Files::MaxFilenameLength(const filesystem::path &base)
+{
+#if defined(_WIN32)
+	if(base.string().size() >= 250)
+		return 0;
+	else
+		return 250 - base.string().size();
+#else
+	return 250;
+#endif
 }
 
 

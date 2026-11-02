@@ -35,6 +35,7 @@ indent_size = 1
 
 # Credits file
 [credits.txt]
+charset = UTF-8
 indent_style = space
 indent_size = 2
 
