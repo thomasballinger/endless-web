@@ -577,7 +577,12 @@
         // important to hide to avoid stealing focus
         document.querySelector('.plugin-editor-upload').style.display = 'none';
 
-        Module.callMain([]);
+        // Pin the TaskQueue worker count so it can never exceed PTHREAD_POOL_SIZE
+        // in the Makefile. Exceeding the preallocated pool makes Emscripten create
+        // threads on demand, which needs the main thread to reach the event loop --
+        // and it may be blocked inside the game loop when that happens.
+        const workers = Math.max(2, Math.min(8, (navigator.hardwareConcurrency || 4) - 1));
+        Module.callMain(['--tq-threads', String(workers)]);
       }
 
       main();
