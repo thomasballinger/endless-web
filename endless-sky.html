@@ -577,6 +577,14 @@
         // important to hide to avoid stealing focus
         document.querySelector('.plugin-editor-upload').style.display = 'none';
 
+        // ?small=1 uses less memory, for low-memory devices such as 4 GB
+        // Chromebooks: images load only when needed, and large ones at a
+        // reduced size. (The web build keeps preferences only in memory, so
+        // this applies to this visit.)
+        if (new URLSearchParams(window.location.search).get('small')) {
+          FS.writeFile('/preferences.txt', '"Defer loading images" 1\n"Reduce large graphics" 2\n');
+        }
+
         Module.callMain([]);
       }
 
