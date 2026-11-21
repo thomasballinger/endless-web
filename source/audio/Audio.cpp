@@ -168,7 +168,13 @@ void Audio::LoadSounds(const vector<filesystem::path> &sources)
 	}
 	// Begin loading the files.
 	if(!loadQueue.empty())
+	{
+#ifdef __EMSCRIPTEN__
+		Load();
+#else
 		loadThread = thread(&Load);
+#endif
+	}
 }
 
 
@@ -280,6 +286,10 @@ void Audio::Play(const Sound *sound, const Point &position, SoundCategory catego
 // Play the given music. An empty string means to play nothing.
 void Audio::PlayMusic(const string &name)
 {
+#ifdef __EMSCRIPTEN__
+	// Music is disabled under Emscripten.
+	return;
+#endif
 	if(!isInitialized)
 		return;
 
@@ -431,12 +441,14 @@ void Audio::Quit()
 	unique_lock<mutex> lock(audioMutex);
 	if(!loadQueue.empty())
 		loadQueue.clear();
+#ifndef __EMSCRIPTEN__
 	if(loadThread.joinable())
 	{
 		lock.unlock();
 		loadThread.join();
 		lock.lock();
 	}
+#endif
 
 	// Now, stop and delete any OpenAL sources that are playing.
 	players.clear();
