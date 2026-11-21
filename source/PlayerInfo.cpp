@@ -779,7 +779,7 @@ void PlayerInfo::AddChanges(list<DataNode> &changes, bool instantChanges)
 	if(changedPlanets)
 		GameData::RecomputeWormholeRequirements();
 	if((changedPlanets || changedShops) && planet && instantChanges)
-		SpriteLoadManager::RecheckThumbnails();
+		SpriteLoadManager::SetRecheckThumbnails();
 	if(changedSystems)
 	{
 		// Recalculate what systems have been seen.
@@ -1363,6 +1363,10 @@ bool PlayerInfo::BuyShip(const Ship *model, const string &name)
 
 	if(ships.back()->HasBays())
 		displayCarrierHelp = true;
+	// The new ship's outfits may not be sold here, so with deferred image
+	// loading, their thumbnails need loading now for the outfitter.
+	if(planet)
+		SpriteLoadManager::SetRecheckThumbnails();
 	return true;
 }
 
