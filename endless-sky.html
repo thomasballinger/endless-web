@@ -577,6 +577,18 @@
         // important to hide to avoid stealing focus
         document.querySelector('.plugin-editor-upload').style.display = 'none';
 
+        // ?small=1 uses less memory, for low-memory devices such as 4 GB
+        // Chromebooks: images load only when needed, and large ones at a
+        // reduced size. ?small=2 only reduces the size of large images.
+        // (The web build keeps preferences only in memory, so this applies
+        // to this visit.)
+        const small = new URLSearchParams(window.location.search).get('small');
+        if (small === '2') {
+          FS.writeFile('/preferences.txt', '"Reduce large graphics" 2\n');
+        } else if (small) {
+          FS.writeFile('/preferences.txt', '"Defer loading images" 1\n"Reduce large graphics" 2\n');
+        }
+
         Module.callMain([]);
       }
 
