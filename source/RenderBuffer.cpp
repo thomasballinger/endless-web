@@ -143,7 +143,10 @@ RenderBuffer::RenderBuffer(const Point &dimensions)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	multiplier = Point(GameWindow::DrawWidth() / Screen::RawWidth(), GameWindow::DrawHeight() / Screen::RawHeight());
+	// (In floating point: with a device pixel ratio below 1, as in a zoomed out
+	// browser, integer division made this 0, so the buffer had no size.)
+	multiplier = Point(static_cast<double>(GameWindow::DrawWidth()) / Screen::RawWidth(),
+		static_cast<double>(GameWindow::DrawHeight()) / Screen::RawHeight());
 
 	// Attach a blank image to the texture.
 	const Point scaledSize = size * multiplier * Screen::Zoom() / 100.0;
